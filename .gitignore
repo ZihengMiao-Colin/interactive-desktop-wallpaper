@@ -1,0 +1,25 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Electron builder output
+out/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# User data (generated at runtime)
+userData/

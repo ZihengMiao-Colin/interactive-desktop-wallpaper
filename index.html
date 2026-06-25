@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互动桌面壁纸 - 伪3D深度视差</title>
+
+    <!--
+        Pixi.js v7 通过 CDN 引入。
+        Electron 环境中也可以使用本地安装的 pixi.js，
+        但 CDN 更简单且兼容两种运行模式（浏览器预览 / Electron 打包）。
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!--
+        Pixi.js Canvas 通过 JS 动态创建并插入 body。
+    -->
+
+    <!-- ==================== 加载提示 ==================== -->
+    <!-- 深度图生成/加载时显示，完成后隐藏 -->
+    <div id="loading-overlay">
+        <div id="loading-spinner"></div>
+        <div id="loading-text">正在加载壁纸...</div>
+    </div>
+
+    <!-- ==================== 调试面板 ==================== -->
+    <!--
+        右上角浮层，用于开发阶段调试视差参数。
+        在 Electron 生产模式下自动隐藏。
+        浏览器模式下默认显示。
+    -->
+    <div id="debug-panel">
+        <div id="debug-panel-header">
+            <span>调试面板</span>
+            <button id="debug-toggle" title="折叠/展开">-</button>
+        </div>
+        <div id="debug-panel-body">
+            <div class="debug-row">
+                <label for="parallax-strength">
+                    视差强度 <span id="parallax-value">30</span>
+                </label>
+                <input type="range" id="parallax-strength" min="5" max="100" value="30" step="1">
+            </div>
+            <div class="debug-row">
+                <label for="smoothness">
+                    阻尼/平滑度 <span id="smoothness-value">0.08</span>
+                </label>
+                <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
+                <!-- 实际值为 slider/100，即 0.01 ~ 0.30 -->
+            </div>
+            <div class="debug-row debug-hint">
+                <small>鼠标移动查看视差效果</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 状态提示（Electron 环境） ==================== -->
+    <div id="status-toast"></div>
+
+    <!-- 主逻辑脚本 -->
+    <script src="app.js"></script>
+</body>
+</html>

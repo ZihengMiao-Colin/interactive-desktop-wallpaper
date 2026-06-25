@@ -1,0 +1,59 @@
+{
+  "name": "interactive-desktop-wallpaper",
+  "version": "1.0.0",
+  "description": "互动 3D 桌面壁纸 — 基于 Pixi.js + Electron 的伪 3D 深度视差壁纸",
+  "main": "main.js",
+  "author": "Wallpaper App",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "electron-log": "^5.0.1",
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.wallpaper.interactive-3d",
+    "productName": "互动3D壁纸",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "index.html",
+      "settings.html",
+      "style.css",
+      "app.js",
+      "assets/**/*",
+      "background.png",
+      "depth_map.png"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/",
+        "to": "assets/"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

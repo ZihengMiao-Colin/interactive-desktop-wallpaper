@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互动3D壁纸 - 设置</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 24px;
+            user-select: none;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #7ecfff;
+            text-align: center;
+        }
+
+        .section {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #aaa;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .row:last-child { margin-bottom: 0; }
+
+        .row label {
+            font-size: 13px;
+            color: #ccc;
+        }
+        .row .value {
+            font-size: 12px;
+            color: #7ecfff;
+            font-family: 'Consolas', 'Cascadia Code', monospace;
+            min-width: 32px;
+            text-align: right;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 140px;
+            height: 5px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.15);
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #7ecfff;
+            cursor: pointer;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.08);
+            color: #e0e0e0;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            margin-bottom: 8px;
+            font-family: inherit;
+        }
+        button:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.3);
+        }
+        button:last-child { margin-bottom: 0; }
+
+        button.primary {
+            background: rgba(126, 207, 255, 0.2);
+            border-color: rgba(126, 207, 255, 0.3);
+            color: #7ecfff;
+        }
+        button.primary:hover {
+            background: rgba(126, 207, 255, 0.3);
+        }
+
+        button.danger {
+            color: #ff6b6b;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+        .toggle-row span { font-size: 13px; }
+
+        /* Toggle 开关 */
+        .toggle {
+            position: relative;
+            width: 40px;
+            height: 22px;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle .slider {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 22px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .toggle .slider::before {
+            content: '';
+            position: absolute;
+            width: 16px; height: 16px;
+            left: 3px; bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle input:checked + .slider { background: #7ecfff; }
+        .toggle input:checked + .slider::before { transform: translateX(18px); }
+
+        .status {
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+            margin-top: 12px;
+        }
+
+        .cache-info {
+            font-size: 11px;
+            color: #888;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>互动3D壁纸 - 设置</h2>
+
+    <!-- 参数调整 -->
+    <div class="section">
+        <div class="section-title">视差参数</div>
+        <div class="row">
+            <label>视差强度</label>
+            <span class="value" id="parallax-value">30</span>
+            <input type="range" id="parallax-strength" min="5" max="100" value="30" step="1">
+        </div>
+        <div class="row">
+            <label>平滑度</label>
+            <span class="value" id="smoothness-value">0.08</span>
+            <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
+        </div>
+    </div>
+
+    <!-- 操作 -->
+    <div class="section">
+        <div class="section-title">操作</div>
+        <button id="btn-select-image" class="primary">更换壁纸...</button>
+        <button id="btn-toggle-debug">显示调试面板</button>
+        <button id="btn-clear-cache" class="danger">清除深度图缓存</button>
+    </div>
+
+    <!-- 开机自启 -->
+    <div class="section">
+        <div class="section-title">系统</div>
+        <div class="toggle-row">
+            <span>开机自启</span>
+            <label class="toggle">
+                <input type="checkbox" id="auto-launch-toggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="status" id="status-text">设置已加载</div>
+
+    <script>
+        // ==================== 初始化 ====================
+        const isElectron = !!(window.electronAPI);
+
+        const parallaxSlider = document.getElementById('parallax-strength');
+        const smoothnessSlider = document.getElementById('smoothness');
+        const parallaxValue = document.getElementById('parallax-value');
+        const smoothnessValue = document.getElementById('smoothness-value');
+        const autoLaunchToggle = document.getElementById('auto-launch-toggle');
+        const statusText = document.getElementById('status-text');
+
+        // ---- 从主进程加载配置 ----
+        async function loadConfig() {
+            if (!isElectron) return;
+
+            try {
+                const config = await window.electronAPI.getConfig();
+                if (config) {
+                    if (config.parallaxMultiplier !== undefined) {
+                        parallaxSlider.value = config.parallaxMultiplier;
+                        parallaxValue.textContent = config.parallaxMultiplier;
+                    }
+                    if (config.smoothness !== undefined) {
+                        smoothnessSlider.value = Math.round(config.smoothness * 100);
+                        smoothnessValue.textContent = config.smoothness.toFixed(2);
+                    }
+                }
+
+                const autoLaunch = await window.electronAPI.getAutoLaunch();
+                autoLaunchToggle.checked = autoLaunch;
+            } catch (err) {
+                console.error('加载配置失败:', err);
+            }
+        }
+
+        // ---- 滑块事件 ----
+        parallaxSlider.addEventListener('input', () => {
+            const val = parseInt(parallaxSlider.value, 10);
+            parallaxValue.textContent = val;
+            if (isElectron) {
+                window.electronAPI.saveConfig({
+                    parallaxMultiplier: val,
+                    smoothness: parseFloat(smoothnessValue.textContent),
+                });
+            }
+        });
+
+        smoothnessSlider.addEventListener('input', () => {
+            const val = parseInt(smoothnessSlider.value, 10) / 100;
+            smoothnessValue.textContent = val.toFixed(2);
+            if (isElectron) {
+                window.electronAPI.saveConfig({
+                    parallaxMultiplier: parseInt(parallaxSlider.value, 10),
+                    smoothness: val,
+                });
+            }
+        });
+
+        // ---- 更换壁纸按钮 ----
+        document.getElementById('btn-select-image').addEventListener('click', async () => {
+            if (!isElectron) {
+                statusText.textContent = '此功能仅在 Electron 中可用';
+                return;
+            }
+
+            const imagePath = await window.electronAPI.selectImage();
+            if (imagePath) {
+                statusText.textContent = '已选择: ' + imagePath.split('\\').pop();
+            }
+        });
+
+        // ---- 调试面板开关 ----
+        let showDebug = false;
+        document.getElementById('btn-toggle-debug').addEventListener('click', () => {
+            showDebug = !showDebug;
+            const btn = document.getElementById('btn-toggle-debug');
+            btn.textContent = showDebug ? '隐藏调试面板' : '显示调试面板';
+
+            if (isElectron) {
+                window.electronAPI.saveConfig({ hideDebugPanel: !showDebug });
+            }
+
+            statusText.textContent = showDebug
+                ? '调试面板将在壁纸上显示'
+                : '调试面板已隐藏（重启生效）';
+        });
+
+        // ---- 清除缓存 ----
+        document.getElementById('btn-clear-cache').addEventListener('click', () => {
+            if (confirm('确定要清除所有深度图缓存吗？下次更换壁纸需要重新生成深度图。')) {
+                // 通过 IPC 通知主进程清除缓存
+                statusText.textContent = '缓存已清除（TODO: 需要在主进程实现 clearCache IPC）';
+            }
+        });
+
+        // ---- 开机自启 ----
+        autoLaunchToggle.addEventListener('change', async () => {
+            if (!isElectron) return;
+
+            const enabled = autoLaunchToggle.checked;
+            const result = await window.electronAPI.toggleAutoLaunch(enabled);
+            statusText.textContent = result ? '已开启开机自启' : '已关闭开机自启';
+        });
+
+        // ---- 加载配置 ----
+        loadConfig();
+    </script>
+
+</body>
+</html>

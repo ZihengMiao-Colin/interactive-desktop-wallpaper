@@ -1,0 +1,211 @@
+/* ==================== 全局重置 ==================== */
+
+/* 消除所有默认边距和滚动条，确保 Canvas 完全填满屏幕 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;       /* 关键：隐藏滚动条，壁纸必须全屏无滚动 */
+    background: #000;       /* 黑色背景，在图片加载前避免白屏闪烁 */
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+
+/* Pixi.js 的 <canvas> 会被插入到这里 */
+body > canvas {
+    display: block;         /* 消除 canvas 底部的默认空隙 */
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+/* ==================== 调试面板样式 ==================== */
+
+#debug-panel {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 9999;                      /* 浮在 Canvas 上方 */
+    width: 240px;
+    background: rgba(20, 20, 30, 0.85); /* 半透明深色背景 */
+    backdrop-filter: blur(10px);        /* 毛玻璃模糊效果 */
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    color: #e0e0e0;
+    font-size: 13px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transition: opacity 0.3s;
+    user-select: none;                  /* 防止拖拽滑块时选中文字 */
+}
+
+/* 面板头部 */
+#debug-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+#debug-toggle {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 18px;
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+#debug-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+/* 面板内容 */
+#debug-panel-body {
+    padding: 10px 14px 14px;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    overflow: hidden;
+}
+
+/* 折叠状态 */
+#debug-panel.collapsed #debug-panel-body {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* 每一行控件 */
+.debug-row {
+    margin-bottom: 12px;
+}
+
+.debug-row:last-child {
+    margin-bottom: 0;
+}
+
+.debug-row label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: #bbb;
+}
+
+.debug-row label span {
+    color: #7ecfff;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+}
+
+/* 滑块样式 */
+.debug-row input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.15);
+    outline: none;
+    cursor: pointer;
+}
+
+.debug-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #7ecfff;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+
+.debug-row input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* 提示文字 */
+.debug-hint {
+    text-align: center;
+    color: #666;
+    margin-top: 6px;
+}
+
+/* ==================== 加载提示覆盖层 ==================== */
+
+#loading-overlay {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 99998;
+    transition: opacity 0.4s;
+}
+
+/* 简单的旋转动画 */
+#loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #7ecfff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+#loading-text {
+    color: #ccc;
+    font-size: 14px;
+    font-family: 'Microsoft YaHei', sans-serif;
+}
+
+/* ==================== 状态 Toast 提示 ==================== */
+
+#status-toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(30, 30, 40, 0.9);
+    color: #e0e0e0;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'Microsoft YaHei', sans-serif;
+    z-index: 99999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#status-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
