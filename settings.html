@@ -39,6 +39,187 @@
             letter-spacing: 0.5px;
         }
 
+        /* ---- 壁纸预览 ---- */
+        .preview-container {
+            width: 100%;
+            height: 200px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: rgba(0,0,0,0.3);
+            border: 1px dashed rgba(255,255,255,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .preview-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .preview-placeholder {
+            color: #555;
+            font-size: 13px;
+            text-align: center;
+        }
+        .preview-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            padding: 6px 10px;
+            font-size: 11px;
+            color: #aaa;
+            display: none;
+        }
+        .preview-info.visible { display: block; }
+
+        /* ---- 模型选择 ---- */
+        .model-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .model-option {
+            flex: 1;
+            padding: 10px 8px;
+            border: 2px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            color: #ccc;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .model-option:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.25);
+        }
+        .model-option.selected {
+            border-color: #7ecfff;
+            background: rgba(126, 207, 255, 0.15);
+            color: #7ecfff;
+        }
+        .model-option .model-name {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+        .model-option .model-desc {
+            font-size: 10px;
+            color: #888;
+        }
+        .model-option.selected .model-desc {
+            color: rgba(126, 207, 255, 0.7);
+        }
+
+        /* ---- 进度条 ---- */
+        .progress-section {
+            display: none;
+            margin-bottom: 12px;
+        }
+        .progress-section.visible { display: block; }
+
+        .progress-bar-outer {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .progress-bar-inner {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #7ecfff, #5eb8e8);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .progress-bar-inner.indeterminate {
+            width: 30%;
+            animation: indeterminate 1.5s ease-in-out infinite;
+        }
+        @keyframes indeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+        .progress-text {
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+        }
+
+        /* ---- 按钮 ---- */
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .btn-row button {
+            flex: 1;
+        }
+        .btn-row:last-child { margin-bottom: 0; }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.08);
+            color: #e0e0e0;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+            margin-bottom: 8px;
+            font-family: inherit;
+        }
+        button:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.3);
+        }
+        button:last-child { margin-bottom: 0; }
+
+        button.primary {
+            background: rgba(126, 207, 255, 0.2);
+            border-color: rgba(126, 207, 255, 0.3);
+            color: #7ecfff;
+        }
+        button.primary:hover {
+            background: rgba(126, 207, 255, 0.3);
+        }
+        button.primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        button.primary:disabled:hover {
+            background: rgba(126, 207, 255, 0.2);
+        }
+
+        button.success {
+            background: rgba(100, 255, 160, 0.2);
+            border-color: rgba(100, 255, 160, 0.3);
+            color: #64ffa0;
+        }
+        button.success:hover {
+            background: rgba(100, 255, 160, 0.3);
+        }
+        button.success:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        button.success:disabled:hover {
+            background: rgba(100, 255, 160, 0.2);
+        }
+
+        button.danger {
+            color: #ff6b6b;
+        }
+
+        /* ---- 参数滑块 ---- */
         .row {
             display: flex;
             justify-content: space-between;
@@ -76,38 +257,7 @@
             cursor: pointer;
         }
 
-        button {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 8px;
-            background: rgba(255,255,255,0.08);
-            color: #e0e0e0;
-            font-size: 13px;
-            cursor: pointer;
-            transition: background 0.2s, border-color 0.2s;
-            margin-bottom: 8px;
-            font-family: inherit;
-        }
-        button:hover {
-            background: rgba(255,255,255,0.15);
-            border-color: rgba(255,255,255,0.3);
-        }
-        button:last-child { margin-bottom: 0; }
-
-        button.primary {
-            background: rgba(126, 207, 255, 0.2);
-            border-color: rgba(126, 207, 255, 0.3);
-            color: #7ecfff;
-        }
-        button.primary:hover {
-            background: rgba(126, 207, 255, 0.3);
-        }
-
-        button.danger {
-            color: #ff6b6b;
-        }
-
+        /* ---- 开机自启 ---- */
         .toggle-row {
             display: flex;
             justify-content: space-between;
@@ -116,7 +266,6 @@
         }
         .toggle-row span { font-size: 13px; }
 
-        /* Toggle 开关 */
         .toggle {
             position: relative;
             width: 40px;
@@ -149,19 +298,59 @@
             color: #666;
             margin-top: 12px;
         }
-
-        .cache-info {
-            font-size: 11px;
-            color: #888;
-            word-break: break-all;
-        }
+        .status.error { color: #ff6b6b; }
+        .status.success { color: #64ffa0; }
     </style>
 </head>
 <body>
 
     <h2>互动3D壁纸 - 设置</h2>
 
-    <!-- 参数调整 -->
+    <!-- 壁纸选择与深度图生成 -->
+    <div class="section">
+        <div class="section-title">壁纸管理</div>
+
+        <!-- 预览 -->
+        <div class="preview-container" id="preview-container">
+            <span class="preview-placeholder" id="preview-placeholder">尚未选择壁纸</span>
+            <img id="preview-image" style="display:none;" alt="预览">
+            <div class="preview-info" id="preview-info"></div>
+        </div>
+
+        <!-- 模型选择 -->
+        <div class="section-title" style="margin-top:4px;">深度估计模型</div>
+        <div class="model-selector" id="model-selector">
+            <div class="model-option selected" data-model="small">
+                <div class="model-name">Small</div>
+                <div class="model-desc">~100MB · 最快</div>
+            </div>
+            <div class="model-option" data-model="base">
+                <div class="model-name">Base</div>
+                <div class="model-desc">~390MB · 均衡</div>
+            </div>
+            <div class="model-option" data-model="large">
+                <div class="model-name">Large</div>
+                <div class="model-desc">~1.3GB · 最佳</div>
+            </div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-section" id="progress-section">
+            <div class="progress-bar-outer">
+                <div class="progress-bar-inner indeterminate" id="progress-bar"></div>
+            </div>
+            <div class="progress-text" id="progress-text">准备中...</div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="btn-row">
+            <button id="btn-select-image">📁 选择壁纸...</button>
+            <button id="btn-generate-depth" class="primary" disabled>🔬 生成深度图</button>
+        </div>
+        <button id="btn-apply-wallpaper" class="success" disabled>✅ 应用壁纸</button>
+    </div>
+
+    <!-- 视差参数 -->
     <div class="section">
         <div class="section-title">视差参数</div>
         <div class="row">
@@ -176,15 +365,7 @@
         </div>
     </div>
 
-    <!-- 操作 -->
-    <div class="section">
-        <div class="section-title">操作</div>
-        <button id="btn-select-image" class="primary">更换壁纸...</button>
-        <button id="btn-toggle-debug">显示调试面板</button>
-        <button id="btn-clear-cache" class="danger">清除深度图缓存</button>
-    </div>
-
-    <!-- 开机自启 -->
+    <!-- 系统 -->
     <div class="section">
         <div class="section-title">系统</div>
         <div class="toggle-row">
@@ -194,46 +375,180 @@
                 <span class="slider"></span>
             </label>
         </div>
+        <button id="btn-clear-cache" class="danger" style="margin-top:12px;">🗑 清除深度图缓存</button>
     </div>
 
     <div class="status" id="status-text">设置已加载</div>
 
     <script>
-        // ==================== 初始化 ====================
+        // ==================== 状态 ====================
         const isElectron = !!(window.electronAPI);
 
+        let selectedImagePath = null;
+        let selectedModel = 'small';
+        let depthGenerated = false;
+        let isGenerating = false;
+
+        // ==================== DOM 引用 ====================
+        const previewContainer = document.getElementById('preview-container');
+        const previewPlaceholder = document.getElementById('preview-placeholder');
+        const previewImage = document.getElementById('preview-image');
+        const previewInfo = document.getElementById('preview-info');
+        const progressSection = document.getElementById('progress-section');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const statusText = document.getElementById('status-text');
+        const btnSelectImage = document.getElementById('btn-select-image');
+        const btnGenerateDepth = document.getElementById('btn-generate-depth');
+        const btnApplyWallpaper = document.getElementById('btn-apply-wallpaper');
         const parallaxSlider = document.getElementById('parallax-strength');
         const smoothnessSlider = document.getElementById('smoothness');
         const parallaxValue = document.getElementById('parallax-value');
         const smoothnessValue = document.getElementById('smoothness-value');
         const autoLaunchToggle = document.getElementById('auto-launch-toggle');
-        const statusText = document.getElementById('status-text');
 
-        // ---- 从主进程加载配置 ----
-        async function loadConfig() {
-            if (!isElectron) return;
+        // ==================== 模型选择 ====================
+        document.querySelectorAll('.model-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                document.querySelectorAll('.model-option').forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                selectedModel = opt.dataset.model;
+                // 重新生成标记
+                if (selectedImagePath) {
+                    depthGenerated = false;
+                    btnApplyWallpaper.disabled = true;
+                    setStatus('模型已切换，请重新生成深度图', '');
+                }
+            });
+        });
+
+        // ==================== 选择壁纸 ====================
+        btnSelectImage.addEventListener('click', async () => {
+            if (!isElectron) {
+                setStatus('此功能仅在 Electron 中可用', 'error');
+                return;
+            }
 
             try {
-                const config = await window.electronAPI.getConfig();
-                if (config) {
-                    if (config.parallaxMultiplier !== undefined) {
-                        parallaxSlider.value = config.parallaxMultiplier;
-                        parallaxValue.textContent = config.parallaxMultiplier;
-                    }
-                    if (config.smoothness !== undefined) {
-                        smoothnessSlider.value = Math.round(config.smoothness * 100);
-                        smoothnessValue.textContent = config.smoothness.toFixed(2);
-                    }
+                const imagePath = await window.electronAPI.selectImage();
+                if (!imagePath) return;
+
+                selectedImagePath = imagePath;
+                depthGenerated = false;
+                btnGenerateDepth.disabled = false;
+                btnApplyWallpaper.disabled = true;
+
+                // 显示预览
+                const dataUrl = window.electronAPI.readFileAsDataURL(imagePath);
+                if (dataUrl) {
+                    previewPlaceholder.style.display = 'none';
+                    previewImage.style.display = 'block';
+                    previewImage.src = dataUrl;
+
+                    // 显示文件信息
+                    previewInfo.classList.add('visible');
+                    const fileName = imagePath.split('\\').pop();
+                    const img = new Image();
+                    img.onload = () => {
+                        previewInfo.textContent = `${fileName}  (${img.naturalWidth}×${img.naturalHeight})`;
+                    };
+                    img.src = dataUrl;
                 }
 
-                const autoLaunch = await window.electronAPI.getAutoLaunch();
-                autoLaunchToggle.checked = autoLaunch;
+                // 检查是否有缓存
+                const cached = await window.electronAPI.getDepthCache(imagePath);
+                if (cached) {
+                    depthGenerated = true;
+                    btnApplyWallpaper.disabled = false;
+                    setStatus('检测到深度图缓存，可直接应用壁纸', 'success');
+                } else {
+                    setStatus('已选择 ' + imagePath.split('\\').pop() + ' — 请生成深度图', '');
+                }
+
             } catch (err) {
-                console.error('加载配置失败:', err);
+                console.error('选择图片失败:', err);
+                setStatus('选择图片失败: ' + err.message, 'error');
             }
+        });
+
+        // ==================== 生成深度图 ====================
+        btnGenerateDepth.addEventListener('click', async () => {
+            if (!isElectron || !selectedImagePath || isGenerating) return;
+
+            isGenerating = true;
+            btnGenerateDepth.disabled = true;
+            btnApplyWallpaper.disabled = true;
+            btnSelectImage.disabled = true;
+            depthGenerated = false;
+
+            // 显示进度
+            progressSection.classList.add('visible');
+            progressBar.classList.add('indeterminate');
+            progressBar.style.width = '';
+            progressText.textContent = '正在启动 Python...';
+
+            setStatus('正在生成深度图（模型: ' + selectedModel + '）...', '');
+
+            try {
+                const result = await window.electronAPI.generateDepthMap(selectedImagePath, selectedModel);
+
+                if (result.success) {
+                    depthGenerated = true;
+                    btnApplyWallpaper.disabled = false;
+                    progressBar.classList.remove('indeterminate');
+                    progressBar.style.width = '100%';
+                    progressText.textContent = '✅ 深度图生成完成！';
+                    setStatus('深度图生成成功！点击"应用壁纸"生效', 'success');
+                } else {
+                    progressText.textContent = '❌ 生成失败';
+                    setStatus('深度图生成失败: ' + (result.error || '未知错误'), 'error');
+                }
+            } catch (err) {
+                console.error('生成深度图失败:', err);
+                progressText.textContent = '❌ 生成失败';
+                setStatus('深度图生成失败: ' + err.message, 'error');
+            } finally {
+                isGenerating = false;
+                btnGenerateDepth.disabled = false;
+                btnSelectImage.disabled = false;
+            }
+        });
+
+        // ==================== 监听进度 ====================
+        if (isElectron) {
+            window.electronAPI.onDepthProgress((data) => {
+                progressText.textContent = data.message;
+
+                // 根据消息内容更新进度条样式
+                if (data.message.includes('[OK]') || data.message.includes('完成')) {
+                    progressBar.classList.remove('indeterminate');
+                    progressBar.style.width = '100%';
+                } else if (data.message.includes('下载') || data.message.includes('Download')) {
+                    progressText.textContent = '📥 ' + data.message;
+                } else if (data.message.includes('加载模型') || data.message.includes('loading')) {
+                    progressText.textContent = '🔧 ' + data.message;
+                } else if (data.message.includes('分析') || data.message.includes('推理')) {
+                    progressText.textContent = '🧠 ' + data.message;
+                    progressBar.classList.remove('indeterminate');
+                    progressBar.style.width = '50%';
+                }
+            });
         }
 
-        // ---- 滑块事件 ----
+        // ==================== 应用壁纸 ====================
+        btnApplyWallpaper.addEventListener('click', async () => {
+            if (!isElectron || !selectedImagePath || !depthGenerated) return;
+
+            try {
+                // 通过 IPC 通知主进程：保存当前图片并发送给壁纸窗口
+                await window.electronAPI.applyWallpaper(selectedImagePath);
+                setStatus('壁纸已应用！移动鼠标查看效果', 'success');
+            } catch (err) {
+                setStatus('应用壁纸失败: ' + err.message, 'error');
+            }
+        });
+
+        // ==================== 视差参数滑块 ====================
         parallaxSlider.addEventListener('input', () => {
             const val = parseInt(parallaxSlider.value, 10);
             parallaxValue.textContent = val;
@@ -256,53 +571,79 @@
             }
         });
 
-        // ---- 更换壁纸按钮 ----
-        document.getElementById('btn-select-image').addEventListener('click', async () => {
-            if (!isElectron) {
-                statusText.textContent = '此功能仅在 Electron 中可用';
-                return;
-            }
-
-            const imagePath = await window.electronAPI.selectImage();
-            if (imagePath) {
-                statusText.textContent = '已选择: ' + imagePath.split('\\').pop();
-            }
-        });
-
-        // ---- 调试面板开关 ----
-        let showDebug = false;
-        document.getElementById('btn-toggle-debug').addEventListener('click', () => {
-            showDebug = !showDebug;
-            const btn = document.getElementById('btn-toggle-debug');
-            btn.textContent = showDebug ? '隐藏调试面板' : '显示调试面板';
-
-            if (isElectron) {
-                window.electronAPI.saveConfig({ hideDebugPanel: !showDebug });
-            }
-
-            statusText.textContent = showDebug
-                ? '调试面板将在壁纸上显示'
-                : '调试面板已隐藏（重启生效）';
-        });
-
-        // ---- 清除缓存 ----
-        document.getElementById('btn-clear-cache').addEventListener('click', () => {
-            if (confirm('确定要清除所有深度图缓存吗？下次更换壁纸需要重新生成深度图。')) {
-                // 通过 IPC 通知主进程清除缓存
-                statusText.textContent = '缓存已清除（TODO: 需要在主进程实现 clearCache IPC）';
-            }
-        });
-
-        // ---- 开机自启 ----
+        // ==================== 开机自启 ====================
         autoLaunchToggle.addEventListener('change', async () => {
             if (!isElectron) return;
-
             const enabled = autoLaunchToggle.checked;
             const result = await window.electronAPI.toggleAutoLaunch(enabled);
-            statusText.textContent = result ? '已开启开机自启' : '已关闭开机自启';
+            setStatus(result ? '已开启开机自启' : '已关闭开机自启', '');
         });
 
-        // ---- 加载配置 ----
+        // ==================== 清除缓存 ====================
+        document.getElementById('btn-clear-cache').addEventListener('click', async () => {
+            if (!confirm('确定要清除所有深度图缓存吗？\n\n下次更换壁纸需要重新生成深度图。')) return;
+
+            if (isElectron) {
+                await window.electronAPI.clearAllCache();
+                depthGenerated = false;
+                btnApplyWallpaper.disabled = true;
+                setStatus('深度图缓存已清除', '');
+            } else {
+                setStatus('缓存已清除', '');
+            }
+        });
+
+        // ==================== 加载配置 ====================
+        async function loadConfig() {
+            if (!isElectron) return;
+
+            try {
+                const config = await window.electronAPI.getConfig();
+                if (config) {
+                    if (config.parallaxMultiplier !== undefined) {
+                        parallaxSlider.value = config.parallaxMultiplier;
+                        parallaxValue.textContent = config.parallaxMultiplier;
+                    }
+                    if (config.smoothness !== undefined) {
+                        smoothnessSlider.value = Math.round(config.smoothness * 100);
+                        smoothnessValue.textContent = config.smoothness.toFixed(2);
+                    }
+                    // 恢复当前图片
+                    if (config.currentImage && window.electronAPI.fileExists(config.currentImage)) {
+                        selectedImagePath = config.currentImage;
+                        const dataUrl = window.electronAPI.readFileAsDataURL(config.currentImage);
+                        if (dataUrl) {
+                            previewPlaceholder.style.display = 'none';
+                            previewImage.style.display = 'block';
+                            previewImage.src = dataUrl;
+                            previewInfo.classList.add('visible');
+                            const fileName = config.currentImage.split('\\').pop();
+                            previewInfo.textContent = fileName;
+                            btnGenerateDepth.disabled = false;
+
+                            // 检查缓存
+                            const cached = await window.electronAPI.getDepthCache(config.currentImage);
+                            if (cached) {
+                                depthGenerated = true;
+                                btnApplyWallpaper.disabled = false;
+                            }
+                        }
+                    }
+                }
+
+                const autoLaunch = await window.electronAPI.getAutoLaunch();
+                autoLaunchToggle.checked = autoLaunch;
+            } catch (err) {
+                console.error('加载配置失败:', err);
+            }
+        }
+
+        function setStatus(msg, cls) {
+            statusText.textContent = msg;
+            statusText.className = 'status ' + (cls || '');
+        }
+
+        // 启动
         loadConfig();
     </script>
 

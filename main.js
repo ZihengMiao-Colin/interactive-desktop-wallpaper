@@ -34,6 +34,7 @@ const {
 
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 // ---- 自定义模块 ----
 const { injectToWallpaperLayer, restoreFromWallpaperLayer } = require('./src/wallpaper-native');
@@ -61,6 +62,30 @@ let store = null;
 /** 渲染是否活跃 */
 let isRenderingActive = true;
 
+/**
+ * 主动要求壁纸窗口重绘一次。
+ *
+ * 窗口注入到 WorkerW 之后，Chromium 的合成器需要一次 resize/重绘
+ * 才会把画面提交到"刚变成子窗口"的 HWND 上；否则要等桌面下次重绘
+ * （比如点一下"显示桌面"）壁纸才出现。
+ *
+ * @param {BrowserWindow} win
+ * @param {number} width
+ * @param {number} height
+ */
+function nudgeWallpaperRepaint(win, width, height) {
+    if (!win || win.isDestroyed()) return;
+
+    try {
+        // 尺寸没变也会走一遍 Chromium 的 resize → 重绘流程
+        win.setBounds({ x: 0, y: 0, width, height });
+        win.webContents.invalidate();
+        win.showInactive();
+    } catch (_) {
+        // 窗口正在销毁时忽略
+    }
+}
+
 /** 是否为开发模式 */
 const isDev = process.argv.includes('--dev');
 
@@ -78,7 +103,8 @@ const isDev = process.argv.includes('--dev');
  *   - frame: false → 无边框
  */
 function createWallpaperWindow() {
-    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    // 壁纸要铺满整个屏幕（含任务栏所在的区域），所以取 bounds 而不是 workAreaSize
+    const { width, height } = screen.getPrimaryDisplay().bounds;
 
     wallpaperWindow = new BrowserWindow({
         width: width,
@@ -123,28 +149,45 @@ function createWallpaperWindow() {
         const cachedConfig = store.getConfig();
         wallpaperWindow.webContents.send('config:load', cachedConfig);
 
-        // 注入到桌面 WorkerW 层（壁纸核心步骤）
+        // 启动全局鼠标位置轮询（WorkerW 层收不到 mousemove 事件）
+        startMousePolling(wallpaperWindow);
+
+        // 注入到桌面 WorkerW 层（壁纸核心步骤）——异步执行，不阻塞主进程。
+        //
+        // 注入完成前不显示窗口：这段时间它还是个普通顶层窗口，
+        // 显示出来会盖住用户所有程序（表现："启动后壁纸把整个屏幕都盖住了"）。
+        // 等注入有结果再决定怎么显示。
         const hwnd = wallpaperWindow.getNativeWindowHandle();
-        const injected = injectToWallpaperLayer(hwnd, width, height);
+        injectToWallpaperLayer(hwnd, width, height).then((injected) => {
+            if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return;
 
-        if (injected) {
-            console.log('[Main] WorkerW 注入成功，窗口已挂载为桌面壁纸层');
-        } else {
-            console.warn('[Main] WorkerW 注入失败，使用 fallback 模式');
-            // Fallback: 设为最底层窗口
+            if (injected) {
+                console.log('[Main] WorkerW injected, window mounted as desktop wallpaper layer');
+
+                wallpaperWindow.show();
+
+                // 挂载后立刻催一次重绘，并在 1.5s / 4s 后各补一次，
+                // 防止首次合成没跟上导致壁纸"消失"
+                nudgeWallpaperRepaint(wallpaperWindow, width, height);
+                setTimeout(() => nudgeWallpaperRepaint(wallpaperWindow, width, height), 1500);
+                setTimeout(() => nudgeWallpaperRepaint(wallpaperWindow, width, height), 4000);
+                return;
+            }
+
+            console.warn('[Main] WorkerW injection failed, using fallback mode');
+            // Fallback: 普通窗口模式。
+            // 关键：打开鼠标穿透，否则这个铺满屏幕的窗口会把桌面图标的
+            // 点击/右键全部吃掉（用户表现为"桌面图标点不动"）。
             wallpaperWindow.setAlwaysOnTop(false);
+            wallpaperWindow.setIgnoreMouseEvents(true);
+            wallpaperWindow.show();
             wallpaperWindow.moveTop();
-        }
-
-        wallpaperWindow.show();
+        });
 
         // 开发模式下打开 DevTools
         if (isDev) {
             wallpaperWindow.webContents.openDevTools({ mode: 'detach' });
         }
-
-        // 启动全局鼠标位置轮询（WorkerW 层收不到 mousemove 事件）
-        startMousePolling(wallpaperWindow);
     });
 
     // 窗口关闭事件
@@ -161,6 +204,10 @@ function createWallpaperWindow() {
 /** 鼠标轮询定时器 */
 let mousePollTimer = null;
 
+/** 上一次推送的鼠标坐标（用于去重，鼠标不动就不发 IPC） */
+let lastMouseX = null;
+let lastMouseY = null;
+
 /**
  * 启动全局鼠标位置轮询。
  *
@@ -168,11 +215,17 @@ let mousePollTimer = null;
  * 因此通过主进程轮询 screen.getCursorScreenPoint() 获取全局鼠标坐标，
  * 并通过 IPC 发送给渲染进程。
  *
+ * 做了两处省电处理：
+ *   - 坐标没变化时不发送（鼠标静止时几乎零开销）
+ *   - 只监控主显示器范围内的坐标
+ *
  * @param {BrowserWindow} win - 壁纸窗口
  */
 function startMousePolling(win) {
-    const { screen } = require('electron');
     const POLL_INTERVAL = 1000 / 30; // 30fps，足够流畅且不过度消耗 CPU
+
+    lastMouseX = null;
+    lastMouseY = null;
 
     mousePollTimer = setInterval(() => {
         if (win && !win.isDestroyed()) {
@@ -184,6 +237,11 @@ function startMousePolling(win) {
                 // 仅当鼠标在主显示器上时才发送（多显示器场景的简单处理）
                 if (point.x >= screenX && point.x <= screenX + screenW &&
                     point.y >= screenY && point.y <= screenY + screenH) {
+                    // 坐标没变就不发，避免鼠标静止时白白唤醒渲染进程
+                    if (point.x === lastMouseX && point.y === lastMouseY) return;
+                    lastMouseX = point.x;
+                    lastMouseY = point.y;
+
                     win.webContents.send('mouse:move', {
                         x: point.x - screenX,  // 转为相对于主显示器的坐标
                         y: point.y - screenY,
@@ -202,6 +260,8 @@ function stopMousePolling() {
         clearInterval(mousePollTimer);
         mousePollTimer = null;
     }
+    lastMouseX = null;
+    lastMouseY = null;
 }
 
 // ==================== 设置窗口创建 ====================
@@ -216,8 +276,8 @@ function createSettingsWindow() {
     }
 
     settingsWindow = new BrowserWindow({
-        width: 500,
-        height: 620,
+        width: 520,
+        height: 760,
         resizable: false,
         frame: true,
         title: '互动3D壁纸 - 设置',
@@ -290,7 +350,7 @@ function registerIpcHandlers() {
 
     // ---- 渲染状态通知 ----
     ipcMain.on('renderer:ready', () => {
-        console.log('[Main] 渲染进程就绪');
+        console.log('[Main] Renderer process ready');
         // 通知全屏检测器渲染已准备好
         if (fullscreenDetector) {
             fullscreenDetector.setRendererReady(true);
@@ -321,6 +381,104 @@ function registerIpcHandlers() {
         return app.getLoginItemSettings().openAtLogin;
     });
 
+    // ---- 生成深度图（调用 Python 脚本） ----
+    ipcMain.handle('depth:generate', async (event, { imagePath, modelSize }) => {
+        const scriptPath = path.join(__dirname, 'generate_depth_map.py');
+        const cacheKey = store._hashPath(imagePath);
+        const outputPath = path.join(store._cacheDir, `${cacheKey}.png`);
+
+        console.log(`[Main] Starting depth generation: ${imagePath} (model: ${modelSize || 'small'})`);
+
+        return new Promise((resolve) => {
+            const args = ['-X', 'utf8', scriptPath, imagePath, '-o', outputPath];
+            if (modelSize) {
+                args.push('-m', modelSize);
+            }
+
+            const proc = spawn('python', args, {
+                stdio: ['ignore', 'pipe', 'pipe'],
+                env: {
+                    ...process.env,
+                    PYTHONUTF8: '1',
+                    PYTHONIOENCODING: 'utf-8',
+                },
+            });
+
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => {
+                const text = data.toString('utf-8');
+                const lines = text.split('\n').filter(l => l.trim());
+                for (const line of lines) {
+                    console.log('[Python]', line);
+                    event.sender.send('depth:progress', { message: line.trim() });
+                }
+            });
+
+            proc.stderr.on('data', (data) => {
+                const text = data.toString('utf-8');
+                stderr += text;
+                console.error('[Python:stderr]', text);
+            });
+
+            proc.on('close', async (code) => {
+                if (code !== 0) {
+                    console.error('[Main] Python exit code:', code);
+                    resolve({ success: false, error: stderr || 'Depth map generation failed' });
+                    return;
+                }
+
+                try {
+                    if (!fs.existsSync(outputPath)) {
+                        resolve({ success: false, error: `Depth file not generated: ${outputPath}` });
+                        return;
+                    }
+
+                    const depthData = fs.readFileSync(outputPath);
+                    const base64 = depthData.toString('base64');
+                    const depthDataUrl = `data:image/png;base64,${base64}`;
+
+                    // 保存到缓存
+                    store.saveDepthCache(imagePath, depthDataUrl);
+
+                    console.log('[Main] Depth map generated and cached');
+
+                    resolve({ success: true, depthDataUrl, depthPath: outputPath });
+                } catch (err) {
+                    console.error('[Main] Failed to read depth map:', err.message);
+                    resolve({ success: false, error: err.message });
+                }
+            });
+
+            proc.on('error', (err) => {
+                console.error('[Main] Failed to start Python:', err.message);
+                resolve({
+                    success: false,
+                    error: `Failed to start Python: ${err.message}\nPlease ensure Python is installed and in PATH`,
+                });
+            });
+        });
+    });
+
+    // ---- 应用壁纸（从设置窗口触发） ----
+    ipcMain.handle('wallpaper:apply', async (_event, imagePath) => {
+        if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
+            // 保存当前图片路径到配置
+            store.saveConfig({ currentImage: imagePath });
+            // 发送给壁纸窗口（壁纸窗口的 onNewImage 会自动检查缓存）
+            wallpaperWindow.webContents.send('image:new', imagePath);
+            console.log('[Main] Apply wallpaper:', imagePath);
+            return true;
+        }
+        return false;
+    });
+
+    // ---- 清除深度图缓存 ----
+    ipcMain.handle('cache:clearAll', async () => {
+        store.clearAllCache();
+        return true;
+    });
+
     // ---- 退出应用 ----
     ipcMain.on('app:quit', () => {
         cleanupAndQuit();
@@ -333,14 +491,14 @@ function startFullscreenDetection() {
     fullscreenDetector = new FullscreenDetector({
         pollInterval: 1000,          // 每秒检测一次
         onFullscreenStart: () => {
-            console.log('[Main] 检测到全屏应用，暂停渲染');
+            console.log('[Main] Fullscreen app detected, pausing render');
             isRenderingActive = false;
             if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
                 wallpaperWindow.webContents.send('renderer:pause');
             }
         },
         onFullscreenEnd: () => {
-            console.log('[Main] 全屏应用已退出，恢复渲染');
+            console.log('[Main] Fullscreen app exited, resuming render');
             isRenderingActive = true;
             if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
                 wallpaperWindow.webContents.send('renderer:resume');
@@ -386,7 +544,7 @@ function setupPowerMonitor() {
 // ==================== 清理和退出 ====================
 
 function cleanupAndQuit() {
-    console.log('[Main] 正在清理...');
+    console.log('[Main] Cleaning up...');
 
     // 停止全屏检测
     if (fullscreenDetector) {
@@ -416,11 +574,11 @@ function cleanupAndQuit() {
 // ==================== 应用生命周期 ====================
 
 app.whenReady().then(() => {
-    console.log('[Main] 应用启动中...');
+    console.log('[Main] App starting...');
 
     // 1. 初始化数据存储
     store = new AppStore();
-    console.log('[Main] 数据存储路径:', store.getStorePath());
+    console.log('[Main] Data store path:', store.getStorePath());
 
     // 2. 注册 IPC 处理器
     registerIpcHandlers();
@@ -454,7 +612,7 @@ app.whenReady().then(() => {
     // 6. 监听电源事件
     setupPowerMonitor();
 
-    console.log('[Main] 应用启动完成');
+    console.log('[Main] App startup complete');
 });
 
 // 所有窗口关闭时不退出（壁纸在托盘中常驻）

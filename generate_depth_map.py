@@ -1,56 +1,193 @@
 """
 ===========================================================================
-generate_depth_map.py — 使用 Depth Anything V2 模型生成深度图
+generate_depth_map.py — Depth map generation using Depth Anything V2
 ===========================================================================
 
-功能：输入任意图片，输出对应的黑白灰度深度图（depth_map.png），
-      可直接用于互动桌面壁纸项目的 DisplacementFilter 视差效果。
+Generates a grayscale depth map from any input image, used by the
+interactive wallpaper project for DisplacementFilter parallax effects.
 
-用法：
-    # 最简单用法（使用 Small 模型，输出 depth_map.png）
-    python generate_depth_map.py 你的图片.jpg
+Usage:
+    python generate_depth_map.py image.jpg
+    python generate_depth_map.py image.jpg -o depth.png -m base
+    python generate_depth_map.py image.jpg --invert
 
-    # 指定输出文件名
-    python generate_depth_map.py 你的图片.jpg -o my_depth.png
+Model loading strategy (auto-detection):
+    1. Scan script directory for local ONNX model files (no network needed)
+    2. Fall back to HuggingFace online download if no ONNX found
 
-    # 使用更大的模型（质量更高，但更慢/更耗显存）
-    python generate_depth_map.py 你的图片.jpg -m base
-    python generate_depth_map.py 你的图片.jpg -m large
+Supported ONNX filenames (place in same directory as this script):
+    depth_anything_v2_small*.onnx    -> matches -m small
+    depth_anything_v2_base*.onnx     -> matches -m base
+    depth_anything_v2_large*.onnx    -> matches -m large
 
-    # 反转深度图（远景白/近景黑 —— 通常不需要）
-    python generate_depth_map.py 你的图片.jpg --invert
+Dependencies:
+    # ONNX mode (recommended, no network):
+    pip install onnxruntime pillow numpy
 
-模型说明：
-    small (25M)  — 最快，适合 CPU 运行，约 100MB
-    base  (98M)  — 平衡质量与速度，约 390MB
-    large (335M) — 最高质量，需要 GPU，约 1.3GB
-
-首次运行时会自动从 Hugging Face 下载模型文件，请耐心等待。
-
-依赖安装：
-    pip install -r requirements.txt
+    # HuggingFace mode (needs network):
+    pip install transformers torch pillow numpy
 ===========================================================================
 """
 
 import argparse
 import sys
 import os
+import io
+import glob as glob_module
 from pathlib import Path
 
+# ---- Force UTF-8 on stdout/stderr (Windows GBK fix) ----
+if hasattr(sys.stdout, 'buffer'):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'buffer'):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
+# ==================== ONNX Mode ====================
+
+def find_onnx_models(script_dir=None):
+    """Scan directory for available ONNX model files.
+
+    Returns: { "small": "path/to/model.onnx", "base": "...", "large": "..." }
+    """
+    if script_dir is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    models = {}
+
+    for model_size in ("small", "base", "large"):
+        pattern = os.path.join(script_dir, f"depth_anything_v2_{model_size}*.onnx")
+        matches = glob_module.glob(pattern)
+
+        if matches:
+            # Prefer largest file (usually FP32, highest quality)
+            matches.sort(key=lambda f: os.path.getsize(f), reverse=True)
+            models[model_size] = matches[0]
+
+    return models
+
+
+def generate_depth_map_onnx(
+    input_path,
+    output_path,
+    onnx_path,
+    invert=False,
+):
+    """Generate depth map using ONNX Runtime (no network needed)."""
+    import numpy as np
+    from PIL import Image
+
+    # ---- Load image ----
+    try:
+        image = Image.open(input_path).convert("RGB")
+    except FileNotFoundError:
+        print(f"[ERROR] File not found: {input_path}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[ERROR] Cannot open image: {e}")
+        sys.exit(1)
+
+    original_size = image.size  # (width, height)
+    model_size_mb = os.path.getsize(onnx_path) / (1024 * 1024)
+
+    print("=" * 60)
+    print(f"  Mode: ONNX Runtime (local model)")
+    print(f"  Model: {os.path.basename(onnx_path)} ({model_size_mb:.1f} MB)")
+    print(f"  Input: {input_path} ({original_size[0]}x{original_size[1]})")
+    print(f"  Output: {output_path}")
+    print("=" * 60)
+
+    # ---- Preprocess: bicubic resize to 518x518 + ImageNet normalize ----
+    print("\n[Preprocess] Resizing to 518x518 + ImageNet normalization...")
+
+    input_size = (518, 518)
+    img_resized = image.resize(input_size, Image.BICUBIC)
+
+    # Convert to numpy (H, W, 3) -> normalize
+    img_np = np.array(img_resized).astype(np.float32) / 255.0
+
+    # ImageNet normalization
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    img_np = (img_np - mean) / std
+
+    # (H, W, 3) -> (1, 3, H, W)
+    img_np = img_np.transpose(2, 0, 1)
+    img_np = np.expand_dims(img_np, axis=0)
+
+    print(f"  Input tensor shape: {img_np.shape}")
+
+    # ---- ONNX Runtime inference ----
+    print("\n[Inference] Analyzing depth information...")
+
+    try:
+        import onnxruntime as ort
+    except ImportError:
+        print("[ERROR] onnxruntime not installed. Run: pip install onnxruntime")
+        sys.exit(1)
+
+    providers = ['CPUExecutionProvider']
+    try:
+        session = ort.InferenceSession(onnx_path, providers=providers)
+    except Exception as e:
+        print(f"[ERROR] Failed to load ONNX model: {e}")
+        sys.exit(1)
+
+    input_name = session.get_inputs()[0].name
+    outputs = session.run(None, {input_name: img_np})
+    predicted_depth = outputs[0]
+
+    print(f"  Raw output shape: {predicted_depth.shape}")
+
+    # ---- Postprocess: bicubic interpolate back to original size ----
+    print("[Postprocess] Upscaling to original resolution...")
+
+    # Ensure 4D (1, 1, H, W)
+    if predicted_depth.ndim == 3:
+        predicted_depth = predicted_depth[np.newaxis, ...]
+    elif predicted_depth.ndim == 2:
+        predicted_depth = predicted_depth[np.newaxis, np.newaxis, ...]
+
+    depth_2d = predicted_depth[0, 0]
+
+    # Normalize to 0-1
+    d_min, d_max = depth_2d.min(), depth_2d.max()
+    if d_max - d_min < 1e-8:
+        print("[WARN] Depth variation is negligible; image may be monochrome")
+        depth_normalized = np.zeros_like(depth_2d)
+    else:
+        depth_normalized = (depth_2d - d_min) / (d_max - d_min)
+
+    depth_uint8 = (depth_normalized * 255).astype(np.uint8)
+    depth_pil = Image.fromarray(depth_uint8, mode="L")
+
+    # Bicubic upscale to original size
+    depth_pil = depth_pil.resize(original_size, Image.BICUBIC)
+
+    # ---- Optional invert ----
+    if invert:
+        depth_pil = Image.fromarray(255 - np.array(depth_pil), mode="L")
+        print("[Invert] Depth map inverted (black=near, white=far)")
+
+    # ---- Save ----
+    depth_pil.save(output_path)
+
+    file_size = os.path.getsize(output_path)
+    print(f"\n[OK] Depth map generated!")
+    print(f"  File: {os.path.abspath(output_path)}")
+    print(f"  Size: {depth_pil.size[0]} x {depth_pil.size[1]}")
+    print(f"  Disk: {file_size / 1024:.1f} KB")
+
+
+# ==================== HuggingFace Mode (fallback) ====================
 
 def download_model_with_progress(model_id, cache_dir=None):
-    """
-    从 Hugging Face Hub 下载模型，显示下载进度。
-
-    如果网络环境访问 Hugging Face 有困难，可以设置环境变量：
-        HF_ENDPOINT=https://hf-mirror.com
-    来使用镜像站点。
-    """
+    """Download model from Hugging Face Hub with progress."""
     from huggingface_hub import snapshot_download
     from huggingface_hub.utils import HfHubHTTPError
 
-    print(f"正在下载模型 {model_id} ...")
-    print("（首次运行需要下载，约 100MB~1.3GB，取决于模型大小）")
+    print(f"Downloading model {model_id} ...")
+    print("(First run downloads ~100MB-1.3GB depending on model size)")
 
     try:
         local_path = snapshot_download(
@@ -58,74 +195,59 @@ def download_model_with_progress(model_id, cache_dir=None):
             cache_dir=cache_dir,
             resume_download=True,
         )
-        print(f"模型已缓存到: {local_path}")
+        print(f"Model cached at: {local_path}")
         return local_path
     except HfHubHTTPError as e:
-        print(f"\n[X] 下载失败: {e}")
-        print("\n可能的解决方案：")
-        print("  1. 检查网络连接")
-        print("  2. 使用镜像站点: set HF_ENDPOINT=https://hf-mirror.com")
-        print("  3. 手动下载模型文件放到缓存目录")
+        print(f"\n[ERROR] Download failed: {e}")
+        print("\nPossible solutions:")
+        print("  1. Check your network connection")
+        print("  2. Use mirror: set HF_ENDPOINT=https://hf-mirror.com")
+        print("  3. Download model files manually")
         sys.exit(1)
 
 
-def generate_depth_map(
+def generate_depth_map_hf(
     input_path,
     output_path,
     model_size="small",
     invert=False,
     device=None,
 ):
-    """
-    使用 Depth Anything V2 从输入图片生成深度图。
-
-    Args:
-        input_path:   输入图片的路径
-        output_path:  输出深度图的保存路径
-        model_size:   模型大小 ("small", "base", "large")
-        invert:       是否反转深度图（默认白色=近景；反转后黑色=近景）
-        device:       强制指定设备 ("cuda", "cpu", "mps")，None=自动选择
-    """
+    """Generate depth map using HuggingFace Transformers."""
     from PIL import Image
     import numpy as np
-
-    # ---- 延迟导入（给用户时间看到上面的提示） ----
     import torch
     from transformers import AutoImageProcessor, AutoModelForDepthEstimation
 
-    # ---- 模型 ID 映射 ----
     MODEL_IDS = {
         "small": "depth-anything/Depth-Anything-V2-Small-hf",
         "base":  "depth-anything/Depth-Anything-V2-Base-hf",
         "large": "depth-anything/Depth-Anything-V2-Large-hf",
     }
 
-    if model_size not in MODEL_IDS:
-        print(f"[X] 未知模型大小: {model_size}，可选: {list(MODEL_IDS.keys())}")
-        sys.exit(1)
-
     model_id = MODEL_IDS[model_size]
 
     print("=" * 60)
-    print(f"  模型: {model_id}")
-    print(f"  输入: {input_path}")
-    print(f"  输出: {output_path}")
+    print(f"  Mode: HuggingFace Transformers")
+    print(f"  Model: {model_id}")
+    print(f"  Input: {input_path}")
+    print(f"  Output: {output_path}")
     print("=" * 60)
 
-    # ---- 加载图片 ----
+    # ---- Load image ----
     try:
         image = Image.open(input_path).convert("RGB")
     except FileNotFoundError:
-        print(f"[X] 找不到文件: {input_path}")
+        print(f"[ERROR] File not found: {input_path}")
         sys.exit(1)
     except Exception as e:
-        print(f"[X] 无法打开图片: {e}")
+        print(f"[ERROR] Cannot open image: {e}")
         sys.exit(1)
 
-    original_size = image.size  # (width, height)
-    print(f"\n[图片] 图片尺寸: {original_size[0]} × {original_size[1]}")
+    original_size = image.size
+    print(f"\n[Image] Size: {original_size[0]} x {original_size[1]}")
 
-    # ---- 选择设备 ----
+    # ---- Select device ----
     if device is None:
         if torch.cuda.is_available():
             device = "cuda"
@@ -133,129 +255,179 @@ def generate_depth_map(
             device = "mps"
         else:
             device = "cpu"
-    print(f"[设备]  使用设备: {device}")
+    print(f"[Device] Using: {device}")
 
-    # ---- 下载模型（带进度提示） ----
+    # ---- Download model ----
     try:
         download_model_with_progress(model_id)
     except Exception:
-        pass  # snapshot_download 可选，from_pretrained 也会自动下载
+        pass
 
-    # ---- 加载模型和处理器 ----
-    print("\n[...] 正在加载模型...")
+    # ---- Load model and processor ----
+    print("\n[...] Loading model...")
     try:
         image_processor = AutoImageProcessor.from_pretrained(model_id)
         model = AutoModelForDepthEstimation.from_pretrained(model_id)
     except Exception as e:
-        print(f"[X] 模型加载失败: {e}")
-        print("\n提示：如果网络连接 Hugging Face 不稳定，请尝试：")
-        print('  设置环境变量: HF_ENDPOINT=https://hf-mirror.com')
-        print("  或手动下载模型文件。")
+        print(f"[ERROR] Model loading failed: {e}")
+        print("\nTip: If Hugging Face is unreachable, try:")
+        print('  set HF_ENDPOINT=https://hf-mirror.com')
+        print("  Or use local ONNX models instead.")
         sys.exit(1)
 
     model = model.to(device)
     model.eval()
 
-    # ---- 推理 ----
-    print("[分析] 正在分析深度信息...")
+    # ---- Inference ----
+    print("[Inference] Analyzing depth information...")
     inputs = image_processor(images=image, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
     with torch.no_grad():
         outputs = model(**inputs)
 
-    # ---- 后处理 ----
-    # predicted_depth 是模型输出的原始深度张量，形状约为 (1, H/14, W/14)
     predicted_depth = outputs.predicted_depth
 
-    # 使用双三次插值将深度图放大回原始图片尺寸
     prediction = torch.nn.functional.interpolate(
         predicted_depth.unsqueeze(1),
-        size=(original_size[1], original_size[0]),  # (height, width)
+        size=(original_size[1], original_size[0]),
         mode="bicubic",
         align_corners=False,
     ).squeeze()
 
-    # ---- 归一化到 0-255 ----
+    # ---- Normalize ----
     depth_np = prediction.cpu().numpy()
-
-    # 深度值越大 = 离相机越近 → 白色（255）
-    # 深度值越小 = 离相机越远 → 黑色（0）
     depth_min = depth_np.min()
     depth_max = depth_np.max()
 
     if depth_max - depth_min < 1e-8:
-        print("[警告]  警告：深度图变化极小，可能输入为纯色图片")
+        print("[WARN] Depth variation is negligible; image may be monochrome")
         depth_normalized = np.zeros_like(depth_np)
     else:
         depth_normalized = (depth_np - depth_min) / (depth_max - depth_min)
 
-    # 可选：反转（使远景变白、近景变黑）
     if invert:
         depth_normalized = 1.0 - depth_normalized
-        print("[反转] 已反转深度图（黑色=近景，白色=远景）")
+        print("[Invert] Depth map inverted (black=near, white=far)")
 
     depth_uint8 = (depth_normalized * 255).astype(np.uint8)
 
-    # ---- 保存 ----
-    depth_image = Image.fromarray(depth_uint8, mode="L")  # L = 8-bit 灰度
+    # ---- Save ----
+    depth_image = Image.fromarray(depth_uint8, mode="L")
     depth_image.save(output_path)
 
     file_size = os.path.getsize(output_path)
-    print(f"\n[OK] 深度图已生成!")
-    print(f"   文件: {os.path.abspath(output_path)}")
-    print(f"   尺寸: {depth_image.size[0]} × {depth_image.size[1]}")
-    print(f"   大小: {file_size / 1024:.1f} KB")
-    print(f"\n[提示] 将 {os.path.basename(output_path)} 放到 index.html 同级目录下即可使用。")
+    print(f"\n[OK] Depth map generated!")
+    print(f"  File: {os.path.abspath(output_path)}")
+    print(f"  Size: {depth_image.size[0]} x {depth_image.size[1]}")
+    print(f"  Disk: {file_size / 1024:.1f} KB")
+
+
+# ==================== Unified Entry Point ====================
+
+def generate_depth_map(
+    input_path,
+    output_path,
+    model_size="small",
+    invert=False,
+    device=None,
+    onnx_path=None,
+):
+    """Auto-select ONNX or HuggingFace mode.
+
+    Priority:
+        1. Explicit --onnx-path
+        2. Matching ONNX model found in script directory
+        3. Fall back to HuggingFace online download
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    available_onnx = find_onnx_models(script_dir)
+
+    selected_onnx = None
+
+    if onnx_path:
+        if not os.path.exists(onnx_path):
+            print(f"[ERROR] ONNX file not found: {onnx_path}")
+            sys.exit(1)
+        selected_onnx = onnx_path
+    elif model_size in available_onnx:
+        selected_onnx = available_onnx[model_size]
+
+    if selected_onnx:
+        generate_depth_map_onnx(
+            input_path=input_path,
+            output_path=output_path,
+            onnx_path=selected_onnx,
+            invert=invert,
+        )
+    else:
+        if available_onnx:
+            print(f"[Info] ONNX models found but none matching '{model_size}': {list(available_onnx.keys())}")
+            print(f"[Info] Requested '{model_size}', falling back to HuggingFace")
+        else:
+            print("[Info] No local ONNX model found, using HuggingFace")
+        generate_depth_map_hf(
+            input_path=input_path,
+            output_path=output_path,
+            model_size=model_size,
+            invert=invert,
+            device=device,
+        )
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="使用 Depth Anything V2 从图片生成黑白深度图",
+        description="Generate grayscale depth map using Depth Anything V2",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-示例:
+Examples:
   python generate_depth_map.py wallpaper.jpg
   python generate_depth_map.py photo.png -o depth_map.png -m base
   python generate_depth_map.py image.jpg --invert
+  python generate_depth_map.py image.jpg --onnx-path model.onnx
         """,
     )
 
     parser.add_argument(
         "input",
-        help="输入图片的路径（支持 jpg/png/webp 等常见格式）",
+        help="Input image path (jpg/png/webp supported)",
     )
     parser.add_argument(
         "-o", "--output",
         default="depth_map.png",
-        help="输出深度图的保存路径（默认: depth_map.png）",
+        help="Output depth map path (default: depth_map.png)",
     )
     parser.add_argument(
         "-m", "--model",
         choices=["small", "base", "large"],
         default="small",
-        help="模型大小: small(快) / base(均衡) / large(最佳质量) [默认: small]",
+        help="Model size: small(fast) / base(balanced) / large(best) [default: small]",
     )
     parser.add_argument(
         "--invert",
         action="store_true",
-        help="反转深度图颜色（默认白色=近景；反转后黑色=近景）",
+        help="Invert depth map colors",
     )
     parser.add_argument(
         "--device",
         choices=["cuda", "cpu", "mps"],
         default=None,
-        help="强制指定运算设备（默认自动选择）",
+        help="Force device (HuggingFace mode only)",
+    )
+    parser.add_argument(
+        "--onnx-path",
+        default=None,
+        help="Manually specify ONNX model file path",
     )
 
     args = parser.parse_args()
 
-    # 检查输入文件
+    # Validate input
     if not Path(args.input).exists():
-        print(f"[X] 找不到输入文件: {args.input}")
+        print(f"[ERROR] Input file not found: {args.input}")
         sys.exit(1)
 
-    # 确认输出目录存在
+    # Ensure output directory exists
     output_dir = Path(args.output).parent
     if output_dir and not output_dir.exists():
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -266,6 +438,7 @@ def main():
         model_size=args.model,
         invert=args.invert,
         device=args.device,
+        onnx_path=args.onnx_path,
     )
 
 

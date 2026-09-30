@@ -305,6 +305,11 @@ async function init() {
         // Pixi.js 的 ticker 会在每帧（通常 60fps）调用我们的更新函数
         app.ticker.add(updateLoop);
 
+        // 先手动出一帧：主进程有可能紧接着就发来"暂停渲染"信号
+        // （比如启动瞬间恰好有全屏窗口），那样 ticker 会被停掉。
+        // 这里保证画面上一定有内容，不会留下空白/黑屏。
+        app.renderer.render(app.stage);
+
     } catch (error) {
         console.error('[初始化失败]', error);
 
@@ -592,13 +597,8 @@ if (isElectron) {
                 showToast('壁纸已更换（使用缓存的深度图）', 2000);
             } else {
                 // 需要生成深度图
-                console.log('[App] 需要生成深度图...');
-                showToast('正在生成深度图，请稍候...', 3000);
-
-                // 在 Electron 中，可以使用 Transformers.js 在前端做推理
-                // 或者通知主进程调用 Python 脚本
-                // 这里提示用户使用 Python 工具生成
-                showToast('请使用"生成深度图.bat"工具生成深度图', 4000);
+                console.log('[App] 未命中深度图缓存');
+                showToast('请在设置窗口中生成深度图（打开托盘菜单 → 设置）', 4000);
             }
         } catch (err) {
             console.error('[App] 切换图片失败:', err);

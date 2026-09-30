@@ -41,7 +41,7 @@ class AppStore {
         // 加载配置
         this._config = this._loadJSON(this._configPath, this._defaultConfig());
 
-        console.log('[Store] 数据目录:', this._userDataPath);
+        console.log('[Store] Data dir:', this._userDataPath);
     }
 
     // ==================== 配置管理 ====================
@@ -99,10 +99,10 @@ class AppStore {
             };
 
             this._saveJSON(this._cacheIndexPath, this._cacheIndex);
-            console.log('[Store] 深度图已缓存:', cacheKey);
+            console.log('[Store] Depth cached:', cacheKey);
             return true;
         } catch (err) {
-            console.error('[Store] 保存深度图缓存失败:', err.message);
+            console.error('[Store] Save depth cache failed:', err.message);
             return false;
         }
     }
@@ -126,7 +126,7 @@ class AppStore {
             if (fs.existsSync(imagePath)) {
                 const currentSize = fs.statSync(imagePath).size;
                 if (currentSize !== entry.imageSize) {
-                    console.log('[Store] 原图已变更，缓存失效');
+                    console.log('[Store] Image changed, cache invalidated');
                     this._invalidateCache(cacheKey);
                     return null;
                 }
@@ -135,10 +135,10 @@ class AppStore {
             // 读取深度图文件并转为 Data URL
             const buffer = fs.readFileSync(entry.depthFile);
             const base64 = buffer.toString('base64');
-            console.log('[Store] 命中深度图缓存:', cacheKey);
+            console.log('[Store] Depth cache hit:', cacheKey);
             return `data:image/png;base64,${base64}`;
         } catch (err) {
-            console.error('[Store] 读取深度图缓存失败:', err.message);
+            console.error('[Store] Read depth cache failed:', err.message);
             return null;
         }
     }
@@ -168,9 +168,9 @@ class AppStore {
             // 清空索引
             this._cacheIndex = {};
             this._saveJSON(this._cacheIndexPath, this._cacheIndex);
-            console.log('[Store] 所有缓存已清理');
+            console.log('[Store] All caches cleared');
         } catch (err) {
-            console.error('[Store] 清理缓存失败:', err.message);
+            console.error('[Store] Clear cache failed:', err.message);
         }
     }
 
@@ -199,7 +199,7 @@ class AppStore {
                 return JSON.parse(raw);
             }
         } catch (err) {
-            console.error(`[Store] 读取 JSON 失败 (${filePath}):`, err.message);
+            console.error(`[Store] Read JSON failed (${filePath}):`, err.message);
         }
         return defaultValue;
     }
@@ -208,7 +208,7 @@ class AppStore {
         try {
             fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
         } catch (err) {
-            console.error(`[Store] 写入 JSON 失败 (${filePath}):`, err.message);
+            console.error(`[Store] Write JSON failed (${filePath}):`, err.message);
         }
     }
 

@@ -26,6 +26,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** 打开系统文件对话框，选择壁纸图片 */
     selectImage: () => ipcRenderer.invoke('dialog:selectImage'),
 
+    // ==================== 深度图生成 ====================
+
+    /**
+     * 调用 Python 脚本生成深度图。
+     * @param {string} imagePath - 原始图片路径
+     * @param {string} modelSize - 模型大小: "small" / "base" / "large"
+     * @returns {Promise<{success: boolean, depthDataUrl?: string, error?: string}>}
+     */
+    generateDepthMap: (imagePath, modelSize) =>
+        ipcRenderer.invoke('depth:generate', { imagePath, modelSize }),
+
+    /**
+     * 监听深度图生成进度。
+     * @param {function} callback - 回调参数: { message: string }
+     * @returns {function} 取消监听函数
+     */
+    onDepthProgress: (callback) => {
+        const handler = (_event, data) => callback(data);
+        ipcRenderer.on('depth:progress', handler);
+        return () => ipcRenderer.removeListener('depth:progress', handler);
+    },
+
     // ==================== 深度图缓存 ====================
 
     /** 保存生成的深度图到本地缓存 */
@@ -35,6 +57,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** 读取缓存的深度图 */
     getDepthCache: (imagePath) =>
         ipcRenderer.invoke('cache:getDepthMap', imagePath),
+
+    /** 清除所有深度图缓存 */
+    clearAllCache: () => ipcRenderer.invoke('cache:clearAll'),
+
+    // ==================== 壁纸应用 ====================
+
+    /**
+     * 通知主进程应用壁纸（发送 image:new 到壁纸窗口）。
+     * @param {string} imagePath - 图片路径
+     */
+    applyWallpaper: (imagePath) => ipcRenderer.invoke('wallpaper:apply', imagePath),
 
     // ==================== 应用配置 ====================
 
