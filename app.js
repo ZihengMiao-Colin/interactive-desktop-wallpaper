@@ -47,10 +47,12 @@
 
 // ==================== 配置参数 ====================
 const CONFIG = {
-    /** 视差强度系数 —— 控制位移的最大像素偏移量 */
+    /** 视差强度系数 —— 控制位移的最大偏移量 */
     parallaxMultiplier: 30,
     /** 平滑度 —— Lerp 插值的比率 (0~1)，越小越平滑 */
     smoothness: 0.08,
+    /** 对焦平面深度 (0.0~1.0) —— 该深度的物体保持完全静止，彻底消除割裂线 */
+    focusDepth: 0.50,
     /** 在 Lively Wallpaper 中运行时，设置此项为 true 以隐藏调试面板 */
     hideDebugPanel: false,
 };
@@ -62,6 +64,8 @@ const parallaxSlider = document.getElementById('parallax-strength');
 const parallaxValueEl = document.getElementById('parallax-value');
 const smoothnessSlider = document.getElementById('smoothness');
 const smoothnessValueEl = document.getElementById('smoothness-value');
+const focusSlider = document.getElementById('focus-depth');
+const focusValueEl = document.getElementById('focus-value');
 
 // 如果配置要求隐藏调试面板
 if (CONFIG.hideDebugPanel && debugPanel) {
@@ -72,91 +76,125 @@ if (CONFIG.hideDebugPanel && debugPanel) {
 
 /**
  * 创建 Pixi.js Application 实例。
- *
- * Pixi.js 会自动创建一个 <canvas> 元素并将其添加到 document.body 中。
- * 我们设置 resizeTo: window 让画布在窗口大小变化时自动调整分辨率。
  */
 const app = new PIXI.Application({
     width: window.innerWidth,             // 初始宽度 = 窗口宽度
     height: window.innerHeight,           // 初始高度 = 窗口高度
-    backgroundColor: 0x000000,            // 黑色背景（图片加载前显示）
-    antialias: true,                      // 开启抗锯齿，画面更平滑
-    resolution: window.devicePixelRatio || 1,  // 适配高 DPI 屏幕（Retina 等）
-    autoDensity: true,                    // 让 CSS 尺寸匹配物理分辨率
-    resizeTo: window,                     // 窗口大小改变时自动调整渲染器大小
+    backgroundColor: 0x000000,            // 黑色背景
+    antialias: true,                      // 开启抗锯齿
+    resolution: window.devicePixelRatio || 1,  // 适配高 DPI 屏幕
+    autoDensity: true,
+    resizeTo: window,
 });
 
 // 将 Pixi.js 生成的 canvas 插入到页面中
 document.body.appendChild(app.view);
 
-// ==================== 图片预加载 ====================
+// ==================== 2.5D 深度视差 Shader 定义 ====================
 
 /**
- * 使用 Image 对象预加载图片。
- *
- * 为什么不用 PIXI.Assets？
- * - 在本地壁纸环境中，直接使用 Image 对象加载本地文件更简单可靠
- * - 不依赖额外的 loader 配置
- *
- * @param {string} url - 图片路径（相对于 index.html）
- * @returns {Promise<HTMLImageElement>} 加载完成的 Image 对象
+ * 自定义顶点着色器
+ * 核心关键：直接将 aVertexPosition (归一化 0.0 ~ 1.0 的全屏 Quad 坐标) 传给片元着色器。
+ * Pixi.js 默认 Filter 顶点着色器会乘以 outputFrame.zw * inputSize.zw，导致由于
+ * 内部分配的 Framebuffer 尺寸比例与屏幕不一致而严重横向拉长图片！
  */
-function loadImage(url) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
+const PARALLAX_VERTEX_SHADER = `
+attribute vec2 aVertexPosition;
+uniform mat3 projectionMatrix;
+uniform vec4 outputFrame;
 
-        img.onload = () => {
-            console.log(`[加载完成] ${url} (${img.naturalWidth}×${img.naturalHeight})`);
-            resolve(img);
-        };
+varying vec2 vTextureCoord;
 
-        img.onerror = (err) => {
-            console.error(`[加载失败] ${url}`, err);
-            reject(new Error(`无法加载图片: ${url}`));
-        };
-
-        img.src = url;
-    });
+vec4 filterVertexPosition(void) {
+    vec2 position = aVertexPosition * max(outputFrame.zw, vec2(0.0)) + outputFrame.xy;
+    return vec4((projectionMatrix * vec3(position, 1.0)).xy, 0.0, 1.0);
 }
 
-// ==================== Cover 模式缩放计算 ====================
+void main(void) {
+    gl_Position = filterVertexPosition();
+    // 强制传递 0.0 ~ 1.0 的绝对归一化屏幕坐标
+    vTextureCoord = aVertexPosition;
+}
+`;
 
 /**
- * 计算 "Cover 模式" 的缩放比例。
+ * 专属 2.5D 深度视差着色器源码
  *
- * Cover 模式（类似 CSS background-size: cover）：
- * - 图片等比缩放，确保完全覆盖容器（不留黑边）
- * - 如果图片和容器宽高比不一致，取较大的缩放比例
- * - 超出的部分会被裁剪（在 Pixi.js 中，画布外自然裁剪）
- *
- * 对比 Contain 模式：取较小的缩放比例（图片完整显示，可能有黑边）。
- *
- * @param {number} imgW   - 图片原始宽度
- * @param {number} imgH   - 图片原始高度
- * @param {number} containerW - 容器宽度（窗口宽度）
- * @param {number} containerH - 容器高度（窗口高度）
- * @returns {number} 缩放比例（apply to both width and height to maintain aspect ratio）
+ * 核心设计：
+ * 1. 数学级精确 Cover 坐标映射：彻底杜绝深度图与原图因缩放错位产生的直线刀痕
+ * 2. 真实 2D 物理透视位移：X/Y 轴与鼠标方向 100% 严密对应
+ * 3. 对焦平面锚定 (uFocus)：主体深度处位移为 0，消灭前后两极相反对拉的剪切割裂
+ * 4. 软截断阻尼 (Soft Clamping)：限制最大相对位移，防止大幅度运动拉开大缝隙
  */
-function getCoverScale(imgW, imgH, containerW, containerH) {
-    const scaleX = containerW / imgW;
-    const scaleY = containerH / imgH;
-    // Cover = 取最大值，确保任一维度都能填满
-    return Math.max(scaleX, scaleY);
+const PARALLAX_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec2 vTextureCoord;
+
+uniform sampler2D uImage;
+uniform sampler2D uDepth;
+uniform vec2 uMouse;
+uniform float uStrength;
+uniform float uFocus;
+uniform vec2 uCoverScale;
+uniform vec2 uCoverOffset;
+
+void main(void) {
+    // 1. 将全屏 UV 映射为完美的 Cover 模式下的图片 UV 坐标 (0.0 ~ 1.0)
+    vec2 baseUV = vTextureCoord * uCoverScale + uCoverOffset;
+
+    // 2. 采样深度信息 (灰度图取 R 通道)
+    float depth = texture2D(uDepth, baseUV).r;
+
+    // 3. 计算相对视觉焦点的位移：当 depth == uFocus 时完全静止，主体绝不撕裂
+    float diff = depth - uFocus;
+
+    // 4. 2D 真实物理视差：鼠标向右看(uMouse.x>0)，近景(diff>0)向相反方向移动
+    vec2 parallax = uMouse * diff * uStrength;
+
+    // 5. 软截断阻尼 (Soft Clamping)：限制局部最大拉伸距离，彻底根除直线割裂与大缝隙
+    float maxDist = 0.045; // 最大允许 4.5% UV 偏移
+    float pLen = length(parallax);
+    if (pLen > maxDist) {
+        parallax = (parallax / pLen) * (maxDist + (pLen - maxDist) * 0.15);
+    }
+
+    // 6. 最终采样坐标 + 安全微钳制
+    vec2 finalUV = clamp(baseUV + parallax, vec2(0.001), vec2(0.999));
+
+    // 7. 采样并输出真实原图色彩
+    gl_FragColor = texture2D(uImage, finalUV);
+}
+`;
+
+/**
+ * 深度视差 Filter 类
+ */
+class DepthParallaxFilter extends PIXI.Filter {
+    constructor(imageTexture, depthTexture) {
+        super(PARALLAX_VERTEX_SHADER, PARALLAX_FRAGMENT_SHADER, {
+            uImage: imageTexture,
+            uDepth: depthTexture,
+            uMouse: new Float32Array([0.0, 0.0]),
+            uStrength: 0.025,
+            uFocus: 0.50,
+            uCoverScale: new Float32Array([1.0, 1.0]),
+            uCoverOffset: new Float32Array([0.0, 0.0]),
+        });
+    }
 }
 
 // ==================== 全局状态变量 ====================
 
-/** 背景图片的 Pixi.js 精灵（Sprite） */
-let bgSprite = null;
+/** 全屏显示精灵 */
+let screenSprite = null;
 
-/** 深度图对应的精灵 —— 作为 DisplacementFilter 的置换贴图来源 */
-let depthSprite = null;
+/** 专属深度视差滤镜实例 */
+let parallaxFilter = null;
 
-/** 位移滤镜实例 */
-let displacementFilter = null;
-
-/** 用于统一管理背景和深度图的容器 */
-let container = null;
+/** 纹理对象缓存 */
+let bgTexture = null;
+let depthTexture = null;
 
 /** 鼠标位置的目标值（归一化到 [-1, 1]） */
 let targetX = 0;
@@ -166,9 +204,84 @@ let targetY = 0;
 let currentX = 0;
 let currentY = 0;
 
-/** 原始图片尺寸缓存（用于 resize 时重新计算缩放） */
+/** 原始图片尺寸缓存（用于计算 Cover 投影） */
 let bgNaturalWidth = 0;
 let bgNaturalHeight = 0;
+
+// ==================== 图片预加载 ====================
+
+/**
+ * 使用 Image 对象预加载图片。
+ * @param {string} url - 图片路径或 Data URL
+ * @returns {Promise<HTMLImageElement>}
+ */
+function loadImage(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const displayUrl = url.startsWith('data:') ? url.slice(0, 32) + '...' : url;
+            console.log(`[加载完成] ${displayUrl} (${img.naturalWidth}×${img.naturalHeight})`);
+            resolve(img);
+        };
+        img.onerror = (err) => {
+            const displayUrl = url.startsWith('data:') ? url.slice(0, 32) + '...' : url;
+            console.error(`[加载失败] ${displayUrl}`, err);
+            reject(new Error(`无法加载图片: ${displayUrl}`));
+        };
+
+        // 如果是 Windows 绝对路径且在 Electron 环境下，优先通过 preload 读取为 Data URL 避免安全性限制
+        if (isElectron && window.electronAPI && window.electronAPI.readFileAsDataURL && (url.includes(':') || url.includes('\\'))) {
+            try {
+                const dataUrl = window.electronAPI.readFileAsDataURL(url);
+                if (dataUrl) {
+                    img.src = dataUrl;
+                    return;
+                }
+            } catch (readErr) {
+                console.warn('[loadImage] 读取本地文件失败，回退到原生路径:', readErr);
+            }
+        }
+
+        img.src = url;
+    });
+}
+
+// ==================== Cover 模式投影坐标计算 ====================
+
+/**
+ * 计算将原始图片居中 Cover 到当前窗口所需的 UV 缩放与偏移。
+ * 确保 Shader 在任何屏幕比例下，原图与深度图 100% 像素级对齐且不产生任何拉伸变形。
+ */
+function updateCoverUniforms() {
+    if (!parallaxFilter) return;
+
+    const screenW = app.screen.width;
+    const screenH = app.screen.height;
+    const imgW = bgNaturalWidth || screenW;
+    const imgH = bgNaturalHeight || screenH;
+
+    const screenAspect = screenW / screenH;
+    const imgAspect = imgW / imgH;
+
+    let scaleX = 1.0;
+    let scaleY = 1.0;
+    let offsetX = 0.0;
+    let offsetY = 0.0;
+
+    if (screenAspect > imgAspect) {
+        // 屏幕比图片更宽：原图上下被等比居中裁切
+        scaleY = imgAspect / screenAspect;
+        offsetY = (1.0 - scaleY) * 0.5;
+    } else {
+        // 屏幕比图片更高：原图左右被等比居中裁切
+        scaleX = screenAspect / imgAspect;
+        offsetX = (1.0 - scaleX) * 0.5;
+    }
+
+    // 核心关键：必须以数组整体赋值，触发 Pixi.js UniformGroup 的 Proxy setter 标记 dirtyId++
+    parallaxFilter.uniforms.uCoverScale = [scaleX, scaleY];
+    parallaxFilter.uniforms.uCoverOffset = [offsetX, offsetY];
+}
 
 // ==================== 主初始化流程 ====================
 
@@ -187,40 +300,66 @@ async function init() {
     try {
         console.log('[初始化] 开始加载图片素材...');
 
+        // ---- 检查是否有上次保存的壁纸与深度图 ----
+        let targetBgPath = 'background.png';
+        let targetDepthSource = 'depth_map.png';
+
+        if (isElectron && window.electronAPI) {
+            try {
+                const savedConfig = await window.electronAPI.getConfig();
+                if (savedConfig && savedConfig.currentImage && window.electronAPI.fileExists(savedConfig.currentImage)) {
+                    targetBgPath = savedConfig.currentImage;
+                    console.log('[初始化] 发现上次保存的壁纸:', targetBgPath);
+                    const cachedDepth = await window.electronAPI.getDepthCache(targetBgPath);
+                    if (cachedDepth) {
+                        targetDepthSource = cachedDepth;
+                        console.log('[初始化] 发现配套的深度图缓存');
+                    }
+                }
+            } catch (cfgErr) {
+                console.warn('[初始化] 检查上次壁纸配置失败:', cfgErr);
+            }
+        }
+
         // ---- 第 1 步：加载背景图（必需） ----
         let bgImg;
         try {
-            bgImg = await loadImage('background.png');
+            bgImg = await loadImage(targetBgPath);
         } catch (err) {
-            console.error('[初始化] background.png 加载失败:', err.message);
-            // 尝试从 userData 目录加载
-            if (isElectron && window.electronAPI) {
-                try {
-                    const userPath = await window.electronAPI.getUserDataPath();
-                    const altBgPath = userPath + '\\background.png';
-                    console.log('[初始化] 尝试备用路径:', altBgPath);
-                    bgImg = await loadImage(altBgPath);
-                } catch (e2) {
+            console.error(`[初始化] ${targetBgPath} 加载失败:`, err.message);
+            // 尝试回退到 background.png
+            try {
+                bgImg = await loadImage('background.png');
+            } catch (err2) {
+                // 尝试从 userData 目录加载
+                if (isElectron && window.electronAPI) {
+                    try {
+                        const userPath = await window.electronAPI.getUserDataPath();
+                        const altBgPath = userPath + '\\background.png';
+                        console.log('[初始化] 尝试备用路径:', altBgPath);
+                        bgImg = await loadImage(altBgPath);
+                    } catch (e2) {
+                        throw new Error(
+                            '未找到有效的背景图片。\n\n' +
+                            '请通过托盘菜单 → "更换壁纸" 来选择一张图片作为壁纸。'
+                        );
+                    }
+                } else {
                     throw new Error(
-                        '未找到 background.png。\n\n' +
-                        '请通过托盘菜单 → "更换壁纸" 来选择一张图片作为壁纸。'
+                        '未找到 background.png。\n请确保 background.png 与 index.html 在同一目录。'
                     );
                 }
-            } else {
-                throw new Error(
-                    '未找到 background.png。\n请确保 background.png 与 index.html 在同一目录。'
-                );
             }
         }
 
         // ---- 第 2 步：加载深度图（可选，缺失时自动生成灰色占位图） ----
         let depthImg;
         try {
-            depthImg = await loadImage('depth_map.png');
-            console.log('[初始化] depth_map.png 加载成功');
+            depthImg = await loadImage(targetDepthSource);
+            console.log('[初始化] 深度图加载成功');
         } catch (depthErr) {
-            console.warn('[初始化] depth_map.png 未找到，使用默认灰色深度图（无深度视差效果）');
-            console.warn('[初始化] 可使用「生成深度图.bat」生成真正的深度图');
+            console.warn('[初始化] 深度图未找到，使用默认灰色深度图（无深度视差效果）');
+            console.warn('[初始化] 可通过设置面板生成真正的深度图');
             depthImg = createFallbackDepthImage(bgImg.naturalWidth, bgImg.naturalHeight);
         }
 
@@ -229,70 +368,24 @@ async function init() {
         bgNaturalHeight = bgImg.naturalHeight;
 
         // ---- 第 2 步：从 Image 对象创建 Pixi.js 纹理 ----
-        // PIXI.Texture.from() 可以直接接收 HTMLImageElement
-        const bgTexture = PIXI.Texture.from(bgImg);
-        const depthTexture = PIXI.Texture.from(depthImg);
-
-        // ---- 第 3 步：设置深度图纹理的包裹模式 ----
-        /**
-         * WRAP_MODES.CLAMP（钳制模式）：
-         * 当滤镜采样超出纹理边缘时，不重复、不镜像，而是取最近的边缘像素颜色。
-         * 这可以防止画面边缘出现"卷边"或"重复"的视觉瑕疵。
-         *
-         * 如果不设置，默认是 WRAP_MODES.REPEAT，边缘可能会采样到对侧的内容。
-         */
+        bgTexture = PIXI.Texture.from(bgImg);
+        depthTexture = PIXI.Texture.from(depthImg);
+        bgTexture.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
         depthTexture.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
 
-        // ---- 第 4 步：创建精灵（Sprite） ----
-        // 背景精灵 —— 实际显示在画面上的彩色壁纸
-        bgSprite = new PIXI.Sprite(bgTexture);
-        bgSprite.anchor.set(0.5, 0.5);  // 锚点设为中心，方便定位和缩放
+        // ---- 第 3 步：创建全屏显示精灵与专属深度视差 Shader ----
+        screenSprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+        screenSprite.width = app.screen.width;
+        screenSprite.height = app.screen.height;
 
-        /**
-         * 深度图精灵 —— DisplacementFilter 的"置换贴图"。
-         *
-         * 【重要】深度精灵需要跟背景精灵共享相同的 worldTransform（位置+缩放），
-         * 因为 DisplacementFilter 通过它来映射"屏幕像素 → 深度图纹理坐标"。
-         *
-         * 我们把它放入与背景相同的容器中（作为兄弟节点），
-         * 并设置 renderable = false，确保它不被绘制但 transform 自动保持同步。
-         */
-        depthSprite = new PIXI.Sprite(depthTexture);
-        depthSprite.anchor.set(0.5, 0.5);
-        depthSprite.renderable = false;  // 不渲染，只提供纹理数据给滤镜
+        parallaxFilter = new DepthParallaxFilter(bgTexture, depthTexture);
+        screenSprite.filters = [parallaxFilter];
 
-        // ---- 第 5 步：创建容器并添加精灵 ----
-        // 将背景和深度图都放入同一个容器，位置统一管理
-        container = new PIXI.Container();
-        container.x = app.screen.width / 2;
-        container.y = app.screen.height / 2;
+        // ---- 第 4 步：将精灵添加到 Pixi.js 舞台并计算 Cover 映射 ----
+        app.stage.addChild(screenSprite);
+        updateCoverUniforms();
 
-        // 先添加深度精灵（在底层），再添加背景（在上层）
-        container.addChild(depthSprite);
-        container.addChild(bgSprite);
-
-        // ---- 第 6 步：应用 Cover 缩放 ----
-        applyCoverScale();
-
-        // ---- 第 7 步：创建位移滤镜 ----
-        /**
-         * new PIXI.DisplacementFilter(sprite, scale)
-         *
-         * @param sprite - 提供置换贴图纹理的精灵
-         * @param scale  - 初始滤镜强度（可以是数字或 PIXI.Point）
-         *
-         * 滤镜的 scale 控制白色区域的最大像素偏移量：
-         * - scale = 0   → 完全无偏移（原图）
-         * - scale = 50  → 白色区域偏移最多 50px，黑色区域不动
-         *
-         * 我们后续会在动画循环中动态修改 scale，由鼠标位置驱动。
-         */
-        displacementFilter = new PIXI.DisplacementFilter(depthSprite, 0);
-        // 将滤镜应用到容器上（所有容器内的精灵都会被滤镜处理）
-        container.filters = [displacementFilter];
-
-        // ---- 第 8 步：将容器添加到 Pixi.js 舞台 ----
-        app.stage.addChild(container);
+        console.log('[初始化] 2.5D 深度视差 Shader 已加载！');
 
         console.log('[初始化] 完成！移动鼠标查看视差效果。');
         console.log(`[初始化] 窗口: ${app.screen.width}×${app.screen.height}`);
@@ -318,43 +411,10 @@ async function init() {
     }
 }
 
-// ==================== Cover 缩放应用 ====================
-
-/**
- * 根据窗口大小重新计算并应用 Cover 缩放。
- *
- * 背景精灵和深度精灵使用相同的缩放比例，
- * 确保 DisplacementFilter 的坐标映射正确。
- */
-function applyCoverScale() {
-    if (!bgSprite || !depthSprite) return;
-
-    const scale = getCoverScale(
-        bgNaturalWidth,
-        bgNaturalHeight,
-        app.screen.width,
-        app.screen.height
-    );
-
-    // 两个精灵使用相同的缩放
-    bgSprite.scale.set(scale);
-    depthSprite.scale.set(scale);
-}
-
 // ==================== 事件绑定 ====================
 
 function bindEvents() {
     // ---- 全局鼠标移动 ----
-    /**
-     * 当鼠标移动时，计算相对于屏幕中心的归一化偏移。
-     *
-     * 归一化公式：
-     *   normalizedX = (mouseX / screenWidth)  × 2 - 1
-     *   normalizedY = (mouseY / screenHeight) × 2 - 1
-     *
-     * Electron 环境：通过主进程轮询全局鼠标位置（WorkerW 层收不到 mousemove 事件）
-     * 浏览器环境：直接监听 window mousemove
-     */
     if (isElectron && window.electronAPI) {
         // Electron 环境：使用主进程 IPC 推送的全局鼠标坐标
         window.electronAPI.onMouseMove((pos) => {
@@ -373,16 +433,11 @@ function bindEvents() {
 
     // ---- 窗口大小变化 ----
     window.addEventListener('resize', () => {
-        // 更新容器位置到新的屏幕中央
-        // 深度精灵作为容器的子节点，位置自动跟随，无需手动同步
-        if (container) {
-            container.x = app.screen.width / 2;
-            container.y = app.screen.height / 2;
+        if (screenSprite) {
+            screenSprite.width = app.screen.width;
+            screenSprite.height = app.screen.height;
         }
-
-        // 重新计算 Cover 缩放
-        applyCoverScale();
-
+        updateCoverUniforms();
         console.log(`[窗口变化] ${app.screen.width}×${app.screen.height}`);
     });
 
@@ -393,11 +448,11 @@ function bindEvents() {
             if (parallaxValueEl) {
                 parallaxValueEl.textContent = CONFIG.parallaxMultiplier;
             }
-            // Electron 环境：自动保存配置
             if (isElectron && window.electronAPI) {
                 window.electronAPI.saveConfig({
                     parallaxMultiplier: CONFIG.parallaxMultiplier,
                     smoothness: CONFIG.smoothness,
+                    focusDepth: CONFIG.focusDepth,
                 });
             }
         });
@@ -406,16 +461,32 @@ function bindEvents() {
     // ---- 调试面板：平滑度滑块 ----
     if (smoothnessSlider) {
         smoothnessSlider.addEventListener('input', () => {
-            // 滑块的值为 1~30，实际平滑度为 value/100，即 0.01 ~ 0.30
             CONFIG.smoothness = parseInt(smoothnessSlider.value, 10) / 100;
             if (smoothnessValueEl) {
                 smoothnessValueEl.textContent = CONFIG.smoothness.toFixed(2);
             }
-            // Electron 环境：自动保存配置
             if (isElectron && window.electronAPI) {
                 window.electronAPI.saveConfig({
                     parallaxMultiplier: CONFIG.parallaxMultiplier,
                     smoothness: CONFIG.smoothness,
+                    focusDepth: CONFIG.focusDepth,
+                });
+            }
+        });
+    }
+
+    // ---- 调试面板：对焦深度滑块 ----
+    if (focusSlider) {
+        focusSlider.addEventListener('input', () => {
+            CONFIG.focusDepth = parseInt(focusSlider.value, 10) / 100.0;
+            if (focusValueEl) {
+                focusValueEl.textContent = CONFIG.focusDepth.toFixed(2);
+            }
+            if (isElectron && window.electronAPI) {
+                window.electronAPI.saveConfig({
+                    parallaxMultiplier: CONFIG.parallaxMultiplier,
+                    smoothness: CONFIG.smoothness,
+                    focusDepth: CONFIG.focusDepth,
                 });
             }
         });
@@ -431,53 +502,30 @@ function bindEvents() {
     }
 }
 
-// ==================== 动画循环（核心 Lerp 逻辑） ====================
+// ==================== 动画循环（核心 Shader 驱动） ====================
 
 /**
  * 每帧更新函数 —— 由 Pixi.js Ticker 驱动（约 60fps）。
- *
- * 【Lerp 平滑插值说明】
- *
- * 这里不直接把 targetX/Y 赋给滤镜，而是用 Lerp（线性插值）让 current 逐步追赶 target。
- *
- * 直观理解：
- * ┌────────────────────────────────────────────────────┐
- * │  target 是"你的手"（鼠标实时位置）                  │
- * │  current 是"弹簧末端拴着的小球"                     │
- * │  smoothness 是"弹簧的软硬程度"                      │
- * │                                                    │
- * │  手移动 → 弹簧拉伸 → 小球逐渐跟上（有惯性延迟）      │
- * │  手停下 → 小球震荡几下后停在手的位置                │
- * │                                                    │
- * │  这就是为什么画面不会"硬切"而是平滑漂移的原因。      │
- * └────────────────────────────────────────────────────┘
- *
- * @param {number} delta - Pixi.js 提供的帧时间增量（用于帧率无关的动画）
+ * @param {number} delta - 帧时间增量
  */
 function updateLoop(delta) {
-    // delta 大约为 1（在 60fps 时），我们用它来让 lerp 与帧率无关
-    // 帧率较高的屏幕（如 144Hz）不会让动画变快，帧率较低时也不会变慢
     const frameAdjustedSmoothness = 1 - Math.pow(1 - CONFIG.smoothness, delta);
 
     // ---- Lerp 插值 ----
-    // 核心公式：current += (target - current) × factor
     currentX += (targetX - currentX) * frameAdjustedSmoothness;
     currentY += (targetY - currentY) * frameAdjustedSmoothness;
 
-    // ---- 将插值结果映射到滤镜强度 ----
-    /**
-     * displacementFilter.scale.x / y 控制 X 轴和 Y 轴的位移强度。
-     *
-     * currentX 的范围是 [-1, 1]（鼠标在左边时为负，右边为正），
-     * 乘以 parallaxMultiplier 后得到实际的像素偏移量。
-     *
-     * 例如 parallaxMultiplier = 30 时：
-     *   - 鼠标在最左边  → scale.x = -30  （像素向左偏移）
-     *   - 鼠标在正中间  → scale.x =   0  （无偏移）
-     *   - 鼠标在最右边  → scale.x = +30  （像素向右偏移）
-     */
-    displacementFilter.scale.x = currentX * CONFIG.parallaxMultiplier;
-    displacementFilter.scale.y = currentY * CONFIG.parallaxMultiplier;
+    // ---- 驱动 2.5D 深度视差 Shader ----
+    if (parallaxFilter) {
+        // 鼠标右移时 (currentX > 0)，近景往左移产生透视反差（整体赋值触发 Proxy setter）
+        parallaxFilter.uniforms.uMouse = [-currentX, -currentY];
+
+        // 视差强度系数转换
+        parallaxFilter.uniforms.uStrength = (CONFIG.parallaxMultiplier / 1000.0) * 0.75;
+
+        // 对焦深度
+        parallaxFilter.uniforms.uFocus = CONFIG.focusDepth !== undefined ? CONFIG.focusDepth : 0.50;
+    }
 }
 
 // ==================== 错误处理 ====================
@@ -611,9 +659,10 @@ if (isElectron) {
     // ---- 监听主进程发来的配置加载 ----
     window.electronAPI.onLoadConfig((config) => {
         console.log('[App] 加载已保存的配置:', config);
-        if (config && config.parallaxMultiplier !== undefined) {
-            CONFIG.parallaxMultiplier = config.parallaxMultiplier;
-            CONFIG.smoothness = config.smoothness || 0.08;
+        if (config) {
+            if (config.parallaxMultiplier !== undefined) CONFIG.parallaxMultiplier = config.parallaxMultiplier;
+            if (config.smoothness !== undefined) CONFIG.smoothness = config.smoothness;
+            if (config.focusDepth !== undefined) CONFIG.focusDepth = config.focusDepth;
             CONFIG.hideDebugPanel = config.hideDebugPanel !== false;
 
             // 同步 UI 滑块
@@ -621,6 +670,8 @@ if (isElectron) {
             if (parallaxValueEl) parallaxValueEl.textContent = CONFIG.parallaxMultiplier;
             if (smoothnessSlider) smoothnessSlider.value = Math.round(CONFIG.smoothness * 100);
             if (smoothnessValueEl) smoothnessValueEl.textContent = CONFIG.smoothness.toFixed(2);
+            if (focusSlider) focusSlider.value = Math.round(CONFIG.focusDepth * 100);
+            if (focusValueEl) focusValueEl.textContent = Number(CONFIG.focusDepth).toFixed(2);
 
             // 根据配置隐藏调试面板
             if (CONFIG.hideDebugPanel && debugPanel) {
@@ -635,6 +686,7 @@ if (isElectron) {
             window.electronAPI.saveConfig({
                 parallaxMultiplier: CONFIG.parallaxMultiplier,
                 smoothness: CONFIG.smoothness,
+                focusDepth: CONFIG.focusDepth,
                 hideDebugPanel: CONFIG.hideDebugPanel,
             });
         }
@@ -693,30 +745,31 @@ async function reloadWithNewImages(bgImg, depthSource) {
 
     // 解析深度图来源
     let depthImg = depthSource;
-    if (typeof depthSource === 'string' && depthSource.startsWith('data:')) {
-        depthImg = await loadImageFromDataURL(depthSource);
+    if (typeof depthSource === 'string') {
+        depthImg = await loadImage(depthSource);
     }
 
     // 更新纹理
-    const bgTexture = PIXI.Texture.from(bgImg);
-    const depthTexture = PIXI.Texture.from(depthImg);
+    bgTexture = PIXI.Texture.from(bgImg);
+    depthTexture = PIXI.Texture.from(depthImg);
+    bgTexture.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
     depthTexture.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
-
-    // 更新精灵
-    if (bgSprite) bgSprite.texture = bgTexture;
-    if (depthSprite) depthSprite.texture = depthTexture;
 
     // 更新尺寸缓存
     bgNaturalWidth = bgImg.naturalWidth || bgImg.width;
     bgNaturalHeight = bgImg.naturalHeight || bgImg.height;
 
-    // 重新缩放
-    applyCoverScale();
+    // 更新 Shader Uniforms
+    if (parallaxFilter) {
+        parallaxFilter.uniforms.uImage = bgTexture;
+        parallaxFilter.uniforms.uDepth = depthTexture;
+        updateCoverUniforms();
+    }
 
     // 恢复动画
     app.ticker.start();
 
-    console.log('[App] 壁纸已重新加载');
+    console.log('[App] 壁纸与深度图已重新加载并应用 Parallax Shader');
 }
 
 /**

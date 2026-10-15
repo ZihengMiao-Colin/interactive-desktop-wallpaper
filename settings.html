@@ -370,6 +370,11 @@
             <span class="value" id="smoothness-value">0.08</span>
             <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
         </div>
+        <div class="row">
+            <label title="设置视觉主体深度，该深度的物体保持完全静止，彻底消除割裂线">对焦深度</label>
+            <span class="value" id="focus-value">0.50</span>
+            <input type="range" id="focus-depth" min="0" max="100" value="50" step="1">
+        </div>
     </div>
 
     <!-- 系统 -->
@@ -412,9 +417,22 @@
         const smoothnessSlider = document.getElementById('smoothness');
         const parallaxValue = document.getElementById('parallax-value');
         const smoothnessValue = document.getElementById('smoothness-value');
+        const focusSlider = document.getElementById('focus-depth');
+        const focusValue = document.getElementById('focus-value');
         const autoLaunchToggle = document.getElementById('auto-launch-toggle');
         const depthBlurSlider = document.getElementById('depth-blur');
         const blurValueEl = document.getElementById('blur-value');
+
+        // ==================== 对焦深度滑块 ====================
+        if (focusSlider) {
+            focusSlider.addEventListener('input', () => {
+                const val = parseInt(focusSlider.value, 10) / 100.0;
+                focusValue.textContent = val.toFixed(2);
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ focusDepth: val });
+                }
+            });
+        }
 
         // ==================== 边缘平滑滑块 ====================
         if (depthBlurSlider) {
@@ -637,6 +655,10 @@
                     if (config.smoothness !== undefined) {
                         smoothnessSlider.value = Math.round(config.smoothness * 100);
                         smoothnessValue.textContent = config.smoothness.toFixed(2);
+                    }
+                    if (config.focusDepth !== undefined && focusSlider) {
+                        focusSlider.value = Math.round(config.focusDepth * 100);
+                        focusValue.textContent = Number(config.focusDepth).toFixed(2);
                     }
                     if (config.blurRadius !== undefined && depthBlurSlider) {
                         depthBlurSlider.value = config.blurRadius;

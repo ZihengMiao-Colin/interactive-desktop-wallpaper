@@ -186,6 +186,8 @@ class AppStore {
         return {
             parallaxMultiplier: 30,
             smoothness: 0.08,
+            focusDepth: 0.50,
+            blurRadius: 8,
             autoLaunch: false,
             currentImage: '',
             hideDebugPanel: true,      // 打包后默认隐藏调试面板
