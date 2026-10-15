@@ -32,10 +32,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * 调用 Python 脚本生成深度图。
      * @param {string} imagePath - 原始图片路径
      * @param {string} modelSize - 模型大小: "small" / "base" / "large"
+     * @param {number} [blurRadius] - 边缘平滑高斯模糊半径（像素），0为不平滑，默认 8
      * @returns {Promise<{success: boolean, depthDataUrl?: string, error?: string}>}
      */
-    generateDepthMap: (imagePath, modelSize) =>
-        ipcRenderer.invoke('depth:generate', { imagePath, modelSize }),
+    generateDepthMap: (imagePath, modelSize, blurRadius) =>
+        ipcRenderer.invoke('depth:generate', { imagePath, modelSize, blurRadius }),
 
     /**
      * 监听深度图生成进度。

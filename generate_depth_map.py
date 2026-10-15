@@ -72,10 +72,11 @@ def generate_depth_map_onnx(
     output_path,
     onnx_path,
     invert=False,
+    blur_radius=8.0,
 ):
     """Generate depth map using ONNX Runtime (no network needed)."""
     import numpy as np
-    from PIL import Image
+    from PIL import Image, ImageFilter
 
     # ---- Load image ----
     try:
@@ -169,6 +170,11 @@ def generate_depth_map_onnx(
         depth_pil = Image.fromarray(255 - np.array(depth_pil), mode="L")
         print("[Invert] Depth map inverted (black=near, white=far)")
 
+    # ---- Optional Gaussian blur for edge smoothing ----
+    if blur_radius and blur_radius > 0:
+        print(f"[Smooth] Applying edge smoothing (Gaussian blur radius: {blur_radius})...")
+        depth_pil = depth_pil.filter(ImageFilter.GaussianBlur(radius=float(blur_radius)))
+
     # ---- Save ----
     depth_pil.save(output_path)
 
@@ -211,10 +217,11 @@ def generate_depth_map_hf(
     output_path,
     model_size="small",
     invert=False,
+    blur_radius=8.0,
     device=None,
 ):
     """Generate depth map using HuggingFace Transformers."""
-    from PIL import Image
+    from PIL import Image, ImageFilter
     import numpy as np
     import torch
     from transformers import AutoImageProcessor, AutoModelForDepthEstimation
@@ -314,6 +321,12 @@ def generate_depth_map_hf(
 
     # ---- Save ----
     depth_image = Image.fromarray(depth_uint8, mode="L")
+
+    # ---- Optional Gaussian blur for edge smoothing ----
+    if blur_radius and blur_radius > 0:
+        print(f"[Smooth] Applying edge smoothing (Gaussian blur radius: {blur_radius})...")
+        depth_image = depth_image.filter(ImageFilter.GaussianBlur(radius=float(blur_radius)))
+
     depth_image.save(output_path)
 
     file_size = os.path.getsize(output_path)
@@ -330,6 +343,7 @@ def generate_depth_map(
     output_path,
     model_size="small",
     invert=False,
+    blur_radius=8.0,
     device=None,
     onnx_path=None,
 ):
@@ -359,6 +373,7 @@ def generate_depth_map(
             output_path=output_path,
             onnx_path=selected_onnx,
             invert=invert,
+            blur_radius=blur_radius,
         )
     else:
         if available_onnx:
@@ -371,6 +386,7 @@ def generate_depth_map(
             output_path=output_path,
             model_size=model_size,
             invert=invert,
+            blur_radius=blur_radius,
             device=device,
         )
 
@@ -383,6 +399,7 @@ def main():
 Examples:
   python generate_depth_map.py wallpaper.jpg
   python generate_depth_map.py photo.png -o depth_map.png -m base
+  python generate_depth_map.py image.jpg --blur 12
   python generate_depth_map.py image.jpg --invert
   python generate_depth_map.py image.jpg --onnx-path model.onnx
         """,
@@ -402,6 +419,12 @@ Examples:
         choices=["small", "base", "large"],
         default="small",
         help="Model size: small(fast) / base(balanced) / large(best) [default: small]",
+    )
+    parser.add_argument(
+        "--blur",
+        type=float,
+        default=8.0,
+        help="Gaussian blur radius for edge smoothing to reduce tearing (default: 8.0, set 0 to disable)",
     )
     parser.add_argument(
         "--invert",
@@ -437,6 +460,7 @@ Examples:
         output_path=args.output,
         model_size=args.model,
         invert=args.invert,
+        blur_radius=args.blur,
         device=args.device,
         onnx_path=args.onnx_path,
     )

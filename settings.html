@@ -334,6 +334,13 @@
             </div>
         </div>
 
+        <!-- 边缘平滑度 (抗撕裂) -->
+        <div class="row" style="margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 6px;">
+            <label title="通过对深度图边缘进行高斯平滑，有效消除大幅度视差下的拉丝和撕裂感">边缘平滑 (抗撕裂)</label>
+            <span class="value" id="blur-value">8px</span>
+            <input type="range" id="depth-blur" min="0" max="30" value="8" step="1">
+        </div>
+
         <!-- 进度条 -->
         <div class="progress-section" id="progress-section">
             <div class="progress-bar-outer">
@@ -406,6 +413,24 @@
         const parallaxValue = document.getElementById('parallax-value');
         const smoothnessValue = document.getElementById('smoothness-value');
         const autoLaunchToggle = document.getElementById('auto-launch-toggle');
+        const depthBlurSlider = document.getElementById('depth-blur');
+        const blurValueEl = document.getElementById('blur-value');
+
+        // ==================== 边缘平滑滑块 ====================
+        if (depthBlurSlider) {
+            depthBlurSlider.addEventListener('input', () => {
+                const val = parseInt(depthBlurSlider.value, 10);
+                blurValueEl.textContent = val === 0 ? '关闭' : val + 'px';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ blurRadius: val });
+                }
+                if (selectedImagePath) {
+                    depthGenerated = false;
+                    btnApplyWallpaper.disabled = true;
+                    setStatus('平滑参数已变更，请重新点击"生成深度图"', '');
+                }
+            });
+        }
 
         // ==================== 模型选择 ====================
         document.querySelectorAll('.model-option').forEach(opt => {
@@ -487,10 +512,11 @@
             progressBar.style.width = '';
             progressText.textContent = '正在启动 Python...';
 
-            setStatus('正在生成深度图（模型: ' + selectedModel + '）...', '');
+            const blurRadius = depthBlurSlider ? parseInt(depthBlurSlider.value, 10) : 8;
+            setStatus(`正在生成深度图（模型: ${selectedModel}, 平滑: ${blurRadius}px）...`, '');
 
             try {
-                const result = await window.electronAPI.generateDepthMap(selectedImagePath, selectedModel);
+                const result = await window.electronAPI.generateDepthMap(selectedImagePath, selectedModel, blurRadius);
 
                 if (result.success) {
                     depthGenerated = true;
@@ -531,6 +557,10 @@
                     progressText.textContent = '🧠 ' + data.message;
                     progressBar.classList.remove('indeterminate');
                     progressBar.style.width = '50%';
+                } else if (data.message.includes('[Smooth]') || data.message.includes('平滑') || data.message.includes('smoothing')) {
+                    progressText.textContent = '✨ ' + data.message;
+                    progressBar.classList.remove('indeterminate');
+                    progressBar.style.width = '85%';
                 }
             });
         }
@@ -607,6 +637,10 @@
                     if (config.smoothness !== undefined) {
                         smoothnessSlider.value = Math.round(config.smoothness * 100);
                         smoothnessValue.textContent = config.smoothness.toFixed(2);
+                    }
+                    if (config.blurRadius !== undefined && depthBlurSlider) {
+                        depthBlurSlider.value = config.blurRadius;
+                        blurValueEl.textContent = config.blurRadius === 0 ? '关闭' : config.blurRadius + 'px';
                     }
                     // 恢复当前图片
                     if (config.currentImage && window.electronAPI.fileExists(config.currentImage)) {

@@ -10,6 +10,10 @@ out/
 __pycache__/
 *.pyc
 
+# Python virtual environment
+venv/
+.venv/
+
 # IDE
 .vscode/
 .idea/

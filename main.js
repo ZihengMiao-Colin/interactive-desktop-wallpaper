@@ -382,20 +382,27 @@ function registerIpcHandlers() {
     });
 
     // ---- 生成深度图（调用 Python 脚本） ----
-    ipcMain.handle('depth:generate', async (event, { imagePath, modelSize }) => {
+    ipcMain.handle('depth:generate', async (event, { imagePath, modelSize, blurRadius }) => {
         const scriptPath = path.join(__dirname, 'generate_depth_map.py');
         const cacheKey = store._hashPath(imagePath);
         const outputPath = path.join(store._cacheDir, `${cacheKey}.png`);
 
-        console.log(`[Main] Starting depth generation: ${imagePath} (model: ${modelSize || 'small'})`);
+        const blurVal = (blurRadius !== undefined && blurRadius !== null) ? Number(blurRadius) : 8.0;
+        console.log(`[Main] Starting depth generation: ${imagePath} (model: ${modelSize || 'small'}, blur: ${blurVal})`);
 
         return new Promise((resolve) => {
             const args = ['-X', 'utf8', scriptPath, imagePath, '-o', outputPath];
             if (modelSize) {
                 args.push('-m', modelSize);
             }
+            args.push('--blur', String(blurVal));
 
-            const proc = spawn('python', args, {
+            // 优先使用项目虚拟环境里的 Python（包含所有依赖），找不到则回退到系统 python
+            const venvPython = path.join(__dirname, 'venv', 'Scripts', 'python.exe');
+            const pythonExe = fs.existsSync(venvPython) ? venvPython : 'python';
+            console.log(`[Main] Using Python: ${pythonExe}`);
+
+            const proc = spawn(pythonExe, args, {
                 stdio: ['ignore', 'pipe', 'pipe'],
                 env: {
                     ...process.env,
