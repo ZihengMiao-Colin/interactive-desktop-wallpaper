@@ -137,6 +137,37 @@ function removeUserAssetFiles(asset) {
     }
 }
 
+/**
+ * 删除素材库目录里没被任何素材引用的文件。
+ * 移除素材时如果视频正被壁纸播放，Windows 上文件会被占用删不掉，留下的副本在下次启动时清理。
+ * @param {string} libraryDir
+ * @param {Array<{file: string, thumb: string|null}>} library
+ * @returns {string[]} 删除的文件名
+ */
+function cleanupOrphanFiles(libraryDir, library) {
+    if (!fs.existsSync(libraryDir)) return [];
+    const referenced = new Set();
+    for (const asset of library) {
+        for (const f of [asset.file, asset.thumb]) {
+            if (f) referenced.add(path.resolve(f).toLowerCase());
+        }
+    }
+
+    const removed = [];
+    for (const name of fs.readdirSync(libraryDir)) {
+        const full = path.join(libraryDir, name);
+        if (referenced.has(path.resolve(full).toLowerCase())) continue;
+        try {
+            if (!fs.statSync(full).isFile()) continue;
+            fs.unlinkSync(full);
+            removed.push(name);
+        } catch (_) {
+            // 仍被占用就留到下次
+        }
+    }
+    return removed;
+}
+
 /** 保存缩略图（JPEG Data URL），返回文件路径 */
 function saveThumbnail(libraryDir, assetId, dataUrl) {
     const base64 = dataUrl.replace(/^data:[^;]+;base64,/, '');
@@ -157,6 +188,7 @@ module.exports = {
     loadBuiltinAssets,
     importUserAsset,
     removeUserAssetFiles,
+    cleanupOrphanFiles,
     saveThumbnail,
     toFileUrl,
 };

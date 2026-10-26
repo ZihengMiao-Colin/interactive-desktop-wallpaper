@@ -46,6 +46,7 @@ const { registerElementsIpc } = require('./src/elements/ipc');
 const { PlacementController } = require('./src/elements/placement-controller');
 const { upsertInstance } = require('./shared/elements-model');
 const { migrateLegacySticker } = require('./src/elements/migrate');
+const { cleanupOrphanFiles } = require('./src/elements/library');
 
 // ==================== 全局状态 ====================
 
@@ -862,6 +863,10 @@ app.whenReady().then(() => {
             return width && height ? width / height : 1;
         },
     });
+
+    // 清理上次没删掉的素材副本（移除素材时视频可能正被占用）
+    const orphans = cleanupOrphanFiles(store.getElementsDir(), store.getConfig().customElements.library);
+    if (orphans.length) console.log('[Main] 已清理无用的素材文件:', orphans);
 
     // 2. 注册 IPC 处理器
     registerIpcHandlers();

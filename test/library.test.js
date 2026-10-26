@@ -128,3 +128,20 @@ test('项目自带的 manifest 能读出两个爆炸视频素材', () => {
         assert.ok(a.aspect > 0);
     }
 });
+
+test('cleanupOrphanFiles 删除素材库没引用的文件，保留被引用的副本和缩略图', () => {
+    const dir = tmpDir();
+    const keep = write(dir, 'a.png', pngBytes);
+    const keepThumb = write(dir, 'a_thumb.jpg', Buffer.alloc(4));
+    write(dir, 'orphan.mp4', Buffer.alloc(4));
+    write(dir, 'orphan_thumb.jpg', Buffer.alloc(4));
+    const removed = lib.cleanupOrphanFiles(dir, [{ id: 'user:a', file: keep, thumb: keepThumb }]);
+    assert.deepEqual(removed.sort(), ['orphan.mp4', 'orphan_thumb.jpg']);
+    assert.ok(fs.existsSync(keep));
+    assert.ok(fs.existsSync(keepThumb));
+    assert.deepEqual(fs.readdirSync(dir).sort(), ['a.png', 'a_thumb.jpg']);
+});
+
+test('cleanupOrphanFiles 目录不存在时返回空数组', () => {
+    assert.deepEqual(lib.cleanupOrphanFiles(path.join(tmpDir(), 'nope'), []), []);
+});
