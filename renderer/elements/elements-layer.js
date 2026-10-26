@@ -131,6 +131,30 @@ class ElementsLayer {
         }
     }
 
+    /**
+     * 是否需要继续每帧渲染：有循环播放的视频 / 动图、间隔播放正在播（或还没开始第一次），
+     * 或者还有素材在加载。都没有时壁纸可以停帧。
+     */
+    needsFrames() {
+        if (this.paused) return false;
+        if (this.loading.size > 0) return true;
+        for (const { instance, source, scheduler } of this.entries.values()) {
+            if (!instance.visible || !source.animated) continue;
+            if (scheduler ? scheduler.needsFrames : instance.playback && instance.playback.mode === 'loop') return true;
+        }
+        return false;
+    }
+
+    /** 最早一个"间隔播放"元素下一次开始播放的时间（performance.now 时间轴）；没有则为 null */
+    nextWakeMs() {
+        let next = null;
+        for (const { instance, scheduler } of this.entries.values()) {
+            const at = instance.visible && scheduler ? scheduler.nextEventMs : null;
+            if (at !== null && (next === null || at < next)) next = at;
+        }
+        return next;
+    }
+
     // ==================== 内部 ====================
 
     /** 当前应该显示的实例：已保存的（草稿替代同 id 的那个）+ 草稿 */

@@ -20,12 +20,21 @@ class WeatherParticleManager {
         this.resize();
     }
 
+    /** 画布按屏幕像素密度放大，高分屏下粒子不发糊；绘制坐标仍用 CSS 像素 */
     resize() {
         if (!this.canvas) return;
+        const dpr = window.devicePixelRatio || 1;
         this.width = window.innerWidth;
         this.height = window.innerHeight;
-        this.canvas.width = this.width;
-        this.canvas.height = this.height;
+        this.canvas.width = Math.round(this.width * dpr);
+        this.canvas.height = Math.round(this.height * dpr);
+        // 改画布尺寸会重置变换，所以每次都要重新设置缩放
+        if (this.ctx) this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    /** 是否有粒子在动（需要每帧渲染） */
+    isActive() {
+        return this.type !== 'none' && this.particles.length > 0;
     }
 
     setConfig(config) {

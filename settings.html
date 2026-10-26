@@ -888,11 +888,18 @@
 
     <div class="status" id="status-text">设置已加载</div>
 
+    <script src="shared/config-sync.js"></script>
     <script src="settings/thumbnail.js"></script>
     <script src="settings/elements-tab.js"></script>
     <script>
         // ==================== 状态 ====================
         const isElectron = !!(window.electronAPI);
+
+        // 拖滑块时节流保存：第一次立即发送，之后每 100ms 最多一次，最后的值一定会发出去。
+        // 否则每个 input 事件都会写一次 config.json 并把完整配置广播给壁纸
+        const configSaver = Shared.configSync.createConfigSaver(
+            (partial) => window.electronAPI.saveConfig(partial), 100);
+        window.addEventListener('beforeunload', () => configSaver.flush());
 
         let selectedImagePath = null;
         let depthGenerated = false;
@@ -930,7 +937,7 @@
                 const val = parseInt(focusSlider.value, 10) / 100.0;
                 focusValue.textContent = val.toFixed(2);
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ focusDepth: val });
+                    configSaver.save({ focusDepth: val });
                 }
             });
         }
@@ -941,7 +948,7 @@
                 const val = parseInt(depthBlurSlider.value, 10);
                 blurValueEl.textContent = val === 0 ? '关闭' : val + 'px';
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ blurRadius: val });
+                    configSaver.save({ blurRadius: val });
                 }
                 if (selectedImagePath) {
                     depthGenerated = false;
@@ -1141,7 +1148,7 @@
                 }
 
                 if (isElectron) {
-                    window.electronAPI.saveConfig(RECOMMENDED);
+                    configSaver.save(RECOMMENDED);
                 }
 
                 setStatus('已恢复推荐设置（强度: 20, 阻尼: 0.08, 对焦: 0.50）', 'success');
@@ -1153,7 +1160,7 @@
             const val = parseInt(parallaxSlider.value, 10);
             parallaxValue.textContent = val;
             if (isElectron) {
-                window.electronAPI.saveConfig({ parallaxMultiplier: val });
+                configSaver.save({ parallaxMultiplier: val });
             }
         });
 
@@ -1161,7 +1168,7 @@
             const val = parseFloat(smoothnessSlider.value) / 100.0;
             smoothnessValue.textContent = val.toFixed(2);
             if (isElectron) {
-                window.electronAPI.saveConfig({ smoothness: val });
+                configSaver.save({ smoothness: val });
             }
         });
 
@@ -1207,7 +1214,7 @@
         if (vinylEnabled) {
             vinylEnabled.addEventListener('change', () => {
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ vinyl: { enabled: vinylEnabled.checked } });
+                    configSaver.save({ vinyl: { enabled: vinylEnabled.checked } });
                 }
                 setStatus(vinylEnabled.checked ? '已开启黑胶唱片机' : '已关闭黑胶唱片机', '');
             });
@@ -1222,7 +1229,7 @@
                         isVinylPlaying = true;
                         vinylCurrentMusicName.textContent = audioRes.name;
                         btnPlayPauseToggle.textContent = '⏸️ 暂停播放';
-                        window.electronAPI.saveConfig({
+                        configSaver.save({
                             vinyl: {
                                 enabled: true,
                                 audioPath: audioRes.path,
@@ -1244,7 +1251,7 @@
                 if (!isElectron) return;
                 isVinylPlaying = !isVinylPlaying;
                 btnPlayPauseToggle.textContent = isVinylPlaying ? '⏸️ 暂停播放' : '▶️ 开始播放';
-                window.electronAPI.saveConfig({ vinyl: { playing: isVinylPlaying } });
+                configSaver.save({ vinyl: { playing: isVinylPlaying } });
                 setStatus(isVinylPlaying ? '唱片机已开始播放' : '唱片机已暂停', '');
             });
         }
@@ -1254,7 +1261,7 @@
                 const vol = parseInt(vinylVolume.value, 10);
                 vinylVolumeVal.textContent = vol + '%';
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ vinyl: { volume: vol / 100.0 } });
+                    configSaver.save({ vinyl: { volume: vol / 100.0 } });
                 }
             });
         }
@@ -1262,7 +1269,7 @@
         if (vinylPosition) {
             vinylPosition.addEventListener('change', () => {
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ vinyl: { position: vinylPosition.value } });
+                    configSaver.save({ vinyl: { position: vinylPosition.value } });
                 }
             });
         }
@@ -1272,7 +1279,7 @@
                 const s = parseInt(vinylScale.value, 10);
                 vinylScaleVal.textContent = s + '%';
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ vinyl: { scale: s / 100.0 } });
+                    configSaver.save({ vinyl: { scale: s / 100.0 } });
                 }
             });
         }
@@ -1283,7 +1290,7 @@
                 try {
                     const coverPath = await window.electronAPI.selectCover();
                     if (coverPath) {
-                        window.electronAPI.saveConfig({ vinyl: { coverPath: coverPath } });
+                        configSaver.save({ vinyl: { coverPath: coverPath } });
                         setStatus('已更换唱片中心封面', 'success');
                     }
                 } catch (err) {
@@ -1295,7 +1302,7 @@
         if (btnResetCover) {
             btnResetCover.addEventListener('click', () => {
                 if (!isElectron) return;
-                window.electronAPI.saveConfig({ vinyl: { coverPath: '' } });
+                configSaver.save({ vinyl: { coverPath: '' } });
                 setStatus('已重置为默认唱片封面', '');
             });
         }
@@ -1313,7 +1320,7 @@
                 btn.classList.add('active');
                 const weatherType = btn.dataset.weather;
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ weather: { type: weatherType } });
+                    configSaver.save({ weather: { type: weatherType } });
                 }
                 const names = { none: '无特效', rain: '绵绵细雨', snow: '浪漫冬雪', sakura: '唯美落樱', leaves: '秋日枫叶', sunlight: '暖目光斑' };
                 setStatus(`已应用天气特效: ${names[weatherType] || weatherType}`, 'success');
@@ -1323,7 +1330,7 @@
         if (weatherDensity) {
             weatherDensity.addEventListener('change', () => {
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ weather: { density: weatherDensity.value } });
+                    configSaver.save({ weather: { density: weatherDensity.value } });
                 }
             });
         }
@@ -1333,7 +1340,7 @@
                 const spd = parseInt(weatherSpeed.value, 10) / 10.0;
                 weatherSpeedVal.textContent = spd.toFixed(1) + 'x';
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ weather: { speed: spd } });
+                    configSaver.save({ weather: { speed: spd } });
                 }
             });
         }
@@ -1341,7 +1348,7 @@
         if (weatherParallaxToggle) {
             weatherParallaxToggle.addEventListener('change', () => {
                 if (isElectron) {
-                    window.electronAPI.saveConfig({ weather: { parallax: weatherParallaxToggle.checked } });
+                    configSaver.save({ weather: { parallax: weatherParallaxToggle.checked } });
                 }
             });
         }
@@ -1404,7 +1411,7 @@
                         videoOverlayEnabled.checked = true;
                     }
                     if (isElectron) {
-                        window.electronAPI.saveConfig({
+                        configSaver.save({
                             videoOverlay: {
                                 enabled: true,
                                 presetId: preset.id,
@@ -1432,7 +1439,7 @@
             videoOverlayEnabled.addEventListener('change', () => {
                 const isEnabled = videoOverlayEnabled.checked;
                 if (isElectron) {
-                    window.electronAPI.saveConfig({
+                    configSaver.save({
                         videoOverlay: { enabled: isEnabled }
                     });
                 }
@@ -1454,7 +1461,7 @@
                         updateVideoCardSelection();
                         if (videoOverlayEnabled) videoOverlayEnabled.checked = true;
 
-                        window.electronAPI.saveConfig({
+                        configSaver.save({
                             videoOverlay: {
                                 enabled: true,
                                 presetId: 'custom',
@@ -1477,7 +1484,7 @@
                 updateVideoCardSelection();
                 if (videoOverlayEnabled) videoOverlayEnabled.checked = true;
                 if (isElectron) {
-                    window.electronAPI.saveConfig({
+                    configSaver.save({
                         videoOverlay: {
                             enabled: true,
                             presetId: 'custom',
@@ -1493,7 +1500,7 @@
         if (videoBlendMode) {
             videoBlendMode.addEventListener('change', () => {
                 if (isElectron) {
-                    window.electronAPI.saveConfig({
+                    configSaver.save({
                         videoOverlay: { blendMode: videoBlendMode.value }
                     });
                 }
@@ -1507,7 +1514,7 @@
                 const val = parseInt(videoOpacity.value, 10);
                 videoOpacityVal.textContent = val + '%';
                 if (isElectron) {
-                    window.electronAPI.saveConfig({
+                    configSaver.save({
                         videoOverlay: { opacity: val / 100.0 }
                     });
                 }
@@ -1519,7 +1526,7 @@
                 const val = parseInt(videoSpeed.value, 10) / 10.0;
                 videoSpeedVal.textContent = val.toFixed(1) + 'x';
                 if (isElectron) {
-                    window.electronAPI.saveConfig({
+                    configSaver.save({
                         videoOverlay: { speed: val }
                     });
                 }

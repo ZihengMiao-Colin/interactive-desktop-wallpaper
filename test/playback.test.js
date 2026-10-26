@@ -57,3 +57,30 @@ test('暂停期间不计时，待播时间顺延', () => {
     assert.equal(s.tick(26999, false), null);
     assert.equal(s.tick(27000, false), 'start');
 });
+
+test('调度器：首次和播放中需要出帧，没有定时唤醒', () => {
+    const s = new IntervalScheduler({ intervalSec: 10, jitterSec: 3 }, () => 0.5);
+    assert.equal(s.needsFrames, true);
+    assert.equal(s.nextEventMs, null);
+    s.tick(0, false);
+    assert.equal(s.needsFrames, true);
+    assert.equal(s.nextEventMs, null);
+});
+
+test('调度器：等待下一次播放时不需要出帧，给出唤醒时间', () => {
+    const s = new IntervalScheduler({ intervalSec: 10, jitterSec: 3 }, () => 0.5);
+    s.tick(0, false);
+    s.tick(7000, true);
+    assert.equal(s.needsFrames, false);
+    assert.equal(s.nextEventMs, 17000);
+});
+
+test('调度器：暂停期间不给唤醒时间，恢复后唤醒时间顺延', () => {
+    const s = new IntervalScheduler({ intervalSec: 10, jitterSec: 3 }, () => 0.5);
+    s.tick(0, false);
+    s.tick(7000, true);
+    s.pause(10000);
+    assert.equal(s.nextEventMs, null);
+    s.resume(12000);
+    assert.equal(s.nextEventMs, 19000);
+});

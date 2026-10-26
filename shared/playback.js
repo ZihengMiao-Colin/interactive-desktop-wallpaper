@@ -52,6 +52,16 @@
             return this.state === 'playing';
         }
 
+        /** 是否需要每帧 tick：还没开始第一次播放，或者正在播放 */
+        get needsFrames() {
+            return this.state !== 'waiting';
+        }
+
+        /** 等待下一次播放时返回开始时间（用来定时唤醒停掉的渲染），其余情况为 null */
+        get nextEventMs() {
+            return this.state === 'waiting' && this.pausedAtMs === null ? this.nextStartMs : null;
+        }
+
         /**
          * 每帧调用。
          * @param {number} nowMs
