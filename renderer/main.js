@@ -10,6 +10,9 @@
 /** 是否运行在 Electron 中（浏览器直接打开 index.html 时为 false） */
 const isElectron = !!window.electronAPI;
 
+/** 摆放窗口：只渲染背景和自定义元素，背景视差冻结在中心 */
+const isEditMode = Host.mode === 'edit';
+
 /** 视差参数（会被主进程下发的配置覆盖） */
 const CONFIG = {
     /** 视差强度系数 */
@@ -94,7 +97,9 @@ let currentX = 0;
 let currentY = 0;
 
 function bindEvents() {
-    if (isElectron) {
+    if (isEditMode) {
+        // 摆放模式下鼠标用来拖元素，不驱动视差
+    } else if (isElectron) {
         // 壁纸挂在 WorkerW 层收不到 mousemove，坐标由主进程轮询后推送
         window.electronAPI.onMouseMove((pos) => {
             targetX = (pos.x / window.innerWidth) * 2 - 1;
@@ -217,7 +222,7 @@ async function resolveInitialSources() {
 
     try {
         const config = await window.electronAPI.getConfig();
-        applyCustomElementsConfig(config);
+        if (!isEditMode) applyCustomElementsConfig(config);
         const current = config && config.currentImage;
         if (current && window.electronAPI.fileExists(current)) {
             const cachedDepth = await window.electronAPI.getDepthCache(current);
@@ -231,8 +236,9 @@ async function resolveInitialSources() {
 
 async function start() {
     UI.showLoading('正在加载壁纸素材...');
+    if (isEditMode) CONFIG.hideDebugPanel = true;
     syncDebugPanel();
-    if (isElectron) registerIpcListeners();
+    if (isElectron && !isEditMode) registerIpcListeners();
 
     const sources = await resolveInitialSources();
     try {
@@ -256,6 +262,11 @@ async function start() {
     bindEvents();
     Scene.app.ticker.add(updateLoop);
     UI.hideLoading();
+
+    if (isEditMode) {
+        await startEditMode({ scene: Scene, layer: elementsLayer, host: Host });
+        return;
+    }
 
     if (isElectron) {
         window.electronAPI.notifyReady();

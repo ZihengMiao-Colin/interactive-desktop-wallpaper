@@ -554,3 +554,93 @@ body > canvas {
     margin-top: 1px;
 }
 
+
+/* ==================== 自定义元素摆放模式 ==================== */
+
+#placement-ui {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    font-family: 'Microsoft YaHei', sans-serif;
+    user-select: none;
+}
+
+#placement-ui[hidden] {
+    display: none;
+}
+
+#placement-hint {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(20, 22, 30, 0.85);
+    color: #fff;
+    font-size: 13px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+#placement-box {
+    position: absolute;
+    border: 2px dashed #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+    cursor: move;
+    touch-action: none;
+}
+
+#placement-box .handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border: 1px solid #333;
+    border-radius: 2px;
+}
+
+#placement-box .handle[data-corner="nw"] { left: -7px; top: -7px; cursor: nwse-resize; }
+#placement-box .handle[data-corner="ne"] { right: -7px; top: -7px; cursor: nesw-resize; }
+#placement-box .handle[data-corner="sw"] { left: -7px; bottom: -7px; cursor: nesw-resize; }
+#placement-box .handle[data-corner="se"] { right: -7px; bottom: -7px; cursor: nwse-resize; }
+
+#placement-toolbar {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(20, 22, 30, 0.9);
+    color: #e6e6ea;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#placement-depth {
+    width: 120px;
+}
+
+#placement-depth-value {
+    min-width: 72px;
+    color: #9ec5ff;
+}
+
+.placement-btn {
+    padding: 5px 12px;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.placement-btn.primary {
+    background: #2f9e5b;
+}
+
+.placement-btn:hover {
+    filter: brightness(1.15);
+}

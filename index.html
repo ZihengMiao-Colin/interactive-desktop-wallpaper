@@ -115,6 +115,24 @@
         </div>
     </div>
 
+    <!-- ==================== 自定义元素摆放模式（仅摆放窗口使用） ==================== -->
+    <div id="placement-ui" hidden>
+        <div id="placement-hint">摆放模式 · 拖动移动，拖动角点缩放，Enter 确认，Esc 取消</div>
+        <div id="placement-box">
+            <span class="handle" data-corner="nw"></span>
+            <span class="handle" data-corner="ne"></span>
+            <span class="handle" data-corner="sw"></span>
+            <span class="handle" data-corner="se"></span>
+        </div>
+        <div id="placement-toolbar">
+            <label for="placement-depth">深度</label>
+            <input type="range" id="placement-depth" min="0" max="100" value="50" step="1">
+            <span id="placement-depth-value">0.50</span>
+            <button id="placement-confirm" class="placement-btn primary">✓ 确认</button>
+            <button id="placement-cancel" class="placement-btn">✕ 取消</button>
+        </div>
+    </div>
+
     <!-- 音频播放器 -->
     <audio id="bg-audio" loop preload="auto"></audio>
 
@@ -134,6 +152,8 @@
     <script src="renderer/elements/sources.js"></script>
     <script src="renderer/elements/element-shader.js"></script>
     <script src="renderer/elements/elements-layer.js"></script>
+    <script src="renderer/elements/depth-sampler.js"></script>
+    <script src="renderer/edit-mode.js"></script>
     <script src="renderer/main.js"></script>
 </body>
 </html>
