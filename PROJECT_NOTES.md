@@ -68,6 +68,8 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 │   ├── parallax-math.js     Cover 映射、视差位移、元素屏幕位移
 │   ├── elements-model.js    自定义元素数据结构与纯函数
 │   ├── playback.js          动图取帧、间隔播放调度
+│   ├── frame-pacing.js      空闲停帧判断
+│   ├── config-sync.js       配置节流保存、只应用变化的配置段
 │   └── placement-math.js    摆放几何：矩形换算、拖动、角点缩放、深度取样
 ├── src/
 │   ├── elements/
@@ -187,8 +189,8 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ### 🟠 P1
 5. ~~preload 的 `getUserDataPath` 必抛异常~~ ✅ 已删除
 6. ~~换壁纸不释放旧纹理~~ ✅ `Scene.load` 会 `destroy(true)` 旧纹理
-7. 一直 60fps 满帧渲染（鼠标静止也一样）；元素层留了 `pause / resume`，空闲降帧还没做。
-8. 拖动滑块时每次 `input` 都写盘并广播完整配置（自定义元素页签自己做了 150ms 防抖，其他页签还没有）。
+7. ~~一直满帧渲染~~ ✅ 空闲停帧：鼠标静止、视差收敛、没有天气粒子和播放中的视频 / 动图时停掉 ticker（实测静止 3 秒 0 帧）。注意：这台机器屏幕约 240Hz，有动画时仍按刷新率满帧渲染，见 §9 阶段 3 的可选项
+8. ~~拖滑块时每次 input 都写盘并广播~~ ✅ 设置页和调试面板节流保存（首次立即发送，之后每 100ms 最多一次，实测 30 次拖动 → 5 次广播）；壁纸只重新应用变了的配置段
 9. 注入失败的兜底模式 `moveTop()` 会把全屏窗口提到所有程序上面。
 10. 单实例锁写在 `whenReady` 之后。
 11. ~~深度缓存只按文件大小判断~~ ✅ 改为大小 + 修改时间（旧索引没有修改时间的条目仍只比大小）
@@ -198,7 +200,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 13. ~~死代码~~ ✅ 拆分 `app.js` 时已清理
 14. ~~README 过时~~ ✅ 已重写
 15. `hideDebugPanel` 没配置时默认隐藏（Electron 下符合预期；浏览器预览不受影响）。
-16. 天气 canvas 没按 `devicePixelRatio` 缩放，高 DPI 下发糊。
+16. ~~天气 canvas 没按 DPR 缩放~~ ✅
 17. ~~mediump 精度~~ ✅ 改为 highp
 18. 视频素材都进了 git：`overlay/` 139MB（`old1.mp4` 53.7MB 推到 GitHub 会有警告）。素材继续增多的话考虑 Git LFS。
 19. `生成深度图.bat`、`requirements.txt` 仍按 torch 路线写。
@@ -221,11 +223,12 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 - [x] 换纹理时销毁旧纹理。
 - [x] 缓存校验改成大小 + 修改时间。
 
-### 阶段 3 — 性能（P1 #7 #8）
-- [ ] 空闲降帧：鼠标静止、Lerp 收敛、且没有播放中的视频 / 动图时停 ticker。
-- [ ] 其他页签的滑块防抖；`config:load` 只下发变化的部分。
-- [ ] 天气 canvas 按 DPR 缩放。
+### ✅ 阶段 3 — 性能（已完成）
+- [x] 空闲停帧：鼠标静止、视差收敛、且没有天气粒子和播放中的视频 / 动图时停 ticker；鼠标移动、配置变化、窗口尺寸变化时唤醒；间隔播放的元素在等待期间也停帧，到点由定时器唤醒（`shared/frame-pacing.js`、`ElementsLayer.needsFrames / nextWakeMs`）。
+- [x] 设置页和调试面板节流保存（`shared/config-sync.js` 的 `createConfigSaver`）；主进程仍广播完整配置，壁纸端用 `changedSections` 只重新应用变了的段。
+- [x] 天气 canvas 按 DPR 缩放。
 - [x] 视差 shader 改用 highp。
+- [ ] 可选：高刷新率屏幕（这台约 240Hz）上，有动画时可以给 ticker 设 `maxFPS = 60`，进一步降低 GPU 占用；代价是鼠标移动时的视差没有那么丝滑。
 
 ### 阶段 4 — 其他新功能
 - [ ] 默认壁纸图库（`default wallpaper/`）。
