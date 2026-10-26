@@ -142,16 +142,17 @@ function updateLoop(delta) {
 // ==================== 与主进程的通信 ====================
 
 function registerIpcListeners() {
-    window.electronAPI.onPauseRender(() => {
+    // info.silent：摆放模式等内部暂停，不弹提示
+    window.electronAPI.onPauseRender((info) => {
         Scene.app.ticker.stop();
         videoOverlayManager.pause();
-        UI.showToast('壁纸已暂停（检测到全屏应用）', 2000);
+        if (!info.silent) UI.showToast('壁纸已暂停（检测到全屏应用）', 2000);
     });
 
-    window.electronAPI.onResumeRender(() => {
+    window.electronAPI.onResumeRender((info) => {
         Scene.app.ticker.start();
         videoOverlayManager.resume();
-        UI.showToast('壁纸已恢复', 1500);
+        if (!info.silent) UI.showToast('壁纸已恢复', 1500);
     });
 
     window.electronAPI.onNewImage(async (imagePath) => {

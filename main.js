@@ -42,6 +42,9 @@ const { injectToWallpaperLayer, restoreFromWallpaperLayer } = require('./src/wal
 const { createTray, updateTrayMenu } = require('./src/tray-manager');
 const { FullscreenDetector } = require('./src/fullscreen-detector');
 const { AppStore } = require('./src/store');
+const { registerElementsIpc } = require('./src/elements/ipc');
+const { PlacementController } = require('./src/elements/placement-controller');
+const { upsertInstance } = require('./shared/elements-model');
 
 // ==================== 全局状态 ====================
 
@@ -62,6 +65,9 @@ let store = null;
 
 /** 渲染是否活跃 */
 let isRenderingActive = true;
+
+/** 自定义元素摆放模式会话 */
+let placement = null;
 
 /**
  * 主动要求壁纸窗口重绘一次。
@@ -302,6 +308,79 @@ function createSettingsWindow() {
     return settingsWindow;
 }
 
+// ==================== 配置广播 ====================
+
+/** 把最新配置推送给壁纸窗口和设置窗口 */
+function broadcastConfig() {
+    const config = store.getConfig();
+    for (const win of [wallpaperWindow, settingsWindow]) {
+        if (win && !win.isDestroyed()) win.webContents.send('config:load', config);
+    }
+}
+
+// ==================== 自定义元素摆放窗口 ====================
+
+/**
+ * 创建全屏置顶的摆放窗口，加载壁纸页面的编辑模式。
+ * 打开期间暂停真实壁纸的渲染，避免同时跑两个 WebGL 场景。
+ */
+function createPlacementWindow() {
+    const { x, y, width, height } = screen.getPrimaryDisplay().bounds;
+    const win = new BrowserWindow({
+        x, y, width, height,
+        frame: false,
+        resizable: false,
+        movable: false,
+        minimizable: false,
+        maximizable: false,
+        fullscreenable: false,
+        skipTaskbar: true,
+        focusable: true,
+        show: false,
+        backgroundColor: '#000000',
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: false,
+            webgl: true,
+            webSecurity: false,
+        },
+    });
+    win.setAlwaysOnTop(true, 'screen-saver');
+    win.loadFile('index.html', { query: { mode: 'edit' } });
+    win.once('ready-to-show', () => {
+        win.show();
+        win.focus();
+    });
+    // 主进程兜底：渲染进程出问题时 Esc 仍然能退出摆放模式
+    win.webContents.on('before-input-event', (_event, input) => {
+        if (input.type === 'keyDown' && input.key === 'Escape') placement.cancel();
+    });
+    if (isDev) win.webContents.openDevTools({ mode: 'detach' });
+
+    if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
+        wallpaperWindow.webContents.send('renderer:pause', { silent: true });
+    }
+    return win;
+}
+
+function createPlacementController() {
+    return new PlacementController({
+        createWindow: createPlacementWindow,
+        onCommit: (instance) => {
+            const { customElements } = store.getConfig();
+            store.saveConfig({ customElements: upsertInstance(customElements, instance) });
+        },
+        onEnd: () => {
+            if (wallpaperWindow && !wallpaperWindow.isDestroyed() && isRenderingActive) {
+                wallpaperWindow.webContents.send('renderer:resume', { silent: true });
+            }
+            broadcastConfig();
+        },
+    });
+}
+
 // ==================== IPC 处理器注册 ====================
 
 function registerIpcHandlers() {
@@ -526,10 +605,8 @@ function registerIpcHandlers() {
     // ---- 保存应用配置 ----
     ipcMain.handle('config:save', async (_event, config) => {
         store.saveConfig(config);
-        // 核心修复：实时广播新配置到壁纸渲染窗口，让视差参数拖动时立刻生效！
-        if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-            wallpaperWindow.webContents.send('config:load', store.getConfig());
-        }
+        // 实时广播，让视差参数拖动时立刻生效
+        broadcastConfig();
         return true;
     });
 
@@ -679,6 +756,18 @@ function registerIpcHandlers() {
     // ---- 退出应用 ----
     ipcMain.on('app:quit', () => {
         cleanupAndQuit();
+    });
+
+    // ---- 自定义元素 ----
+    placement = createPlacementController();
+    registerElementsIpc({
+        ipcMain,
+        dialog,
+        store,
+        elementsDir: path.join(__dirname, 'elements'),
+        getDialogParent: () => settingsWindow || wallpaperWindow,
+        broadcastConfig,
+        placement,
     });
 }
 

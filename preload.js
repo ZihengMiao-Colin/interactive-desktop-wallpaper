@@ -15,6 +15,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { toFileUrl } = require('./src/elements/library');
 
 /**
  * 暴露到渲染进程 window.electronAPI 的安全 API。
@@ -140,13 +141,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * 返回 unsubscribe 函数用于取消监听。
      */
     onPauseRender: (callback) => {
-        const handler = () => callback();
+        const handler = (_event, info) => callback(info || {});
         ipcRenderer.on('renderer:pause', handler);
         return () => ipcRenderer.removeListener('renderer:pause', handler);
     },
 
     onResumeRender: (callback) => {
-        const handler = () => callback();
+        const handler = (_event, info) => callback(info || {});
         ipcRenderer.on('renderer:resume', handler);
         return () => ipcRenderer.removeListener('renderer:resume', handler);
     },
@@ -180,6 +181,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
     notifyDepthGenerated: (imagePath, depthDataUrl) =>
         ipcRenderer.send('renderer:depthGenerated', { imagePath, depthDataUrl }),
 
+    // ==================== 自定义元素 ====================
+
+    elements: {
+        /** 默认素材列表 */
+        getBuiltin: () => ipcRenderer.invoke('elements:getBuiltin'),
+        /** 打开文件对话框导入素材 → { asset } | { canceled: true } | { error } */
+        importFile: () => ipcRenderer.invoke('elements:import'),
+        /** 从素材库移除用户素材（连同壁纸上的实例） */
+        removeAsset: (assetId) => ipcRenderer.invoke('elements:removeAsset', assetId),
+        /** 保存缩略图（JPEG Data URL） */
+        saveThumb: (assetId, dataUrl) => ipcRenderer.invoke('elements:saveThumb', assetId, dataUrl),
+        /** 局部修改壁纸上的实例 */
+        updateInstance: (instanceId, patch) => ipcRenderer.invoke('elements:updateInstance', instanceId, patch),
+        /** 删除壁纸上的实例 */
+        removeInstance: (instanceId) => ipcRenderer.invoke('elements:removeInstance', instanceId),
+        /** 进入摆放模式：{ assetId } 新建，{ instanceId } 重新摆放 */
+        startPlacement: (target) => ipcRenderer.invoke('elements:startPlacement', target),
+    },
+
+    /** 摆放窗口专用 */
+    placement: {
+        getDraft: () => ipcRenderer.invoke('placement:getDraft'),
+        commit: (instance) => ipcRenderer.invoke('placement:commit', instance),
+        cancel: () => ipcRenderer.invoke('placement:cancel'),
+    },
+
+    /** 本地路径 → file:// URL（正确转义中文、空格、#、%） */
+    toFileUrl: (filePath) => toFileUrl(filePath),
+
     // ==================== 工具函数 ====================
 
     /** 读取文件为 Base64 Data URL */
@@ -212,12 +242,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             console.error('[Preload] 保存文件失败:', err);
             return false;
         }
-    },
-
-    /** 获取用户数据目录 */
-    getUserDataPath: () => {
-        const { app } = require('electron');
-        return app.getPath('userData');
     },
 
     /** 检查文件是否存在 */
