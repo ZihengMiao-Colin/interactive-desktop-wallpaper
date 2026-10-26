@@ -72,6 +72,7 @@ function updateTrayMenu(tray, callbacks) {
     const {
         onOpenSettings,
         onSelectImage,
+        onOpenDepthDir,
         onQuit,
         getAutoLaunch,
         setAutoLaunch,
@@ -87,6 +88,10 @@ function updateTrayMenu(tray, callbacks) {
         {
             label: '更换壁纸...',
             click: () => onSelectImage(),
+        },
+        {
+            label: '打开深度图文件夹...',
+            click: () => onOpenDepthDir && onOpenDepthDir(),
         },
         { type: 'separator' },
         {

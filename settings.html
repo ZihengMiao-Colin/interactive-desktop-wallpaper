@@ -76,47 +76,6 @@
         }
         .preview-info.visible { display: block; }
 
-        /* ---- 模型选择 ---- */
-        .model-selector {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        .model-option {
-            flex: 1;
-            padding: 10px 8px;
-            border: 2px solid rgba(255,255,255,0.12);
-            border-radius: 8px;
-            background: rgba(255,255,255,0.04);
-            color: #ccc;
-            font-size: 12px;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.2s;
-            font-family: inherit;
-        }
-        .model-option:hover {
-            background: rgba(255,255,255,0.1);
-            border-color: rgba(255,255,255,0.25);
-        }
-        .model-option.selected {
-            border-color: #7ecfff;
-            background: rgba(126, 207, 255, 0.15);
-            color: #7ecfff;
-        }
-        .model-option .model-name {
-            font-weight: 600;
-            font-size: 13px;
-            margin-bottom: 2px;
-        }
-        .model-option .model-desc {
-            font-size: 10px;
-            color: #888;
-        }
-        .model-option.selected .model-desc {
-            color: rgba(126, 207, 255, 0.7);
-        }
-
         /* ---- 进度条 ---- */
         .progress-section {
             display: none;
@@ -292,6 +251,241 @@
         .toggle input:checked + .slider { background: #7ecfff; }
         .toggle input:checked + .slider::before { transform: translateX(18px); }
 
+        /* ---- 深度图存储路径卡片 ---- */
+        .path-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .path-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #aaa;
+        }
+        .path-box {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-family: 'Consolas', 'Segoe UI Mono', monospace;
+            font-size: 11px;
+            color: #7ecfff;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: text;
+        }
+        .path-box:hover {
+            border-color: rgba(126, 207, 255, 0.4);
+            background: rgba(126, 207, 255, 0.05);
+        }
+
+        /* ---- 恢复推荐设置按钮与标题排版 ---- */
+        .section-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .section-header-row .section-title {
+            margin-bottom: 0;
+        }
+        .btn-reset-link {
+            font-size: 11px;
+            color: #7ecfff;
+            background: rgba(126, 207, 255, 0.1);
+            border: 1px solid rgba(126, 207, 255, 0.25);
+            border-radius: 4px;
+            padding: 3px 8px;
+            width: auto;
+            margin-bottom: 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-reset-link:hover {
+            background: rgba(126, 207, 255, 0.2);
+            border-color: rgba(126, 207, 255, 0.4);
+        }
+
+        /* ---- 壁纸自定义元素样式 ---- */
+        .element-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 14px;
+            background: rgba(0, 0, 0, 0.28);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .element-tab-btn {
+            flex: 1;
+            padding: 7px 4px;
+            font-size: 11px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: #aaa;
+            cursor: pointer;
+            margin-bottom: 0;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .element-tab-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .element-tab-btn.active {
+            background: rgba(126, 207, 255, 0.18);
+            color: #7ecfff;
+            font-weight: 600;
+        }
+
+        .element-sub-box {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+
+        .custom-select {
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #7ecfff;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 12px;
+            outline: none;
+            cursor: pointer;
+            width: 140px;
+            font-family: inherit;
+        }
+        .custom-select option {
+            background: #1a1e28;
+            color: #e0e0e0;
+        }
+
+        .weather-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .weather-btn {
+            padding: 8px 4px;
+            font-size: 11px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.04);
+            color: #bbb;
+            cursor: pointer;
+            margin-bottom: 0;
+            text-align: center;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .weather-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        .weather-btn.active {
+            background: rgba(126, 207, 255, 0.18);
+            border-color: #7ecfff;
+            color: #7ecfff;
+            font-weight: 600;
+        }
+
+        /* ---- 视频特效卡片网格 ---- */
+        .video-overlay-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .video-card {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+            padding: 0;
+            margin-bottom: 0;
+            user-select: none;
+        }
+        .video-card:hover {
+            border-color: rgba(126, 207, 255, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+        .video-card.active {
+            border-color: #7ecfff;
+            background: rgba(126, 207, 255, 0.12);
+            box-shadow: 0 0 10px rgba(126, 207, 255, 0.3);
+        }
+        .video-card-thumb-wrap {
+            width: 100%;
+            height: 62px;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+        .video-card-thumb-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .video-card-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            font-size: 9px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .video-card-badge.badge-screen {
+            background: rgba(16, 120, 200, 0.85);
+            color: #d0f0ff;
+        }
+        .video-card-badge.badge-chroma {
+            background: rgba(20, 160, 60, 0.85);
+            color: #dffff0;
+        }
+        .video-card-body {
+            padding: 5px 6px;
+        }
+        .video-card-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .video-card.active .video-card-title {
+            color: #7ecfff;
+        }
+        .video-card-desc {
+            font-size: 9px;
+            color: #888;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .status {
             text-align: center;
             font-size: 11px;
@@ -317,26 +511,9 @@
             <div class="preview-info" id="preview-info"></div>
         </div>
 
-        <!-- 模型选择 -->
-        <div class="section-title" style="margin-top:4px;">深度估计模型</div>
-        <div class="model-selector" id="model-selector">
-            <div class="model-option selected" data-model="small">
-                <div class="model-name">Small</div>
-                <div class="model-desc">~100MB · 最快</div>
-            </div>
-            <div class="model-option" data-model="base">
-                <div class="model-name">Base</div>
-                <div class="model-desc">~390MB · 均衡</div>
-            </div>
-            <div class="model-option" data-model="large">
-                <div class="model-name">Large</div>
-                <div class="model-desc">~1.3GB · 最佳</div>
-            </div>
-        </div>
-
         <!-- 边缘平滑度 (抗撕裂) -->
         <div class="row" style="margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 6px;">
-            <label title="通过对深度图边缘进行高斯平滑，有效消除大幅度视差下的拉丝和撕裂感">边缘平滑 (抗撕裂)</label>
+            <label title="通过对深度图边缘进行高斯平滑，有效消除大幅度视差下的拉丝和撕裂感">边缘平滑</label>
             <span class="value" id="blur-value">8px</span>
             <input type="range" id="depth-blur" min="0" max="30" value="8" step="1">
         </div>
@@ -359,14 +536,18 @@
 
     <!-- 视差参数 -->
     <div class="section">
-        <div class="section-title">视差参数</div>
+        <div class="section-header-row">
+            <div class="section-title">视差参数</div>
+            <button class="btn-reset-link" id="btn-reset-default" title="恢复为标准推荐设置 (强度: 20, 阻尼: 0.08, 对焦: 0.50)">恢复推荐设置</button>
+        </div>
+
         <div class="row">
             <label>视差强度</label>
-            <span class="value" id="parallax-value">30</span>
-            <input type="range" id="parallax-strength" min="5" max="100" value="30" step="1">
+            <span class="value" id="parallax-value">20</span>
+            <input type="range" id="parallax-strength" min="5" max="100" value="20" step="1">
         </div>
         <div class="row">
-            <label>平滑度</label>
+            <label>阻尼平滑度</label>
             <span class="value" id="smoothness-value">0.08</span>
             <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
         </div>
@@ -375,6 +556,222 @@
             <span class="value" id="focus-value">0.50</span>
             <input type="range" id="focus-depth" min="0" max="100" value="50" step="1">
         </div>
+    </div>
+
+    <!-- ==================== 壁纸自定义元素 ==================== -->
+    <div class="section">
+        <div class="section-title">壁纸自定义元素</div>
+
+        <!-- 子功能标签页导航 -->
+        <div class="element-tabs">
+            <button class="element-tab-btn active" data-tab="vinyl">🎵 黑胶唱片机</button>
+            <button class="element-tab-btn" data-tab="video">🎬 视频特效</button>
+            <button class="element-tab-btn" data-tab="weather">🌦️ 天气特效</button>
+            <button class="element-tab-btn" data-tab="sticker">🖼️ 自定义贴纸</button>
+        </div>
+
+        <!-- 1. 黑胶唱片机面板 -->
+        <div class="element-tab-content active" id="tab-vinyl">
+            <div class="toggle-row">
+                <span>启用黑胶唱片机</span>
+                <label class="toggle">
+                    <input type="checkbox" id="vinyl-enabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="element-sub-box">
+                <div class="path-label-row">
+                    <span>当前音乐</span>
+                    <span id="vinyl-current-music-name" style="color: #7ecfff; font-size: 11px;">未导入</span>
+                </div>
+                <div class="btn-row" style="margin-top: 8px;">
+                    <button id="btn-import-audio" class="primary">📁 导入本地音乐...</button>
+                    <button id="btn-play-pause-toggle">▶️ 播放 / 暂停</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <label>播放音量</label>
+                <span class="value" id="vinyl-volume-val">60%</span>
+                <input type="range" id="vinyl-volume" min="0" max="100" value="60" step="5">
+            </div>
+
+            <div class="row">
+                <label>停靠位置</label>
+                <select id="vinyl-position" class="custom-select">
+                    <option value="bottom-right" selected>右下角 (推荐)</option>
+                    <option value="bottom-left">左下角</option>
+                    <option value="top-right">右上角</option>
+                    <option value="top-left">左上角</option>
+                </select>
+            </div>
+
+            <div class="row">
+                <label>缩放大小</label>
+                <span class="value" id="vinyl-scale-val">100%</span>
+                <input type="range" id="vinyl-scale" min="70" max="130" value="100" step="5">
+            </div>
+
+            <div class="btn-row" style="margin-top: 8px;">
+                <button id="btn-import-cover">🖼️ 更换唱片封面...</button>
+                <button id="btn-reset-cover">重置封面</button>
+            </div>
+        </div>
+
+        <!-- 2. 视频特效覆盖层面版 -->
+        <div class="element-tab-content" id="tab-video" style="display:none;">
+            <div class="toggle-row">
+                <span>启用视频特效覆盖层</span>
+                <label class="toggle">
+                    <input type="checkbox" id="video-overlay-enabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- 内置特效卡片网格 -->
+            <div class="video-overlay-grid" id="video-presets-grid">
+                <!-- 预设卡片动态渲染 -->
+            </div>
+
+            <!-- 自定义视频导入 -->
+            <div class="element-sub-box">
+                <div class="path-label-row">
+                    <span>自定义本地视频 (MP4/WebM)</span>
+                    <span id="video-custom-name" style="color: #7ecfff; font-size: 11px;">未导入</span>
+                </div>
+                <div class="btn-row" style="margin-top: 8px;">
+                    <button id="btn-import-video" class="primary">📁 导入本地视频...</button>
+                    <button id="btn-select-custom-preset" disabled>使用此视频</button>
+                </div>
+            </div>
+
+            <!-- 调节参数 -->
+            <div class="row">
+                <label>混合模式</label>
+                <select id="video-blend-mode" class="custom-select">
+                    <option value="auto" selected>自动识别 (推荐)</option>
+                    <option value="screen">滤色混合 (黑底视频)</option>
+                    <option value="chroma">绿幕抠图 (绿底视频)</option>
+                </select>
+            </div>
+
+            <div class="row">
+                <label>特效不透明度</label>
+                <span class="value" id="video-opacity-val">85%</span>
+                <input type="range" id="video-opacity" min="10" max="100" value="85" step="5">
+            </div>
+
+            <div class="row">
+                <label>播放速度</label>
+                <span class="value" id="video-speed-val">1.0x</span>
+                <input type="range" id="video-speed" min="5" max="20" value="10" step="1">
+            </div>
+        </div>
+
+        <!-- 2. 天气粒子特效面板 -->
+        <div class="element-tab-content" id="tab-weather" style="display:none;">
+            <div class="weather-grid">
+                <button class="weather-btn active" data-weather="none">🚫 无特效</button>
+                <button class="weather-btn" data-weather="rain">🌧️ 绵绵细雨</button>
+                <button class="weather-btn" data-weather="snow">❄️ 浪漫冬雪</button>
+                <button class="weather-btn" data-weather="sakura">🌸 唯美落樱</button>
+                <button class="weather-btn" data-weather="leaves">🍂 秋日枫叶</button>
+                <button class="weather-btn" data-weather="sunlight">✨ 暖目光斑</button>
+            </div>
+
+            <div class="row" style="margin-top: 10px;">
+                <label>粒子密度</label>
+                <select id="weather-density" class="custom-select">
+                    <option value="low">稀疏 (低)</option>
+                    <option value="medium" selected>适中 (推荐)</option>
+                    <option value="high">浓密 (高)</option>
+                </select>
+            </div>
+
+            <div class="row">
+                <label>飘落速度</label>
+                <span class="value" id="weather-speed-val">1.0x</span>
+                <input type="range" id="weather-speed" min="5" max="20" value="10" step="1">
+            </div>
+
+            <div class="toggle-row" style="margin-top: 4px;">
+                <span title="粒子根据前后景深随鼠标移动产生立体视差位移">粒子随鼠标视差位移</span>
+                <label class="toggle">
+                    <input type="checkbox" id="weather-parallax-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 3. 自定义贴纸挂件面板 -->
+        <div class="element-tab-content" id="tab-sticker" style="display:none;">
+            <div class="toggle-row">
+                <span>启用贴纸挂件</span>
+                <label class="toggle">
+                    <input type="checkbox" id="sticker-enabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="element-sub-box">
+                <div class="path-label-row">
+                    <span>贴纸图片 (透明 PNG/GIF)</span>
+                    <span id="sticker-current-name" style="color: #7ecfff; font-size: 11px;">未导入</span>
+                </div>
+                <div class="btn-row" style="margin-top: 8px;">
+                    <button id="btn-import-sticker" class="primary">📁 导入本地贴纸图片...</button>
+                    <button id="btn-remove-sticker" class="danger">移除贴纸</button>
+                </div>
+            </div>
+
+            <div class="row" style="margin-top: 10px;">
+                <label>水平位置 (X)</label>
+                <span class="value" id="sticker-x-val">85%</span>
+                <input type="range" id="sticker-x" min="0" max="100" value="85" step="1">
+            </div>
+
+            <div class="row">
+                <label>垂直位置 (Y)</label>
+                <span class="value" id="sticker-y-val">20%</span>
+                <input type="range" id="sticker-y" min="0" max="100" value="20" step="1">
+            </div>
+
+            <div class="row">
+                <label>贴纸尺寸</label>
+                <span class="value" id="sticker-size-val">180px</span>
+                <input type="range" id="sticker-size" min="60" max="450" value="180" step="10">
+            </div>
+
+            <div class="row">
+                <label title="贴纸参与3D视差的景深：0.0为远景几乎不动，0.5为与焦点同步，1.0为近景大幅摆动">视差深度</label>
+                <span class="value" id="sticker-depth-val">0.70</span>
+                <input type="range" id="sticker-depth" min="0" max="100" value="70" step="5">
+            </div>
+
+            <div class="row">
+                <label>透明度</label>
+                <span class="value" id="sticker-opacity-val">90%</span>
+                <input type="range" id="sticker-opacity" min="20" max="100" value="90" step="5">
+            </div>
+        </div>
+    </div>
+
+    <!-- 深度图存储与缓存 -->
+    <div class="section">
+        <div class="section-title">深度图存储与缓存</div>
+        <div class="path-container">
+            <div class="path-label-row">
+                <span>存放位置</span>
+                <span style="font-size: 11px; color: #777;">(点击路径可直接打开)</span>
+            </div>
+            <div class="path-box" id="depth-dir-path" title="点击在文件资源管理器中打开">读取中...</div>
+        </div>
+        <div class="btn-row">
+            <button id="btn-open-depth-dir">📂 打开文件夹</button>
+            <button id="btn-change-depth-dir">🔄 更改位置...</button>
+        </div>
+        <button id="btn-clear-cache" class="danger" style="margin-top:8px;">🗑 清除所有深度图缓存</button>
     </div>
 
     <!-- 系统 -->
@@ -387,7 +784,6 @@
                 <span class="slider"></span>
             </label>
         </div>
-        <button id="btn-clear-cache" class="danger" style="margin-top:12px;">🗑 清除深度图缓存</button>
     </div>
 
     <div class="status" id="status-text">设置已加载</div>
@@ -397,7 +793,6 @@
         const isElectron = !!(window.electronAPI);
 
         let selectedImagePath = null;
-        let selectedModel = 'small';
         let depthGenerated = false;
         let isGenerating = false;
 
@@ -422,6 +817,10 @@
         const autoLaunchToggle = document.getElementById('auto-launch-toggle');
         const depthBlurSlider = document.getElementById('depth-blur');
         const blurValueEl = document.getElementById('blur-value');
+        const depthDirPath = document.getElementById('depth-dir-path');
+        const btnOpenDepthDir = document.getElementById('btn-open-depth-dir');
+        const btnChangeDepthDir = document.getElementById('btn-change-depth-dir');
+        const btnResetDefault = document.getElementById('btn-reset-default');
 
         // ==================== 对焦深度滑块 ====================
         if (focusSlider) {
@@ -449,21 +848,6 @@
                 }
             });
         }
-
-        // ==================== 模型选择 ====================
-        document.querySelectorAll('.model-option').forEach(opt => {
-            opt.addEventListener('click', () => {
-                document.querySelectorAll('.model-option').forEach(o => o.classList.remove('selected'));
-                opt.classList.add('selected');
-                selectedModel = opt.dataset.model;
-                // 重新生成标记
-                if (selectedImagePath) {
-                    depthGenerated = false;
-                    btnApplyWallpaper.disabled = true;
-                    setStatus('模型已切换，请重新生成深度图', '');
-                }
-            });
-        });
 
         // ==================== 选择壁纸 ====================
         btnSelectImage.addEventListener('click', async () => {
@@ -531,10 +915,10 @@
             progressText.textContent = '正在启动 Python...';
 
             const blurRadius = depthBlurSlider ? parseInt(depthBlurSlider.value, 10) : 8;
-            setStatus(`正在生成深度图（模型: ${selectedModel}, 平滑: ${blurRadius}px）...`, '');
+            setStatus(`正在生成深度图（极速引擎, 平滑: ${blurRadius}px）...`, '');
 
             try {
-                const result = await window.electronAPI.generateDepthMap(selectedImagePath, selectedModel, blurRadius);
+                const result = await window.electronAPI.generateDepthMap(selectedImagePath, 'small', blurRadius);
 
                 if (result.success) {
                     depthGenerated = true;
@@ -596,28 +980,530 @@
             }
         });
 
+        // ==================== 恢复推荐设置 ====================
+        if (btnResetDefault) {
+            btnResetDefault.addEventListener('click', () => {
+                const RECOMMENDED = {
+                    parallaxMultiplier: 20,
+                    smoothness: 0.08,
+                    focusDepth: 0.50,
+                    blurRadius: 8,
+                };
+
+                parallaxSlider.value = RECOMMENDED.parallaxMultiplier;
+                parallaxValue.textContent = RECOMMENDED.parallaxMultiplier;
+
+                smoothnessSlider.value = Math.round(RECOMMENDED.smoothness * 100);
+                smoothnessValue.textContent = RECOMMENDED.smoothness.toFixed(2);
+
+                if (focusSlider) {
+                    focusSlider.value = Math.round(RECOMMENDED.focusDepth * 100);
+                    focusValue.textContent = Number(RECOMMENDED.focusDepth).toFixed(2);
+                }
+
+                if (depthBlurSlider) {
+                    depthBlurSlider.value = RECOMMENDED.blurRadius;
+                    blurValueEl.textContent = RECOMMENDED.blurRadius + 'px';
+                }
+
+                if (isElectron) {
+                    window.electronAPI.saveConfig(RECOMMENDED);
+                }
+
+                setStatus('已恢复推荐设置（强度: 20, 阻尼: 0.08, 对焦: 0.50）', 'success');
+            });
+        }
+
         // ==================== 视差参数滑块 ====================
         parallaxSlider.addEventListener('input', () => {
             const val = parseInt(parallaxSlider.value, 10);
             parallaxValue.textContent = val;
             if (isElectron) {
-                window.electronAPI.saveConfig({
-                    parallaxMultiplier: val,
-                    smoothness: parseFloat(smoothnessValue.textContent),
-                });
+                window.electronAPI.saveConfig({ parallaxMultiplier: val });
             }
         });
 
         smoothnessSlider.addEventListener('input', () => {
-            const val = parseInt(smoothnessSlider.value, 10) / 100;
+            const val = parseFloat(smoothnessSlider.value) / 100.0;
             smoothnessValue.textContent = val.toFixed(2);
             if (isElectron) {
-                window.electronAPI.saveConfig({
-                    parallaxMultiplier: parseInt(parallaxSlider.value, 10),
-                    smoothness: val,
-                });
+                window.electronAPI.saveConfig({ smoothness: val });
             }
         });
+
+        // ==================== 壁纸自定义元素设置交互 ====================
+
+        // 1. 选项卡切换
+        const elementTabs = document.querySelectorAll('.element-tab-btn');
+        const tabContents = {
+            vinyl: document.getElementById('tab-vinyl'),
+            video: document.getElementById('tab-video'),
+            weather: document.getElementById('tab-weather'),
+            sticker: document.getElementById('tab-sticker'),
+        };
+
+        elementTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                elementTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const targetKey = tab.dataset.tab;
+                Object.keys(tabContents).forEach(key => {
+                    if (tabContents[key]) {
+                        tabContents[key].style.display = (key === targetKey) ? 'block' : 'none';
+                    }
+                });
+            });
+        });
+
+        // 2. 黑胶唱片机控制
+        const vinylEnabled = document.getElementById('vinyl-enabled');
+        const vinylCurrentMusicName = document.getElementById('vinyl-current-music-name');
+        const btnImportAudio = document.getElementById('btn-import-audio');
+        const btnPlayPauseToggle = document.getElementById('btn-play-pause-toggle');
+        const vinylVolume = document.getElementById('vinyl-volume');
+        const vinylVolumeVal = document.getElementById('vinyl-volume-val');
+        const vinylPosition = document.getElementById('vinyl-position');
+        const vinylScale = document.getElementById('vinyl-scale');
+        const vinylScaleVal = document.getElementById('vinyl-scale-val');
+        const btnImportCover = document.getElementById('btn-import-cover');
+        const btnResetCover = document.getElementById('btn-reset-cover');
+
+        let isVinylPlaying = false;
+
+        if (vinylEnabled) {
+            vinylEnabled.addEventListener('change', () => {
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ vinyl: { enabled: vinylEnabled.checked } });
+                }
+                setStatus(vinylEnabled.checked ? '已开启黑胶唱片机' : '已关闭黑胶唱片机', '');
+            });
+        }
+
+        if (btnImportAudio) {
+            btnImportAudio.addEventListener('click', async () => {
+                if (!isElectron) return;
+                try {
+                    const audioRes = await window.electronAPI.selectAudio();
+                    if (audioRes && audioRes.path) {
+                        isVinylPlaying = true;
+                        vinylCurrentMusicName.textContent = audioRes.name;
+                        btnPlayPauseToggle.textContent = '⏸️ 暂停播放';
+                        window.electronAPI.saveConfig({
+                            vinyl: {
+                                enabled: true,
+                                audioPath: audioRes.path,
+                                audioName: audioRes.name,
+                                playing: true,
+                            }
+                        });
+                        if (vinylEnabled) vinylEnabled.checked = true;
+                        setStatus(`已导入音乐: ${audioRes.name} 并开始播放`, 'success');
+                    }
+                } catch (err) {
+                    setStatus('导入音频失败: ' + err.message, 'error');
+                }
+            });
+        }
+
+        if (btnPlayPauseToggle) {
+            btnPlayPauseToggle.addEventListener('click', () => {
+                if (!isElectron) return;
+                isVinylPlaying = !isVinylPlaying;
+                btnPlayPauseToggle.textContent = isVinylPlaying ? '⏸️ 暂停播放' : '▶️ 开始播放';
+                window.electronAPI.saveConfig({ vinyl: { playing: isVinylPlaying } });
+                setStatus(isVinylPlaying ? '唱片机已开始播放' : '唱片机已暂停', '');
+            });
+        }
+
+        if (vinylVolume) {
+            vinylVolume.addEventListener('input', () => {
+                const vol = parseInt(vinylVolume.value, 10);
+                vinylVolumeVal.textContent = vol + '%';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ vinyl: { volume: vol / 100.0 } });
+                }
+            });
+        }
+
+        if (vinylPosition) {
+            vinylPosition.addEventListener('change', () => {
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ vinyl: { position: vinylPosition.value } });
+                }
+            });
+        }
+
+        if (vinylScale) {
+            vinylScale.addEventListener('input', () => {
+                const s = parseInt(vinylScale.value, 10);
+                vinylScaleVal.textContent = s + '%';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ vinyl: { scale: s / 100.0 } });
+                }
+            });
+        }
+
+        if (btnImportCover) {
+            btnImportCover.addEventListener('click', async () => {
+                if (!isElectron) return;
+                try {
+                    const coverPath = await window.electronAPI.selectCover();
+                    if (coverPath) {
+                        window.electronAPI.saveConfig({ vinyl: { coverPath: coverPath } });
+                        setStatus('已更换唱片中心封面', 'success');
+                    }
+                } catch (err) {
+                    setStatus('更换封面失败: ' + err.message, 'error');
+                }
+            });
+        }
+
+        if (btnResetCover) {
+            btnResetCover.addEventListener('click', () => {
+                if (!isElectron) return;
+                window.electronAPI.saveConfig({ vinyl: { coverPath: '' } });
+                setStatus('已重置为默认唱片封面', '');
+            });
+        }
+
+        // 3. 天气粒子特效控制
+        const weatherButtons = document.querySelectorAll('.weather-btn');
+        const weatherDensity = document.getElementById('weather-density');
+        const weatherSpeed = document.getElementById('weather-speed');
+        const weatherSpeedVal = document.getElementById('weather-speed-val');
+        const weatherParallaxToggle = document.getElementById('weather-parallax-toggle');
+
+        weatherButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                weatherButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const weatherType = btn.dataset.weather;
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ weather: { type: weatherType } });
+                }
+                const names = { none: '无特效', rain: '绵绵细雨', snow: '浪漫冬雪', sakura: '唯美落樱', leaves: '秋日枫叶', sunlight: '暖目光斑' };
+                setStatus(`已应用天气特效: ${names[weatherType] || weatherType}`, 'success');
+            });
+        });
+
+        if (weatherDensity) {
+            weatherDensity.addEventListener('change', () => {
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ weather: { density: weatherDensity.value } });
+                }
+            });
+        }
+
+        if (weatherSpeed) {
+            weatherSpeed.addEventListener('input', () => {
+                const spd = parseInt(weatherSpeed.value, 10) / 10.0;
+                weatherSpeedVal.textContent = spd.toFixed(1) + 'x';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ weather: { speed: spd } });
+                }
+            });
+        }
+
+        if (weatherParallaxToggle) {
+            weatherParallaxToggle.addEventListener('change', () => {
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ weather: { parallax: weatherParallaxToggle.checked } });
+                }
+            });
+        }
+
+        // 4. 自定义贴纸挂件控制
+        const stickerEnabled = document.getElementById('sticker-enabled');
+        const stickerCurrentName = document.getElementById('sticker-current-name');
+        const btnImportSticker = document.getElementById('btn-import-sticker');
+        const btnRemoveSticker = document.getElementById('btn-remove-sticker');
+        const stickerX = document.getElementById('sticker-x');
+        const stickerXVal = document.getElementById('sticker-x-val');
+        const stickerY = document.getElementById('sticker-y');
+        const stickerYVal = document.getElementById('sticker-y-val');
+        const stickerSize = document.getElementById('sticker-size');
+        const stickerSizeVal = document.getElementById('sticker-size-val');
+        const stickerDepth = document.getElementById('sticker-depth');
+        const stickerDepthVal = document.getElementById('sticker-depth-val');
+        const stickerOpacity = document.getElementById('sticker-opacity');
+        const stickerOpacityVal = document.getElementById('sticker-opacity-val');
+
+        if (stickerEnabled) {
+            stickerEnabled.addEventListener('change', () => {
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ sticker: { enabled: stickerEnabled.checked } });
+                }
+                setStatus(stickerEnabled.checked ? '已开启贴纸挂件' : '已关闭贴纸挂件', '');
+            });
+        }
+
+        if (btnImportSticker) {
+            btnImportSticker.addEventListener('click', async () => {
+                if (!isElectron) return;
+                try {
+                    const stickerPath = await window.electronAPI.selectSticker();
+                    if (stickerPath) {
+                        const name = stickerPath.split('\\').pop();
+                        stickerCurrentName.textContent = name;
+                        if (stickerEnabled) stickerEnabled.checked = true;
+                        window.electronAPI.saveConfig({
+                            sticker: {
+                                enabled: true,
+                                imagePath: stickerPath,
+                            }
+                        });
+                        setStatus(`已导入贴纸: ${name}`, 'success');
+                    }
+                } catch (err) {
+                    setStatus('导入贴纸失败: ' + err.message, 'error');
+                }
+            });
+        }
+
+        if (btnRemoveSticker) {
+            btnRemoveSticker.addEventListener('click', () => {
+                if (!isElectron) return;
+                stickerCurrentName.textContent = '未导入';
+                if (stickerEnabled) stickerEnabled.checked = false;
+                window.electronAPI.saveConfig({
+                    sticker: {
+                        enabled: false,
+                        imagePath: '',
+                    }
+                });
+                setStatus('已移除贴纸挂件', '');
+            });
+        }
+
+        if (stickerX) {
+            stickerX.addEventListener('input', () => {
+                const val = parseInt(stickerX.value, 10);
+                stickerXVal.textContent = val + '%';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ sticker: { positionX: val } });
+                }
+            });
+        }
+
+        if (stickerY) {
+            stickerY.addEventListener('input', () => {
+                const val = parseInt(stickerY.value, 10);
+                stickerYVal.textContent = val + '%';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ sticker: { positionY: val } });
+                }
+            });
+        }
+
+        if (stickerSize) {
+            stickerSize.addEventListener('input', () => {
+                const val = parseInt(stickerSize.value, 10);
+                stickerSizeVal.textContent = val + 'px';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ sticker: { size: val } });
+                }
+            });
+        }
+
+        if (stickerDepth) {
+            stickerDepth.addEventListener('input', () => {
+                const val = parseInt(stickerDepth.value, 10) / 100.0;
+                stickerDepthVal.textContent = val.toFixed(2);
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ sticker: { depth: val } });
+                }
+            });
+        }
+
+        if (stickerOpacity) {
+            stickerOpacity.addEventListener('input', () => {
+                const val = parseInt(stickerOpacity.value, 10);
+                stickerOpacityVal.textContent = val + '%';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({ sticker: { opacity: val / 100.0 } });
+                }
+            });
+        }
+
+        // 5. 视频特效覆盖层控制
+        const videoOverlayEnabled = document.getElementById('video-overlay-enabled');
+        const videoPresetsGrid = document.getElementById('video-presets-grid');
+        const videoCustomName = document.getElementById('video-custom-name');
+        const btnImportVideo = document.getElementById('btn-import-video');
+        const btnSelectCustomPreset = document.getElementById('btn-select-custom-preset');
+        const videoBlendMode = document.getElementById('video-blend-mode');
+        const videoOpacity = document.getElementById('video-opacity');
+        const videoOpacityVal = document.getElementById('video-opacity-val');
+        const videoSpeed = document.getElementById('video-speed');
+        const videoSpeedVal = document.getElementById('video-speed-val');
+
+        let overlayPresets = [];
+        let currentOverlayPresetId = 'snow2';
+        let customVideoPath = '';
+        let customVideoName = '';
+
+        async function initVideoPresets() {
+            if (!isElectron) return;
+            try {
+                overlayPresets = await window.electronAPI.getOverlayPresets();
+                renderVideoPresetCards();
+            } catch (err) {
+                console.error('加载视频特效预设失败:', err);
+            }
+        }
+
+        function renderVideoPresetCards() {
+            if (!videoPresetsGrid) return;
+            videoPresetsGrid.innerHTML = '';
+            overlayPresets.forEach(preset => {
+                const card = document.createElement('div');
+                card.className = `video-card ${preset.id === currentOverlayPresetId ? 'active' : ''}`;
+                card.dataset.id = preset.id;
+
+                const isChroma = (preset.mode === 'chroma');
+                const badgeClass = isChroma ? 'badge-chroma' : 'badge-screen';
+                const badgeText = isChroma ? '绿幕' : '滤色';
+                const thumbUrl = encodeURI('file:///' + preset.thumb.replace(/\\/g, '/'));
+
+                card.innerHTML = `
+                    <div class="video-card-thumb-wrap">
+                        <img src="${thumbUrl}" alt="${preset.title}" loading="lazy">
+                        <span class="video-card-badge ${badgeClass}">${badgeText}</span>
+                    </div>
+                    <div class="video-card-body">
+                        <div class="video-card-title">${preset.title}</div>
+                        <div class="video-card-desc">${preset.desc}</div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    currentOverlayPresetId = preset.id;
+                    updateVideoCardSelection();
+                    if (videoOverlayEnabled && !videoOverlayEnabled.checked) {
+                        videoOverlayEnabled.checked = true;
+                    }
+                    if (isElectron) {
+                        window.electronAPI.saveConfig({
+                            videoOverlay: {
+                                enabled: true,
+                                presetId: preset.id,
+                            }
+                        });
+                    }
+                    setStatus(`已选择视频特效: ${preset.title} (${preset.modeName})`, 'success');
+                });
+
+                videoPresetsGrid.appendChild(card);
+            });
+        }
+
+        function updateVideoCardSelection() {
+            const cards = videoPresetsGrid ? videoPresetsGrid.querySelectorAll('.video-card') : [];
+            cards.forEach(c => {
+                c.classList.toggle('active', c.dataset.id === currentOverlayPresetId);
+            });
+            if (btnSelectCustomPreset) {
+                btnSelectCustomPreset.classList.toggle('primary', currentOverlayPresetId === 'custom');
+            }
+        }
+
+        if (videoOverlayEnabled) {
+            videoOverlayEnabled.addEventListener('change', () => {
+                const isEnabled = videoOverlayEnabled.checked;
+                if (isElectron) {
+                    window.electronAPI.saveConfig({
+                        videoOverlay: { enabled: isEnabled }
+                    });
+                }
+                setStatus(isEnabled ? '已开启视频特效覆盖层' : '已关闭视频特效覆盖层', '');
+            });
+        }
+
+        if (btnImportVideo) {
+            btnImportVideo.addEventListener('click', async () => {
+                if (!isElectron) return;
+                try {
+                    const res = await window.electronAPI.selectOverlayVideo();
+                    if (res && res.path) {
+                        customVideoPath = res.path;
+                        customVideoName = res.name;
+                        videoCustomName.textContent = res.name;
+                        if (btnSelectCustomPreset) btnSelectCustomPreset.disabled = false;
+                        currentOverlayPresetId = 'custom';
+                        updateVideoCardSelection();
+                        if (videoOverlayEnabled) videoOverlayEnabled.checked = true;
+
+                        window.electronAPI.saveConfig({
+                            videoOverlay: {
+                                enabled: true,
+                                presetId: 'custom',
+                                customPath: customVideoPath,
+                                customName: customVideoName,
+                            }
+                        });
+                        setStatus(`已导入并应用视频特效: ${res.name}`, 'success');
+                    }
+                } catch (err) {
+                    setStatus('导入视频失败: ' + err.message, 'error');
+                }
+            });
+        }
+
+        if (btnSelectCustomPreset) {
+            btnSelectCustomPreset.addEventListener('click', () => {
+                if (!customVideoPath) return;
+                currentOverlayPresetId = 'custom';
+                updateVideoCardSelection();
+                if (videoOverlayEnabled) videoOverlayEnabled.checked = true;
+                if (isElectron) {
+                    window.electronAPI.saveConfig({
+                        videoOverlay: {
+                            enabled: true,
+                            presetId: 'custom',
+                            customPath: customVideoPath,
+                            customName: customVideoName,
+                        }
+                    });
+                }
+                setStatus(`已切换为自定义视频: ${customVideoName}`, 'success');
+            });
+        }
+
+        if (videoBlendMode) {
+            videoBlendMode.addEventListener('change', () => {
+                if (isElectron) {
+                    window.electronAPI.saveConfig({
+                        videoOverlay: { blendMode: videoBlendMode.value }
+                    });
+                }
+                const modeLabels = { auto: '自动识别', screen: '滤色混合', chroma: '绿幕抠图' };
+                setStatus(`已切换混合模式: ${modeLabels[videoBlendMode.value]}`, 'success');
+            });
+        }
+
+        if (videoOpacity) {
+            videoOpacity.addEventListener('input', () => {
+                const val = parseInt(videoOpacity.value, 10);
+                videoOpacityVal.textContent = val + '%';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({
+                        videoOverlay: { opacity: val / 100.0 }
+                    });
+                }
+            });
+        }
+
+        if (videoSpeed) {
+            videoSpeed.addEventListener('input', () => {
+                const val = parseInt(videoSpeed.value, 10) / 10.0;
+                videoSpeedVal.textContent = val.toFixed(1) + 'x';
+                if (isElectron) {
+                    window.electronAPI.saveConfig({
+                        videoOverlay: { speed: val }
+                    });
+                }
+            });
+        }
 
         // ==================== 开机自启 ====================
         autoLaunchToggle.addEventListener('change', async () => {
@@ -626,6 +1512,64 @@
             const result = await window.electronAPI.toggleAutoLaunch(enabled);
             setStatus(result ? '已开启开机自启' : '已关闭开机自启', '');
         });
+
+        // ==================== 深度图存储路径与目录操作 ====================
+        async function refreshDepthCacheDir() {
+            if (!isElectron || !depthDirPath) return;
+            try {
+                const dir = await window.electronAPI.getDepthCacheDir();
+                if (dir) {
+                    depthDirPath.textContent = dir;
+                    depthDirPath.title = dir + '\n(点击直接在文件资源管理器中打开)';
+                }
+            } catch (err) {
+                console.error('获取深度图存放路径失败:', err);
+            }
+        }
+
+        if (btnOpenDepthDir) {
+            btnOpenDepthDir.addEventListener('click', async () => {
+                if (!isElectron) return;
+                try {
+                    await window.electronAPI.openDepthCacheDir();
+                    setStatus('已在文件资源管理器中打开深度图文件夹', 'success');
+                } catch (err) {
+                    setStatus('打开文件夹失败: ' + err.message, 'error');
+                }
+            });
+        }
+
+        if (depthDirPath) {
+            depthDirPath.addEventListener('click', async () => {
+                if (!isElectron) return;
+                try {
+                    await window.electronAPI.openDepthCacheDir();
+                    setStatus('已在文件资源管理器中打开深度图文件夹', 'success');
+                } catch (err) {
+                    setStatus('打开文件夹失败: ' + err.message, 'error');
+                }
+            });
+        }
+
+        if (btnChangeDepthDir) {
+            btnChangeDepthDir.addEventListener('click', async () => {
+                if (!isElectron) return;
+                try {
+                    const res = await window.electronAPI.selectDepthCacheDir();
+                    if (!res) return; // 用户取消
+
+                    if (res.success) {
+                        await refreshDepthCacheDir();
+                        const movedTip = res.movedCount > 0 ? `（已自动迁移 ${res.movedCount} 个已有深度图）` : '';
+                        setStatus(`深度图存放位置已更改为: ${res.path} ${movedTip}`, 'success');
+                    } else {
+                        setStatus(`更改位置失败: ${res.error || '未知错误'}`, 'error');
+                    }
+                } catch (err) {
+                    setStatus(`更改位置失败: ${err.message}`, 'error');
+                }
+            });
+        }
 
         // ==================== 清除缓存 ====================
         document.getElementById('btn-clear-cache').addEventListener('click', async () => {
@@ -644,6 +1588,9 @@
         // ==================== 加载配置 ====================
         async function loadConfig() {
             if (!isElectron) return;
+
+            // 加载深度图存储目录
+            await refreshDepthCacheDir();
 
             try {
                 const config = await window.electronAPI.getConfig();
@@ -664,6 +1611,114 @@
                         depthBlurSlider.value = config.blurRadius;
                         blurValueEl.textContent = config.blurRadius === 0 ? '关闭' : config.blurRadius + 'px';
                     }
+
+                    // 恢复黑胶唱片机配置
+                    if (config.vinyl) {
+                        if (vinylEnabled) vinylEnabled.checked = !!config.vinyl.enabled;
+                        if (vinylCurrentMusicName) {
+                            vinylCurrentMusicName.textContent = config.vinyl.audioName || (config.vinyl.audioPath ? config.vinyl.audioPath.split('\\').pop() : '未导入');
+                        }
+                        isVinylPlaying = !!config.vinyl.playing;
+                        if (btnPlayPauseToggle) {
+                            btnPlayPauseToggle.textContent = isVinylPlaying ? '⏸️ 暂停播放' : '▶️ 播放 / 暂停';
+                        }
+                        if (vinylVolume) {
+                            const vol = Math.round((config.vinyl.volume !== undefined ? config.vinyl.volume : 0.6) * 100);
+                            vinylVolume.value = vol;
+                            if (vinylVolumeVal) vinylVolumeVal.textContent = vol + '%';
+                        }
+                        if (vinylPosition && config.vinyl.position) {
+                            vinylPosition.value = config.vinyl.position;
+                        }
+                        if (vinylScale) {
+                            const sc = Math.round((config.vinyl.scale !== undefined ? config.vinyl.scale : 1.0) * 100);
+                            vinylScale.value = sc;
+                            if (vinylScaleVal) vinylScaleVal.textContent = sc + '%';
+                        }
+                    }
+
+                    // 恢复天气粒子配置
+                    if (config.weather) {
+                        const targetType = config.weather.type || 'none';
+                        weatherButtons.forEach(btn => {
+                            btn.classList.toggle('active', btn.dataset.weather === targetType);
+                        });
+                        if (weatherDensity && config.weather.density) {
+                            weatherDensity.value = config.weather.density;
+                        }
+                        if (weatherSpeed) {
+                            const spd = Math.round((config.weather.speed !== undefined ? config.weather.speed : 1.0) * 10);
+                            weatherSpeed.value = spd;
+                            if (weatherSpeedVal) weatherSpeedVal.textContent = (spd / 10).toFixed(1) + 'x';
+                        }
+                        if (weatherParallaxToggle) {
+                            weatherParallaxToggle.checked = config.weather.parallax !== false;
+                        }
+                    }
+
+                    // 恢复自定义贴纸配置
+                    if (config.sticker) {
+                        if (stickerEnabled) stickerEnabled.checked = !!config.sticker.enabled;
+                        if (stickerCurrentName) {
+                            stickerCurrentName.textContent = config.sticker.imagePath ? config.sticker.imagePath.split('\\').pop() : '未导入';
+                        }
+                        if (stickerX && config.sticker.positionX !== undefined) {
+                            stickerX.value = config.sticker.positionX;
+                            if (stickerXVal) stickerXVal.textContent = config.sticker.positionX + '%';
+                        }
+                        if (stickerY && config.sticker.positionY !== undefined) {
+                            stickerY.value = config.sticker.positionY;
+                            if (stickerYVal) stickerYVal.textContent = config.sticker.positionY + '%';
+                        }
+                        if (stickerSize && config.sticker.size !== undefined) {
+                            stickerSize.value = config.sticker.size;
+                            if (stickerSizeVal) stickerSizeVal.textContent = config.sticker.size + 'px';
+                        }
+                        if (stickerDepth && config.sticker.depth !== undefined) {
+                            const d = Math.round(config.sticker.depth * 100);
+                            stickerDepth.value = d;
+                            if (stickerDepthVal) stickerDepthVal.textContent = config.sticker.depth.toFixed(2);
+                        }
+                        if (stickerOpacity && config.sticker.opacity !== undefined) {
+                            const op = Math.round(config.sticker.opacity * 100);
+                            stickerOpacity.value = op;
+                            if (stickerOpacityVal) stickerOpacityVal.textContent = op + '%';
+                        }
+                    }
+
+                    // 恢复视频特效覆盖层配置
+                    if (config.videoOverlay) {
+                        if (videoOverlayEnabled) {
+                            videoOverlayEnabled.checked = !!config.videoOverlay.enabled;
+                        }
+                        if (config.videoOverlay.presetId) {
+                            currentOverlayPresetId = config.videoOverlay.presetId;
+                        }
+                        if (config.videoOverlay.customPath) {
+                            customVideoPath = config.videoOverlay.customPath;
+                            customVideoName = config.videoOverlay.customName || config.videoOverlay.customPath.split('\\').pop();
+                            if (videoCustomName) videoCustomName.textContent = customVideoName;
+                            if (btnSelectCustomPreset) btnSelectCustomPreset.disabled = false;
+                        }
+                        if (videoBlendMode && config.videoOverlay.blendMode) {
+                            videoBlendMode.value = config.videoOverlay.blendMode;
+                        }
+                        if (videoOpacity && config.videoOverlay.opacity !== undefined) {
+                            const op = Math.round(config.videoOverlay.opacity * 100);
+                            videoOpacity.value = op;
+                            if (videoOpacityVal) videoOpacityVal.textContent = op + '%';
+                        }
+                        if (videoSpeed && config.videoOverlay.speed !== undefined) {
+                            const spd = Math.round(config.videoOverlay.speed * 10);
+                            videoSpeed.value = spd;
+                            if (videoSpeedVal) videoSpeedVal.textContent = (spd / 10).toFixed(1) + 'x';
+                        }
+                    }
+
+                    // 初始化并渲染视频特效预设卡片
+                    await initVideoPresets();
+                    updateVideoCardSelection();
+
                     // 恢复当前图片
                     if (config.currentImage && window.electronAPI.fileExists(config.currentImage)) {
                         selectedImagePath = config.currentImage;

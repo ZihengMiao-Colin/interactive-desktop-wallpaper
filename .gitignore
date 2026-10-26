@@ -32,3 +32,6 @@ userData/
 # 需要时用 export_onnx.py 自行导出，或直接放到项目根目录，
 # generate_depth_map.py 会自动扫描识别
 *.onnx
+
+# 头脑风暴 mockup 与执行计划工作区
+.superpowers/

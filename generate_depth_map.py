@@ -366,6 +366,9 @@ def generate_depth_map(
         selected_onnx = onnx_path
     elif model_size in available_onnx:
         selected_onnx = available_onnx[model_size]
+    elif "small" in available_onnx:
+        print(f"[Info] Local '{model_size}' model not found, using high-performance local 'small' ONNX model instead")
+        selected_onnx = available_onnx["small"]
 
     if selected_onnx:
         generate_depth_map_onnx(

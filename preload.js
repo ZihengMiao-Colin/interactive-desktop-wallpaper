@@ -21,10 +21,35 @@ const fs = require('fs');
  */
 contextBridge.exposeInMainWorld('electronAPI', {
 
-    // ==================== 图片选择 ====================
+    // ==================== 图片与文件选择 ====================
 
     /** 打开系统文件对话框，选择壁纸图片 */
     selectImage: () => ipcRenderer.invoke('dialog:selectImage'),
+
+    /** 打开系统文件对话框，选择本地音乐 */
+    selectAudio: () => ipcRenderer.invoke('dialog:selectAudio'),
+
+    /** 打开系统文件对话框，选择唱片中心封面 */
+    selectCover: () => ipcRenderer.invoke('dialog:selectCover'),
+
+    /** 打开系统文件对话框，选择本地贴纸图片 */
+    selectSticker: () => ipcRenderer.invoke('dialog:selectSticker'),
+
+    /** 打开系统文件对话框，选择本地视频特效 */
+    selectOverlayVideo: () => ipcRenderer.invoke('dialog:selectOverlayVideo'),
+
+    /** 获取内置视频特效列表 */
+    getOverlayPresets: () => ipcRenderer.invoke('overlay:getPresets'),
+
+    /** 读取本地文件为 Uint8Array 二进制数组 */
+    readFileBuffer: (filePath) => {
+        try {
+            return fs.readFileSync(filePath);
+        } catch (err) {
+            console.error('[Preload] 读取文件 Buffer 失败:', err);
+            return null;
+        }
+    },
 
     // ==================== 深度图生成 ====================
 
@@ -61,6 +86,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /** 清除所有深度图缓存 */
     clearAllCache: () => ipcRenderer.invoke('cache:clearAll'),
+
+    /** 获取深度图存放文件夹路径 */
+    getDepthCacheDir: () => ipcRenderer.invoke('depth:getCacheDir'),
+
+    /** 打开深度图存放文件夹（在系统文件资源管理器中定位） */
+    openDepthCacheDir: () => ipcRenderer.invoke('depth:openCacheDir'),
+
+    /** 更改深度图存放文件夹 */
+    selectDepthCacheDir: () => ipcRenderer.invoke('depth:selectCacheDir'),
 
     // ==================== 壁纸应用 ====================
 
@@ -152,8 +186,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readFileAsDataURL: (filePath) => {
         try {
             const ext = path.extname(filePath).toLowerCase().slice(1);
-            const mimeMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', bmp: 'image/bmp' };
-            const mime = mimeMap[ext] || 'image/png';
+            const mimeMap = {
+                png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', bmp: 'image/bmp', gif: 'image/gif',
+                mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', flac: 'audio/flac', m4a: 'audio/mp4', aac: 'audio/aac'
+            };
+            const mime = mimeMap[ext] || 'application/octet-stream';
             const data = fs.readFileSync(filePath);
             const base64 = data.toString('base64');
             return `data:${mime};base64,${base64}`;

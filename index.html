@@ -65,6 +65,59 @@
     <!-- ==================== 状态提示（Electron 环境） ==================== -->
     <div id="status-toast"></div>
 
+    <!-- ==================== 视频特效覆盖层 (滤色 / WebGL绿幕抠图) ==================== -->
+    <video id="overlay-video" loop muted playsinline style="display: none;"></video>
+    <canvas id="overlay-chroma-canvas" style="display: none;"></canvas>
+
+    <!-- ==================== 天气粒子特效 Canvas 层 ==================== -->
+    <canvas id="weather-canvas"></canvas>
+
+    <!-- ==================== 自定义本地贴纸/挂件层 ==================== -->
+    <div id="sticker-container" class="sticker-widget" style="display: none;">
+        <img id="sticker-img" src="" alt="Custom Sticker">
+    </div>
+
+    <!-- ==================== 黑胶唱片机动态组件 ==================== -->
+    <div id="vinyl-widget" class="vinyl-widget pos-bottom-right" style="display: none;">
+        <!-- 唱臂结构 -->
+        <div class="vinyl-tonearm" id="vinyl-tonearm">
+            <div class="tonearm-pivot"></div>
+            <div class="tonearm-rod"></div>
+            <div class="tonearm-head"></div>
+        </div>
+
+        <!-- 唱盘底座与黑胶 -->
+        <div class="vinyl-deck">
+            <div class="vinyl-platter">
+                <div class="vinyl-record" id="vinyl-record">
+                    <div class="vinyl-reflection"></div>
+                    <!-- 唱片中心标签贴纸 -->
+                    <div class="vinyl-center-label" id="vinyl-center-label">
+                        <img id="vinyl-cover-img" src="" alt="Album Cover" style="display: none;">
+                        <div class="vinyl-default-cover" id="vinyl-default-cover">
+                            <span class="vinyl-music-icon">🎵</span>
+                        </div>
+                        <div class="vinyl-spindle"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 歌曲信息浮动胶囊 -->
+        <div class="vinyl-info-card" id="vinyl-info-card">
+            <div class="vinyl-sound-waves" id="vinyl-sound-waves">
+                <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="vinyl-text-col">
+                <div class="vinyl-song-name" id="vinyl-song-name">未选择音乐</div>
+                <div class="vinyl-play-status" id="vinyl-play-status">等待播放</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音频播放器 -->
+    <audio id="bg-audio" loop preload="auto"></audio>
+
     <!-- 主逻辑脚本 -->
     <script src="app.js"></script>
 </body>

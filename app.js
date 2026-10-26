@@ -48,7 +48,7 @@
 // ==================== 配置参数 ====================
 const CONFIG = {
     /** 视差强度系数 —— 控制位移的最大偏移量 */
-    parallaxMultiplier: 30,
+    parallaxMultiplier: 20,
     /** 平滑度 —— Lerp 插值的比率 (0~1)，越小越平滑 */
     smoothness: 0.08,
     /** 对焦平面深度 (0.0~1.0) —— 该深度的物体保持完全静止，彻底消除割裂线 */
@@ -152,11 +152,11 @@ void main(void) {
     // 4. 2D 真实物理视差：鼠标向右看(uMouse.x>0)，近景(diff>0)向相反方向移动
     vec2 parallax = uMouse * diff * uStrength;
 
-    // 5. 软截断阻尼 (Soft Clamping)：限制局部最大拉伸距离，彻底根除直线割裂与大缝隙
-    float maxDist = 0.045; // 最大允许 4.5% UV 偏移
+    // 5. 软截断阻尼 (Soft Clamping)：根据视差强度自适应最大位移，强度调大时位移大幅放开
+    float maxDist = max(0.035, uStrength * 1.6);
     float pLen = length(parallax);
     if (pLen > maxDist) {
-        parallax = (parallax / pLen) * (maxDist + (pLen - maxDist) * 0.15);
+        parallax = (parallax / pLen) * (maxDist + (pLen - maxDist) * 0.2);
     }
 
     // 6. 最终采样坐标 + 安全微钳制
@@ -307,6 +307,9 @@ async function init() {
         if (isElectron && window.electronAPI) {
             try {
                 const savedConfig = await window.electronAPI.getConfig();
+                if (savedConfig) {
+                    applyCustomElementsConfig(savedConfig);
+                }
                 if (savedConfig && savedConfig.currentImage && window.electronAPI.fileExists(savedConfig.currentImage)) {
                     targetBgPath = savedConfig.currentImage;
                     console.log('[初始化] 发现上次保存的壁纸:', targetBgPath);
@@ -520,12 +523,848 @@ function updateLoop(delta) {
         // 鼠标右移时 (currentX > 0)，近景往左移产生透视反差（整体赋值触发 Proxy setter）
         parallaxFilter.uniforms.uMouse = [-currentX, -currentY];
 
-        // 视差强度系数转换
-        parallaxFilter.uniforms.uStrength = (CONFIG.parallaxMultiplier / 1000.0) * 0.75;
+        // 视差强度系数转换：增大动态范围，让低强度微动细腻，高强度视差极强
+        parallaxFilter.uniforms.uStrength = (CONFIG.parallaxMultiplier / 1000.0) * 1.25;
 
         // 对焦深度
-        parallaxFilter.uniforms.uFocus = CONFIG.focusDepth !== undefined ? CONFIG.focusDepth : 0.50;
+        parallaxFilter.uniforms.uFocus = CONFIG.focusDepth !== undefined ? Number(CONFIG.focusDepth) : 0.50;
     }
+
+    // ---- 驱动自定义元素 ----
+    if (weatherManager) weatherManager.update(delta, currentX, currentY);
+    if (stickerManager) stickerManager.update(currentX, currentY);
+    if (vinylManager) vinylManager.update(currentX, currentY);
+}
+
+// ==================== 壁纸自定义元素管理器 ====================
+
+// 1. 天气粒子特效管理器
+class WeatherParticleManager {
+    constructor() {
+        this.canvas = document.getElementById('weather-canvas');
+        this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+        this.type = 'none';
+        this.density = 'medium';
+        this.speed = 1.0;
+        this.parallax = true;
+        this.particles = [];
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
+
+        window.addEventListener('resize', () => this.resize());
+        this.resize();
+    }
+
+    resize() {
+        if (!this.canvas) return;
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+    }
+
+    setConfig(config) {
+        if (!config) return;
+        const typeChanged = this.type !== config.type;
+        const densityChanged = this.density !== config.density;
+        this.type = config.type || 'none';
+        this.density = config.density || 'medium';
+        this.speed = config.speed !== undefined ? config.speed : 1.0;
+        this.parallax = config.parallax !== false;
+
+        if (typeChanged || densityChanged) {
+            this.initParticles();
+        }
+    }
+
+    initParticles() {
+        this.particles = [];
+        if (this.type === 'none' || !this.ctx) {
+            if (this.ctx) this.ctx.clearRect(0, 0, this.width, this.height);
+            return;
+        }
+
+        const counts = {
+            rain:     { low: 80,  medium: 160, high: 280 },
+            snow:     { low: 50,  medium: 100, high: 200 },
+            sakura:   { low: 25,  medium: 50,  high: 90 },
+            leaves:   { low: 20,  medium: 40,  high: 75 },
+            sunlight: { low: 30,  medium: 65,  high: 120 },
+        };
+
+        const count = (counts[this.type] && counts[this.type][this.density]) || 60;
+
+        for (let i = 0; i < count; i++) {
+            this.particles.push(this.createParticle(true));
+        }
+    }
+
+    createParticle(randomY = false) {
+        const y = randomY ? Math.random() * this.height : -30;
+        const x = Math.random() * this.width;
+        const depth = 0.2 + Math.random() * 0.8; // 深度 0.2 (远景) ~ 1.0 (近景)
+
+        switch (this.type) {
+            case 'rain':
+                return {
+                    x, y,
+                    len: (16 + Math.random() * 14) * (depth * 0.6 + 0.7),
+                    speed: (18 + Math.random() * 8) * (depth * 0.5 + 0.7),
+                    depth,
+                    alpha: (0.35 + Math.random() * 0.45) * depth,
+                };
+            case 'snow':
+                return {
+                    x, y,
+                    radius: (2.0 + Math.random() * 3.5) * depth,
+                    speed: (1.2 + Math.random() * 1.8) * depth,
+                    angle: Math.random() * Math.PI * 2,
+                    swingSpeed: 0.02 + Math.random() * 0.03,
+                    swingRadius: 1.0 + Math.random() * 2.0,
+                    depth,
+                    alpha: 0.4 + Math.random() * 0.5,
+                };
+            case 'sakura':
+                return {
+                    x, y,
+                    size: (10 + Math.random() * 8) * depth,
+                    speed: (1.4 + Math.random() * 1.6) * depth,
+                    rot: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 0.04,
+                    flip: Math.random() * Math.PI,
+                    flipSpeed: 0.02 + Math.random() * 0.03,
+                    depth,
+                    color: Math.random() > 0.4 ? 'rgba(255, 183, 197, ' : 'rgba(255, 160, 180, ',
+                };
+            case 'leaves':
+                const colors = ['#e25822', '#d35400', '#f39c12', '#e67e22', '#c0392b'];
+                return {
+                    x, y,
+                    size: (12 + Math.random() * 12) * depth,
+                    speed: (1.6 + Math.random() * 1.8) * depth,
+                    rot: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 0.03,
+                    flip: Math.random() * Math.PI,
+                    flipSpeed: 0.02 + Math.random() * 0.025,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    depth,
+                };
+            case 'sunlight':
+                return {
+                    x, y: Math.random() * this.height,
+                    radius: (15 + Math.random() * 35) * depth,
+                    speedY: -(0.2 + Math.random() * 0.5) * depth,
+                    speedX: (Math.random() - 0.5) * 0.4,
+                    phase: Math.random() * Math.PI * 2,
+                    pulseSpeed: 0.015 + Math.random() * 0.02,
+                    depth,
+                    baseAlpha: 0.15 + Math.random() * 0.25,
+                };
+            default:
+                return { x, y, depth: 1 };
+        }
+    }
+
+    update(delta, mouseX, mouseY) {
+        if (this.type === 'none' || !this.ctx || this.particles.length === 0) return;
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.width, this.height);
+
+        const spd = this.speed;
+        const pOffset = this.parallax;
+
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+
+            // 视差位移量：近处粒子漂得更快，产生强烈的真 3D 景深感
+            const pX = pOffset ? -mouseX * p.depth * 36 : 0;
+            const pY = pOffset ? -mouseY * p.depth * 36 : 0;
+
+            switch (this.type) {
+                case 'rain': {
+                    p.y += p.speed * spd * delta;
+                    const wind = (mouseX * 10 + 2);
+                    p.x += wind * spd * delta * 0.3;
+
+                    if (p.y > this.height + 30) {
+                        Object.assign(p, this.createParticle(false));
+                    }
+
+                    const rx = p.x + pX;
+                    const ry = p.y + pY;
+                    ctx.beginPath();
+                    ctx.moveTo(rx, ry);
+                    ctx.lineTo(rx + wind * 0.5, ry + p.len);
+                    ctx.strokeStyle = `rgba(180, 215, 255, ${p.alpha})`;
+                    ctx.lineWidth = p.depth * 1.5;
+                    ctx.stroke();
+                    break;
+                }
+                case 'snow': {
+                    p.angle += p.swingSpeed * spd * delta;
+                    p.x += (Math.sin(p.angle) * p.swingRadius + mouseX * 2) * spd * delta;
+                    p.y += p.speed * spd * delta;
+
+                    if (p.y > this.height + 20) {
+                        Object.assign(p, this.createParticle(false));
+                    }
+
+                    const rx = p.x + pX;
+                    const ry = p.y + pY;
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+                    ctx.fill();
+                    break;
+                }
+                case 'sakura': {
+                    p.rot += p.rotSpeed * spd * delta;
+                    p.flip += p.flipSpeed * spd * delta;
+                    p.x += (Math.sin(p.flip) * 1.5 + 0.8 + mouseX * 3) * spd * delta;
+                    p.y += p.speed * spd * delta;
+
+                    if (p.y > this.height + 30 || p.x > this.width + 30) {
+                        Object.assign(p, this.createParticle(false));
+                    }
+
+                    const rx = p.x + pX;
+                    const ry = p.y + pY;
+                    ctx.save();
+                    ctx.translate(rx, ry);
+                    ctx.rotate(p.rot);
+                    ctx.scale(Math.cos(p.flip), 1);
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, -p.size);
+                    ctx.bezierCurveTo(p.size * 0.8, -p.size * 0.6, p.size * 0.7, p.size * 0.6, 0, p.size);
+                    ctx.bezierCurveTo(-p.size * 0.7, p.size * 0.6, -p.size * 0.8, -p.size * 0.6, 0, -p.size);
+                    ctx.fillStyle = p.color + '0.85)';
+                    ctx.fill();
+                    ctx.restore();
+                    break;
+                }
+                case 'leaves': {
+                    p.rot += p.rotSpeed * spd * delta;
+                    p.flip += p.flipSpeed * spd * delta;
+                    p.x += (Math.sin(p.flip) * 2.2 + 0.5 + mouseX * 3) * spd * delta;
+                    p.y += p.speed * spd * delta;
+
+                    if (p.y > this.height + 30 || p.x > this.width + 30) {
+                        Object.assign(p, this.createParticle(false));
+                    }
+
+                    const rx = p.x + pX;
+                    const ry = p.y + pY;
+                    ctx.save();
+                    ctx.translate(rx, ry);
+                    ctx.rotate(p.rot);
+                    ctx.scale(Math.cos(p.flip), 1);
+
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, p.size * 0.6, p.size, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = 0.88 * p.depth;
+                    ctx.fill();
+                    ctx.restore();
+                    break;
+                }
+                case 'sunlight': {
+                    p.phase += p.pulseSpeed * spd * delta;
+                    p.y += p.speedY * spd * delta;
+                    p.x += (p.speedX + Math.sin(p.phase) * 0.5) * spd * delta;
+
+                    if (p.y < -50) p.y = this.height + 30;
+                    if (p.x < -50) p.x = this.width + 30;
+                    if (p.x > this.width + 50) p.x = -30;
+
+                    const rx = p.x + pX;
+                    const ry = p.y + pY;
+                    const alpha = p.baseAlpha * (0.6 + Math.sin(p.phase) * 0.4);
+
+                    const grad = ctx.createRadialGradient(rx, ry, 0, rx, ry, p.radius);
+                    grad.addColorStop(0, `rgba(255, 235, 175, ${alpha})`);
+                    grad.addColorStop(0.5, `rgba(255, 215, 130, ${alpha * 0.5})`);
+                    grad.addColorStop(1, 'rgba(255, 200, 100, 0)');
+
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+                    break;
+                }
+            }
+        }
+    }
+}
+
+// 2. 自定义本地贴纸/挂件管理器
+class StickerManager {
+    constructor() {
+        this.container = document.getElementById('sticker-container');
+        this.img = document.getElementById('sticker-img');
+        this.config = null;
+        this.currentPath = '';
+    }
+
+    setConfig(config) {
+        this.config = config;
+        if (!this.container || !this.img) return;
+
+        if (!config || !config.enabled || !config.imagePath) {
+            this.container.style.display = 'none';
+            return;
+        }
+
+        // 加载贴纸图片
+        if (this.currentPath !== config.imagePath) {
+            this.currentPath = config.imagePath;
+            if (isElectron && window.electronAPI) {
+                const dataUrl = window.electronAPI.readFileAsDataURL(config.imagePath);
+                if (dataUrl) {
+                    this.img.src = dataUrl;
+                } else {
+                    this.img.src = config.imagePath;
+                }
+            } else {
+                this.img.src = config.imagePath;
+            }
+        }
+
+        this.container.style.display = 'block';
+        this.container.style.width = (config.size || 180) + 'px';
+        this.container.style.opacity = config.opacity !== undefined ? config.opacity : 0.9;
+    }
+
+    update(mouseX, mouseY) {
+        if (!this.container || !this.config || !this.config.enabled || !this.config.imagePath) return;
+
+        const posX = (window.innerWidth * (this.config.positionX !== undefined ? this.config.positionX : 85)) / 100;
+        const posY = (window.innerHeight * (this.config.positionY !== undefined ? this.config.positionY : 20)) / 100;
+
+        // 根据所选深度计算视差位移
+        const diff = (this.config.depth !== undefined ? this.config.depth : 0.7) - (CONFIG.focusDepth !== undefined ? CONFIG.focusDepth : 0.5);
+        const offsetX = -mouseX * diff * (CONFIG.parallaxMultiplier * 1.5);
+        const offsetY = -mouseY * diff * (CONFIG.parallaxMultiplier * 1.5);
+
+        this.container.style.left = `${posX + offsetX}px`;
+        this.container.style.top = `${posY + offsetY}px`;
+    }
+}
+
+// 3. 黑胶唱片机动态组件管理器
+class VinylPlayerManager {
+    constructor() {
+        this.widget = document.getElementById('vinyl-widget');
+        this.record = document.getElementById('vinyl-record');
+        this.tonearm = document.getElementById('vinyl-tonearm');
+        this.coverImg = document.getElementById('vinyl-cover-img');
+        this.defaultCover = document.getElementById('vinyl-default-cover');
+        this.soundWaves = document.getElementById('vinyl-sound-waves');
+        this.songNameEl = document.getElementById('vinyl-song-name');
+        this.statusEl = document.getElementById('vinyl-play-status');
+        this.audio = document.getElementById('bg-audio');
+
+        this.config = null;
+        this.currentAudioPath = '';
+        this.currentCoverPath = '';
+        this.audioBlobUrl = null;
+    }
+
+    setConfig(config) {
+        this.config = config;
+        if (!this.widget || !this.audio) return;
+
+        if (!config || !config.enabled) {
+            this.widget.style.display = 'none';
+            if (!this.audio.paused) {
+                this.audio.pause();
+            }
+            return;
+        }
+
+        this.widget.style.display = 'flex';
+
+        // 停靠方位
+        const posClass = `pos-${config.position || 'bottom-right'}`;
+        this.widget.className = `vinyl-widget ${posClass}`;
+
+        // 音频加载
+        if (config.audioPath && this.currentAudioPath !== config.audioPath) {
+            this.currentAudioPath = config.audioPath;
+            this.loadAudioFile(config.audioPath);
+        } else if (!config.audioPath && this.currentAudioPath) {
+            this.currentAudioPath = '';
+            this.audio.pause();
+            this.audio.src = '';
+            if (this.songNameEl) this.songNameEl.textContent = '未选择音乐';
+        }
+
+        // 歌曲名称显示
+        if (this.songNameEl) {
+            if (config.audioName) {
+                this.songNameEl.textContent = config.audioName;
+            } else if (config.audioPath) {
+                const name = config.audioPath.split('\\').pop().split('/').pop().replace(/\.[^/.]+$/, '');
+                this.songNameEl.textContent = name;
+            } else {
+                this.songNameEl.textContent = '未选择音乐';
+            }
+        }
+
+        // 唱片中心封面图片
+        if (config.coverPath && this.currentCoverPath !== config.coverPath) {
+            this.currentCoverPath = config.coverPath;
+            if (isElectron && window.electronAPI) {
+                const dataUrl = window.electronAPI.readFileAsDataURL(config.coverPath);
+                if (dataUrl && this.coverImg) {
+                    this.coverImg.src = dataUrl;
+                    this.coverImg.style.display = 'block';
+                    if (this.defaultCover) this.defaultCover.style.display = 'none';
+                }
+            }
+        } else if (!config.coverPath) {
+            this.currentCoverPath = '';
+            if (this.coverImg) this.coverImg.style.display = 'none';
+            if (this.defaultCover) this.defaultCover.style.display = 'flex';
+        }
+
+        // 音量
+        const vol = config.volume !== undefined ? Math.max(0, Math.min(1, config.volume)) : 0.6;
+        this.audio.volume = vol;
+        this.audio.loop = config.loop !== false;
+
+        // 播放状态控制
+        if (config.playing && config.audioPath) {
+            if (this.audio.paused) {
+                this.audio.play().catch(err => {
+                    console.warn('[Vinyl] 播放音频未启动:', err);
+                });
+            }
+            if (this.record) {
+                this.record.classList.add('spinning');
+                this.record.classList.remove('paused');
+            }
+            if (this.tonearm) this.tonearm.classList.add('playing');
+            if (this.soundWaves) this.soundWaves.classList.add('active');
+            if (this.statusEl) this.statusEl.textContent = '正在播放';
+        } else {
+            if (!this.audio.paused) {
+                this.audio.pause();
+            }
+            if (this.record) {
+                this.record.classList.add('paused');
+            }
+            if (this.tonearm) this.tonearm.classList.remove('playing');
+            if (this.soundWaves) this.soundWaves.classList.remove('active');
+            if (this.statusEl) this.statusEl.textContent = config.audioPath ? '已暂停' : '请导入音乐';
+        }
+    }
+
+    loadAudioFile(filePath) {
+        if (!isElectron || !window.electronAPI) {
+            this.audio.src = filePath;
+            return;
+        }
+
+        try {
+            // 优先使用高效 Uint8Array -> Blob -> createObjectURL
+            if (window.electronAPI.readFileBuffer) {
+                const buffer = window.electronAPI.readFileBuffer(filePath);
+                if (buffer) {
+                    if (this.audioBlobUrl) {
+                        URL.revokeObjectURL(this.audioBlobUrl);
+                    }
+                    const ext = filePath.split('.').pop().toLowerCase();
+                    const mimeMap = { mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', flac: 'audio/flac', m4a: 'audio/mp4' };
+                    const blob = new Blob([buffer], { type: mimeMap[ext] || 'audio/mpeg' });
+                    this.audioBlobUrl = URL.createObjectURL(blob);
+                    this.audio.src = this.audioBlobUrl;
+                    console.log('[Vinyl] 音频加载成功 (Blob URL)');
+                    return;
+                }
+            }
+
+            // 回退到 Data URL
+            const dataUrl = window.electronAPI.readFileAsDataURL(filePath);
+            if (dataUrl) {
+                this.audio.src = dataUrl;
+                console.log('[Vinyl] 音频加载成功 (Data URL)');
+            }
+        } catch (err) {
+            console.error('[Vinyl] 音频加载失败:', err);
+        }
+    }
+
+    update(mouseX, mouseY) {
+        if (!this.widget || !this.config || !this.config.enabled) return;
+        const scale = this.config.scale !== undefined ? this.config.scale : 1.0;
+        // 微小视差浮动
+        const pX = -mouseX * 10;
+        const pY = -mouseY * 10;
+        this.widget.style.transform = `translate3d(${pX}px, ${pY}px, 0) scale(${scale})`;
+    }
+}
+
+// 4. 视频特效覆盖层管理器 (支持 CSS Screen 滤色混合 与 WebGL 绿幕抠图)
+class VideoOverlayManager {
+    constructor() {
+        this.video = document.getElementById('overlay-video');
+        this.canvas = document.getElementById('overlay-chroma-canvas');
+        this.gl = null;
+        this.program = null;
+        this.texture = null;
+        this.uResolution = null;
+        this.uVideoResolution = null;
+        this.uOpacity = null;
+        this.animFrameId = null;
+        this.isRendering = false;
+        this.isPaused = false;
+
+        this.config = {
+            enabled: false,
+            presetId: 'snow2',
+            customPath: '',
+            customName: '',
+            blendMode: 'auto',
+            opacity: 0.85,
+            speed: 1.0,
+        };
+
+        this.presets = {
+            'rain1': { mode: 'screen', path: 'overlay/rain1.mp4' },
+            'rain2': { mode: 'screen', path: 'overlay/rain2.mp4' },
+            'snow1': { mode: 'screen', path: 'overlay/snow1.mp4' },
+            'snow2': { mode: 'chroma', path: 'overlay/snow2.mp4' },
+            'snow3': { mode: 'screen', path: 'overlay/snow3.mp4' },
+            'old1':  { mode: 'screen', path: 'overlay/old1.mp4' },
+            'old2':  { mode: 'screen', path: 'overlay/old2.mp4' },
+            'old3':  { mode: 'screen', path: 'overlay/old3.mp4' },
+        };
+
+        this._initWebGL();
+        window.addEventListener('resize', () => this._onResize());
+    }
+
+    _initWebGL() {
+        if (!this.canvas) return;
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+
+        try {
+            this.gl = this.canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
+        } catch (e) {
+            console.warn('[VideoOverlay] WebGL 初始化失败:', e);
+            return;
+        }
+
+        const gl = this.gl;
+        if (!gl) return;
+
+        const vsSource = `
+            attribute vec2 a_position;
+            varying vec2 v_texCoord;
+            void main() {
+                v_texCoord = vec2((a_position.x + 1.0) * 0.5, (1.0 - a_position.y) * 0.5);
+                gl_Position = vec4(a_position, 0.0, 1.0);
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            uniform sampler2D u_texture;
+            uniform float u_opacity;
+            uniform vec2 u_resolution;
+            uniform vec2 u_videoResolution;
+            varying vec2 v_texCoord;
+
+            void main() {
+                vec2 uv = v_texCoord;
+                float screenRatio = u_resolution.x / u_resolution.y;
+                float videoRatio = u_videoResolution.x / u_videoResolution.y;
+
+                if (screenRatio > videoRatio) {
+                    uv.y = (uv.y - 0.5) * (videoRatio / screenRatio) + 0.5;
+                } else {
+                    uv.x = (uv.x - 0.5) * (screenRatio / videoRatio) + 0.5;
+                }
+
+                if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+                    discard;
+                }
+
+                vec4 color = texture2D(u_texture, uv);
+
+                // 绿幕色度键 (Chroma Key) 计算: greenness = G - max(R, B)
+                float maxRB = max(color.r, color.b);
+                float greenness = color.g - maxRB;
+
+                // 边缘羽化 (0.04 ~ 0.14)
+                float alpha = 1.0 - smoothstep(0.04, 0.14, greenness);
+
+                // 去溢色处理 (Despill): 消除主体边缘被绿幕反射出的绿色
+                if (color.g > maxRB) {
+                    color.g = maxRB;
+                }
+
+                gl_FragColor = vec4(color.rgb, color.a * alpha * u_opacity);
+            }
+        `;
+
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('[VideoOverlay] Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+        const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+        const program = gl.createProgram();
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('[VideoOverlay] Program link error:', gl.getProgramInfoLog(program));
+            return;
+        }
+
+        this.program = program;
+        gl.useProgram(program);
+
+        // 创建屏幕 Quad 顶点缓冲区 (2个三角形构成的矩形)
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        const positions = new Float32Array([
+            -1.0, -1.0,
+             1.0, -1.0,
+            -1.0,  1.0,
+            -1.0,  1.0,
+             1.0, -1.0,
+             1.0,  1.0,
+        ]);
+        gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+        const aPosition = gl.getAttribLocation(program, 'a_position');
+        gl.enableVertexAttribArray(aPosition);
+        gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+
+        // 获取 Uniform 位置
+        this.uResolution = gl.getUniformLocation(program, 'u_resolution');
+        this.uVideoResolution = gl.getUniformLocation(program, 'u_videoResolution');
+        this.uOpacity = gl.getUniformLocation(program, 'u_opacity');
+
+        // 创建视频纹理
+        this.texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        // 开启透明度混合
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
+
+    _onResize() {
+        if (this.canvas) {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+            if (this.gl) {
+                this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+            }
+        }
+    }
+
+    setConfig(newConfig) {
+        if (!newConfig) return;
+        const prev = { ...this.config };
+        this.config = { ...this.config, ...newConfig };
+
+        const srcChanged = (prev.presetId !== this.config.presetId) ||
+                           (prev.customPath !== this.config.customPath) ||
+                           (prev.enabled !== this.config.enabled);
+
+        const modeChanged = (prev.blendMode !== this.config.blendMode);
+
+        if (!this.config.enabled) {
+            this._stop();
+            return;
+        }
+
+        if (srcChanged || modeChanged) {
+            this._applySource();
+        } else {
+            this._applyPlaybackProps();
+        }
+    }
+
+    _resolveCurrentVideo() {
+        if (this.config.presetId === 'custom' && this.config.customPath) {
+            let mode = this.config.blendMode;
+            if (mode === 'auto') mode = 'screen';
+            return { path: this.config.customPath, mode: mode };
+        }
+        const preset = this.presets[this.config.presetId] || this.presets['snow2'];
+        let mode = this.config.blendMode;
+        if (mode === 'auto') mode = preset.mode;
+        return { path: preset.path, mode: mode };
+    }
+
+    _applySource() {
+        if (!this.video) return;
+
+        const info = this._resolveCurrentVideo();
+        if (!info || !info.path) {
+            this._stop();
+            return;
+        }
+
+        let videoUrl = info.path;
+        if (!videoUrl.startsWith('http') && !videoUrl.startsWith('data:') && !videoUrl.startsWith('file://')) {
+            if (/^[a-zA-Z]:[\\\/]/.test(videoUrl)) {
+                videoUrl = encodeURI('file:///' + videoUrl.replace(/\\/g, '/'));
+            }
+        } else if (videoUrl.startsWith('file://')) {
+            videoUrl = encodeURI(videoUrl);
+        }
+
+        const isChroma = (info.mode === 'chroma');
+        const isSameSrc = (this.video.dataset.currentPath === info.path);
+
+        if (!isSameSrc) {
+            this.video.src = videoUrl;
+            this.video.dataset.currentPath = info.path;
+            this.video.load();
+        }
+
+        this.video.playbackRate = this.config.speed || 1.0;
+        this.video.muted = true;
+        this.video.loop = true;
+
+        if (isChroma) {
+            // WebGL 绿幕抠图模式：隐藏原生 video，激活 Canvas
+            this.video.style.display = 'none';
+            if (this.canvas) {
+                this.canvas.style.display = 'block';
+                this.canvas.style.opacity = (this.config.opacity !== undefined) ? this.config.opacity : 0.85;
+            }
+            this._startChromaLoop();
+        } else {
+            // Screen 滤色模式：直接显示原生 video（GPU 硬件解码混合，0额外开销）
+            this._stopChromaLoop();
+            if (this.canvas) this.canvas.style.display = 'none';
+            this.video.style.display = 'block';
+            this.video.style.mixBlendMode = 'screen';
+            this.video.style.opacity = (this.config.opacity !== undefined) ? this.config.opacity : 0.85;
+        }
+
+        if (!this.isPaused) {
+            this.video.play().catch(err => console.warn('[VideoOverlay] 自动播放受阻:', err));
+        }
+    }
+
+    _applyPlaybackProps() {
+        if (!this.video) return;
+        this.video.playbackRate = this.config.speed || 1.0;
+
+        const opacity = (this.config.opacity !== undefined) ? this.config.opacity : 0.85;
+        const info = this._resolveCurrentVideo();
+        if (info.mode === 'chroma' && this.canvas) {
+            this.canvas.style.opacity = opacity;
+        } else {
+            this.video.style.opacity = opacity;
+        }
+    }
+
+    _startChromaLoop() {
+        if (this.isRendering) return;
+        this.isRendering = true;
+
+        const renderFrame = () => {
+            if (!this.isRendering) return;
+
+            if (this.gl && this.program && this.video && this.video.readyState >= 2 && !this.video.paused) {
+                const gl = this.gl;
+                gl.useProgram(this.program);
+
+                // 更新视频纹理
+                gl.bindTexture(gl.TEXTURE_2D, this.texture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.video);
+
+                // 传递 Uniform 尺寸
+                gl.uniform2f(this.uResolution, this.canvas.width, this.canvas.height);
+                gl.uniform2f(this.uVideoResolution, this.video.videoWidth || 1920, this.video.videoHeight || 1080);
+                gl.uniform1f(this.uOpacity, 1.0);
+
+                gl.clearColor(0, 0, 0, 0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+            }
+
+            this.animFrameId = requestAnimationFrame(renderFrame);
+        };
+
+        this.animFrameId = requestAnimationFrame(renderFrame);
+    }
+
+    _stopChromaLoop() {
+        this.isRendering = false;
+        if (this.animFrameId) {
+            cancelAnimationFrame(this.animFrameId);
+            this.animFrameId = null;
+        }
+    }
+
+    _stop() {
+        this._stopChromaLoop();
+        if (this.video) {
+            this.video.pause();
+            this.video.style.display = 'none';
+            this.video.dataset.currentPath = '';
+        }
+        if (this.canvas) {
+            this.canvas.style.display = 'none';
+        }
+    }
+
+    pause() {
+        this.isPaused = true;
+        if (this.video) this.video.pause();
+        this._stopChromaLoop();
+    }
+
+    resume() {
+        this.isPaused = false;
+        if (this.config.enabled && this.video) {
+            const info = this._resolveCurrentVideo();
+            this.video.play().catch(() => {});
+            if (info.mode === 'chroma') {
+                this._startChromaLoop();
+            }
+        }
+    }
+}
+
+// 实例化管理器
+const weatherManager = new WeatherParticleManager();
+const stickerManager = new StickerManager();
+const vinylManager = new VinylPlayerManager();
+const videoOverlayManager = new VideoOverlayManager();
+
+function applyCustomElementsConfig(config) {
+    if (!config) return;
+    if (config.weather && weatherManager) weatherManager.setConfig(config.weather);
+    if (config.sticker && stickerManager) stickerManager.setConfig(config.sticker);
+    if (config.vinyl && vinylManager) vinylManager.setConfig(config.vinyl);
+    if (config.videoOverlay && videoOverlayManager) videoOverlayManager.setConfig(config.videoOverlay);
 }
 
 // ==================== 错误处理 ====================
@@ -616,6 +1455,9 @@ if (isElectron) {
         if (app && app.ticker) {
             app.ticker.stop();
         }
+        if (videoOverlayManager) {
+            videoOverlayManager.pause();
+        }
         showToast('壁纸已暂停（检测到全屏应用）', 2000);
     });
 
@@ -624,6 +1466,9 @@ if (isElectron) {
         console.log('[App] 收到恢复信号，恢复渲染');
         if (app && app.ticker) {
             app.ticker.start();
+        }
+        if (videoOverlayManager) {
+            videoOverlayManager.resume();
         }
         showToast('壁纸已恢复', 1500);
     });
@@ -677,6 +1522,9 @@ if (isElectron) {
             if (CONFIG.hideDebugPanel && debugPanel) {
                 debugPanel.style.display = 'none';
             }
+
+            // 更新自定义元素（唱片机、天气、贴纸）
+            applyCustomElementsConfig(config);
         }
     });
 

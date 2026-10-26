@@ -30,6 +30,7 @@ const {
     nativeImage,
     powerMonitor,
     screen,
+    shell,
 } = require('electron');
 
 const path = require('path');
@@ -130,6 +131,7 @@ function createWallpaperWindow() {
             nodeIntegration: false,   // 安全：禁止渲染进程访问 Node.js
             sandbox: false,           // 需要 preload 访问 Node API
             webgl: true,              // Pixi.js 需要 WebGL
+            webSecurity: false,       // 允许直接播放本地视频/音频与纹理
             offscreen: false,
         },
     });
@@ -276,9 +278,9 @@ function createSettingsWindow() {
     }
 
     settingsWindow = new BrowserWindow({
-        width: 520,
-        height: 760,
-        resizable: false,
+        width: 540,
+        height: 800,
+        resizable: true,
         frame: true,
         title: '互动3D壁纸 - 设置',
         autoHideMenuBar: true,
@@ -287,6 +289,7 @@ function createSettingsWindow() {
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: false,
+            webSecurity: false,
         },
     });
 
@@ -327,6 +330,160 @@ function registerIpcHandlers() {
         return imagePath;
     });
 
+    // ---- 选择本地音乐文件 ----
+    ipcMain.handle('dialog:selectAudio', async () => {
+        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+            title: '选择本地音乐/音频文件',
+            filters: [
+                { name: '音频文件', extensions: ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'] },
+                { name: '所有文件', extensions: ['*'] }
+            ],
+            properties: ['openFile'],
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+
+        const filePath = result.filePaths[0];
+        const fileName = path.basename(filePath);
+        return { path: filePath, name: fileName };
+    });
+
+    // ---- 选择唱片中心封面图片 ----
+    ipcMain.handle('dialog:selectCover', async () => {
+        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+            title: '选择唱片中心封面图片',
+            filters: [
+                { name: '图片文件', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'] },
+            ],
+            properties: ['openFile'],
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+
+        return result.filePaths[0];
+    });
+
+    // ---- 选择本地贴纸/挂件图片 ----
+    ipcMain.handle('dialog:selectSticker', async () => {
+        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+            title: '选择本地贴纸/挂件图片 (建议透明 PNG)',
+            filters: [
+                { name: '图片文件', extensions: ['png', 'webp', 'gif', 'jpg', 'jpeg'] },
+                { name: '所有文件', extensions: ['*'] }
+            ],
+            properties: ['openFile'],
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+
+        return result.filePaths[0];
+    });
+
+    // ---- 选择自定义视频特效文件 ----
+    ipcMain.handle('dialog:selectOverlayVideo', async () => {
+        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+            title: '选择本地视频特效文件',
+            filters: [
+                { name: '视频文件', extensions: ['mp4', 'webm', 'mov', 'mkv'] },
+                { name: '所有文件', extensions: ['*'] }
+            ],
+            properties: ['openFile'],
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+
+        const filePath = result.filePaths[0];
+        const fileName = path.basename(filePath);
+        return { path: filePath, name: fileName };
+    });
+
+    // ---- 获取内置视频特效列表 ----
+    ipcMain.handle('overlay:getPresets', async () => {
+        const overlayDir = path.join(__dirname, 'overlay');
+        return [
+            {
+                id: 'rain1',
+                title: '细雨蒙蒙',
+                desc: '窗前微雨 · 宁静舒适',
+                mode: 'screen',
+                modeName: '滤色混合',
+                path: path.join(overlayDir, 'rain1.mp4'),
+                thumb: path.join(overlayDir, 'rain1_thumb.jpg'),
+            },
+            {
+                id: 'rain2',
+                title: '暴雨倾盆',
+                desc: '2K高清大雨 · 沉浸感强',
+                mode: 'screen',
+                modeName: '滤色混合',
+                path: path.join(overlayDir, 'rain2.mp4'),
+                thumb: path.join(overlayDir, 'rain2_thumb.jpg'),
+            },
+            {
+                id: 'snow1',
+                title: '唯美落雪',
+                desc: '轻柔雪花 · 浪漫冬日',
+                mode: 'screen',
+                modeName: '滤色混合',
+                path: path.join(overlayDir, 'snow1.mp4'),
+                thumb: path.join(overlayDir, 'snow1_thumb.jpg'),
+            },
+            {
+                id: 'snow2',
+                title: '纯净落雪',
+                desc: '绿幕抠图 · 真实雪景',
+                mode: 'chroma',
+                modeName: '绿幕抠图',
+                path: path.join(overlayDir, 'snow2.mp4'),
+                thumb: path.join(overlayDir, 'snow2_thumb.jpg'),
+            },
+            {
+                id: 'snow3',
+                title: '漫天大雪',
+                desc: '密集风雪 · 寒冬飘舞',
+                mode: 'screen',
+                modeName: '滤色混合',
+                path: path.join(overlayDir, 'snow3.mp4'),
+                thumb: path.join(overlayDir, 'snow3_thumb.jpg'),
+            },
+            {
+                id: 'old1',
+                title: '老电影胶片',
+                desc: '复古胶片颗粒 · 怀旧质感',
+                mode: 'screen',
+                modeName: '滤色混合',
+                path: path.join(overlayDir, 'old1.mp4'),
+                thumb: path.join(overlayDir, 'old1_thumb.jpg'),
+            },
+            {
+                id: 'old2',
+                title: '放映机划痕',
+                desc: '经典黑白划痕 · 复古放映',
+                mode: 'screen',
+                modeName: '滤色混合',
+                path: path.join(overlayDir, 'old2.mp4'),
+                thumb: path.join(overlayDir, 'old2_thumb.jpg'),
+            },
+            {
+                id: 'old3',
+                title: '复古光斑',
+                desc: '暖调光斑闪烁 · 电影氛围',
+                mode: 'screen',
+                modeName: '滤色混合',
+                path: path.join(overlayDir, 'old3.mp4'),
+                thumb: path.join(overlayDir, 'old3_thumb.jpg'),
+            },
+        ];
+    });
+
     // ---- 保存深度图到缓存 ----
     ipcMain.handle('cache:saveDepthMap', async (_event, { imagePath, depthDataUrl }) => {
         return store.saveDepthCache(imagePath, depthDataUrl);
@@ -337,9 +494,42 @@ function registerIpcHandlers() {
         return store.getDepthCache(imagePath);
     });
 
+    // ---- 深度图存放文件夹管理 ----
+    ipcMain.handle('depth:getCacheDir', async () => {
+        return store.getDepthCacheDir();
+    });
+
+    ipcMain.handle('depth:openCacheDir', async () => {
+        const dir = store.getDepthCacheDir();
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        await shell.openPath(dir);
+        return true;
+    });
+
+    ipcMain.handle('depth:selectCacheDir', async () => {
+        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+            title: '选择深度图存放文件夹',
+            defaultPath: store.getDepthCacheDir(),
+            properties: ['openDirectory', 'createDirectory'],
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+
+        const newDir = result.filePaths[0];
+        return store.setDepthCacheDir(newDir, true);
+    });
+
     // ---- 保存应用配置 ----
     ipcMain.handle('config:save', async (_event, config) => {
         store.saveConfig(config);
+        // 核心修复：实时广播新配置到壁纸渲染窗口，让视差参数拖动时立刻生效！
+        if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
+            wallpaperWindow.webContents.send('config:load', store.getConfig());
+        }
         return true;
     });
 
@@ -580,6 +770,9 @@ function cleanupAndQuit() {
 
 // ==================== 应用生命周期 ====================
 
+// 允许壁纸后台播放音频，免除手势交互限制
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 app.whenReady().then(() => {
     console.log('[Main] App starting...');
 
@@ -605,6 +798,13 @@ app.whenReady().then(() => {
             if (!result.canceled && result.filePaths.length > 0 && wallpaperWindow) {
                 wallpaperWindow.webContents.send('image:new', result.filePaths[0]);
             }
+        },
+        onOpenDepthDir: async () => {
+            const dir = store.getDepthCacheDir();
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            await shell.openPath(dir);
         },
         onQuit: () => cleanupAndQuit(),
         getAutoLaunch: () => app.getLoginItemSettings().openAtLogin,

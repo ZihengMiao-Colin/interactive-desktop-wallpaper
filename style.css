@@ -209,3 +209,326 @@ body > canvas {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
+
+/* ==================== 视频特效覆盖层 ==================== */
+#overlay-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    pointer-events: none;
+    z-index: 80;
+    mix-blend-mode: screen;
+    will-change: opacity;
+    transition: opacity 0.3s ease;
+}
+
+#overlay-chroma-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 80;
+    will-change: opacity;
+    transition: opacity 0.3s ease;
+}
+
+/* ==================== 天气粒子特效 Canvas ==================== */
+#weather-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* ==================== 自定义贴纸挂件 ==================== */
+.sticker-widget {
+    position: fixed;
+    pointer-events: none;
+    z-index: 120;
+    user-select: none;
+    will-change: transform, left, top;
+}
+.sticker-widget img {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.5));
+}
+
+/* ==================== 黑胶唱片机组件 ==================== */
+.vinyl-widget {
+    position: fixed;
+    pointer-events: none;
+    z-index: 140;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    will-change: transform;
+    transition: transform 0.1s ease-out, opacity 0.3s ease;
+}
+
+/* 停靠方位 */
+.vinyl-widget.pos-bottom-right { right: 36px; bottom: 36px; }
+.vinyl-widget.pos-bottom-left  { left: 36px; bottom: 36px; }
+.vinyl-widget.pos-top-right    { right: 36px; top: 36px; }
+.vinyl-widget.pos-top-left     { left: 36px; top: 36px; }
+
+/* 唱机底座与盘面容器 */
+.vinyl-deck {
+    position: relative;
+    width: 154px;
+    height: 154px;
+}
+
+.vinyl-platter {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    border-radius: 50%;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+/* 黑胶唱片本尊 */
+.vinyl-record {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    background: radial-gradient(circle,
+        #111 0%,
+        #181818 24%,
+        #222 26%,
+        #141414 36%,
+        #202020 38%,
+        #111 50%,
+        #242424 53%,
+        #121212 68%,
+        #1c1c1c 70%,
+        #0d0d0d 88%,
+        #222 93%,
+        #050505 100%);
+    box-shadow: inset 0 0 3px rgba(255,255,255,0.25);
+    overflow: hidden;
+}
+
+/* 旋转动画 */
+.vinyl-record.spinning {
+    animation: spinVinyl 3.6s linear infinite;
+}
+.vinyl-record.paused {
+    animation-play-state: paused;
+}
+
+@keyframes spinVinyl {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* 唱片沟槽高光扫光 */
+.vinyl-reflection {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+        from 35deg,
+        transparent 0deg,
+        rgba(255, 255, 255, 0.09) 35deg,
+        transparent 70deg,
+        transparent 180deg,
+        rgba(255, 255, 255, 0.09) 215deg,
+        transparent 250deg
+    );
+    pointer-events: none;
+}
+
+/* 唱片中心标签贴纸 */
+.vinyl-center-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #1c2333;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 8px rgba(0,0,0,0.6);
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.vinyl-center-label img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.vinyl-default-cover {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1f304d, #0d1522);
+}
+
+.vinyl-music-icon {
+    font-size: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+/* 中心轴孔金属柱 */
+.vinyl-spindle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    box-shadow: 0 0 2px #000, inset 0 0 2px #555;
+    z-index: 2;
+}
+
+/* 拟真机械唱臂 */
+.vinyl-tonearm {
+    position: absolute;
+    top: -10px;
+    right: -8px;
+    width: 44px;
+    height: 104px;
+    transform-origin: 32px 14px;
+    z-index: 10;
+    pointer-events: none;
+    transform: rotate(-32deg);
+    transition: transform 0.75s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.vinyl-tonearm.playing {
+    transform: rotate(18deg);
+}
+
+/* 唱臂轴座 */
+.tonearm-pivot {
+    position: absolute;
+    top: 4px;
+    right: 2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #e2e8f0 30%, #94a3b8 70%, #475569 100%);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 唱臂杆 */
+.tonearm-rod {
+    position: absolute;
+    top: 20px;
+    right: 12px;
+    width: 3px;
+    height: 70px;
+    background: linear-gradient(to right, #cbd5e1, #94a3b8, #64748b);
+    border-radius: 2px;
+    box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* 唱头与唱针 */
+.tonearm-head {
+    position: absolute;
+    bottom: 2px;
+    right: 7px;
+    width: 14px;
+    height: 16px;
+    background: #334155;
+    border-radius: 2px 2px 4px 4px;
+    transform: rotate(20deg);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+.tonearm-head::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 5px;
+    width: 2px;
+    height: 4px;
+    background: #f59e0b;
+    border-radius: 1px;
+}
+
+/* 歌曲信息浮动胶囊 */
+.vinyl-info-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 7px 14px;
+    background: rgba(15, 20, 32, 0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    max-width: 210px;
+}
+
+/* 动态音律跳动波形条 */
+.vinyl-sound-waves {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.vinyl-sound-waves span {
+    width: 3px;
+    height: 4px;
+    background: #7ecfff;
+    border-radius: 2px;
+    transition: height 0.2s;
+}
+
+.vinyl-sound-waves.active span:nth-child(1) { animation: wavePulse 0.8s ease-in-out infinite alternate; }
+.vinyl-sound-waves.active span:nth-child(2) { animation: wavePulse 0.6s ease-in-out infinite alternate 0.2s; }
+.vinyl-sound-waves.active span:nth-child(3) { animation: wavePulse 0.9s ease-in-out infinite alternate 0.4s; }
+.vinyl-sound-waves.active span:nth-child(4) { animation: wavePulse 0.7s ease-in-out infinite alternate 0.1s; }
+
+@keyframes wavePulse {
+    0%   { height: 3px; }
+    100% { height: 14px; }
+}
+
+.vinyl-text-col {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vinyl-song-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #f1f5f9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+
+.vinyl-play-status {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 1px;
+}
+

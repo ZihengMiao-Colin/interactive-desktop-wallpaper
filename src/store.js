@@ -26,39 +26,143 @@ class AppStore {
     constructor() {
         // 用户数据目录: %APPDATA%/interactive-desktop-wallpaper/
         this._userDataPath = app.getPath('userData');
-        this._cacheDir = path.join(this._userDataPath, 'depth_cache');
         this._configPath = path.join(this._userDataPath, 'config.json');
         this._cacheIndexPath = path.join(this._userDataPath, 'cache_index.json');
 
+        // 加载配置
+        this._config = this._loadJSON(this._configPath, this._defaultConfig());
+
+        // 深度图存放目录：优先使用用户自定义目录，默认保存在 userData/depth_cache
+        this._defaultCacheDir = path.join(this._userDataPath, 'depth_cache');
+        this._cacheDir = this._config.depthCacheDir || this._defaultCacheDir;
+
         // 确保目录存在
         if (!fs.existsSync(this._cacheDir)) {
-            fs.mkdirSync(this._cacheDir, { recursive: true });
+            try {
+                fs.mkdirSync(this._cacheDir, { recursive: true });
+            } catch (err) {
+                console.error('[Store] 创建深度图缓存目录失败，回退到默认目录:', err);
+                this._cacheDir = this._defaultCacheDir;
+                if (!fs.existsSync(this._cacheDir)) {
+                    fs.mkdirSync(this._cacheDir, { recursive: true });
+                }
+            }
         }
 
         // 加载缓存索引
         this._cacheIndex = this._loadJSON(this._cacheIndexPath, {});
 
-        // 加载配置
-        this._config = this._loadJSON(this._configPath, this._defaultConfig());
-
         console.log('[Store] Data dir:', this._userDataPath);
+        console.log('[Store] Depth cache dir:', this._cacheDir);
+    }
+
+    // ==================== 深度图存储位置管理 ====================
+
+    /**
+     * 获取当前深度图存放文件夹路径。
+     * @returns {string}
+     */
+    getDepthCacheDir() {
+        return this._cacheDir;
+    }
+
+    /**
+     * 更改深度图存放位置，并可选择是否迁移已有深度图文件。
+     *
+     * @param {string} newDir - 新文件夹路径
+     * @param {boolean} [moveExisting=true] - 是否将现有深度图迁移到新目录
+     * @returns {{success: boolean, path?: string, movedCount?: number, error?: string}}
+     */
+    setDepthCacheDir(newDir, moveExisting = true) {
+        try {
+            if (!newDir || typeof newDir !== 'string') {
+                return { success: false, error: '无效的目标文件夹路径' };
+            }
+
+            const normalizedNewDir = path.resolve(newDir);
+            const oldDir = path.resolve(this._cacheDir);
+
+            if (normalizedNewDir === oldDir) {
+                return { success: true, path: normalizedNewDir, movedCount: 0 };
+            }
+
+            // 确保新目录存在
+            if (!fs.existsSync(normalizedNewDir)) {
+                fs.mkdirSync(normalizedNewDir, { recursive: true });
+            }
+
+            let movedCount = 0;
+            // 迁移已有深度图文件
+            if (moveExisting && fs.existsSync(oldDir)) {
+                const files = fs.readdirSync(oldDir);
+                for (const file of files) {
+                    if (file.toLowerCase().endsWith('.png')) {
+                        const oldFile = path.join(oldDir, file);
+                        const newFile = path.join(normalizedNewDir, file);
+                        try {
+                            fs.copyFileSync(oldFile, newFile);
+                            try { fs.unlinkSync(oldFile); } catch (_) {}
+                            movedCount++;
+                        } catch (copyErr) {
+                            console.warn(`[Store] 迁移文件 ${file} 失败:`, copyErr.message);
+                        }
+                    }
+                }
+            }
+
+            // 更新缓存索引里的绝对路径
+            for (const key of Object.keys(this._cacheIndex)) {
+                const entry = this._cacheIndex[key];
+                if (entry && entry.depthFile) {
+                    const fileName = path.basename(entry.depthFile);
+                    entry.depthFile = path.join(normalizedNewDir, fileName);
+                }
+            }
+
+            this._cacheDir = normalizedNewDir;
+            this.saveConfig({ depthCacheDir: normalizedNewDir });
+            this._saveJSON(this._cacheIndexPath, this._cacheIndex);
+
+            console.log(`[Store] 深度图存储位置已更新: ${normalizedNewDir} (迁移了 ${movedCount} 个文件)`);
+            return { success: true, path: normalizedNewDir, movedCount };
+        } catch (err) {
+            console.error('[Store] 变更深度图存放位置失败:', err);
+            return { success: false, error: err.message };
+        }
     }
 
     // ==================== 配置管理 ====================
 
     /**
-     * 获取当前完整配置。
+     * 获取当前完整配置（自动补齐默认值）。
      */
     getConfig() {
-        return { ...this._config };
+        const defaults = this._defaultConfig();
+        return {
+            ...defaults,
+            ...this._config,
+            vinyl: { ...defaults.vinyl, ...(this._config.vinyl || {}) },
+            weather: { ...defaults.weather, ...(this._config.weather || {}) },
+            sticker: { ...defaults.sticker, ...(this._config.sticker || {}) },
+            videoOverlay: { ...defaults.videoOverlay, ...(this._config.videoOverlay || {}) },
+        };
     }
 
     /**
-     * 保存配置（部分更新）。
+     * 保存配置（支持部分深度更新）。
      * @param {Object} partial - 要更新的配置字段
      */
     saveConfig(partial) {
-        this._config = { ...this._config, ...partial };
+        if (!partial) return;
+        const current = this.getConfig();
+        this._config = {
+            ...current,
+            ...partial,
+            vinyl: partial.vinyl ? { ...current.vinyl, ...partial.vinyl } : current.vinyl,
+            weather: partial.weather ? { ...current.weather, ...partial.weather } : current.weather,
+            sticker: partial.sticker ? { ...current.sticker, ...partial.sticker } : current.sticker,
+            videoOverlay: partial.videoOverlay ? { ...current.videoOverlay, ...partial.videoOverlay } : current.videoOverlay,
+        };
         this._saveJSON(this._configPath, this._config);
     }
 
@@ -184,13 +288,53 @@ class AppStore {
 
     _defaultConfig() {
         return {
-            parallaxMultiplier: 30,
+            parallaxMultiplier: 20,
             smoothness: 0.08,
             focusDepth: 0.50,
             blurRadius: 8,
             autoLaunch: false,
             currentImage: '',
+            depthCacheDir: '',
             hideDebugPanel: true,      // 打包后默认隐藏调试面板
+            // 1. 黑胶唱片机组件
+            vinyl: {
+                enabled: false,             // 是否开启唱片机
+                position: 'bottom-right',   // 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+                scale: 1.0,                 // 缩放大小 0.7 ~ 1.3
+                volume: 0.6,                // 音量 0.0 ~ 1.0
+                playing: false,             // 是否正在播放
+                loop: true,                 // 循环播放
+                audioPath: '',              // 本地音频文件路径
+                audioName: '',              // 音频文件名
+                coverPath: '',              // 唱片中心封面图片路径
+            },
+            // 2. 天气粒子特效
+            weather: {
+                type: 'none',               // 'none' | 'rain' | 'snow' | 'sakura' | 'leaves' | 'sunlight'
+                density: 'medium',          // 'low' | 'medium' | 'high'
+                speed: 1.0,                 // 速度倍率 0.5 ~ 2.0
+                parallax: true,             // 是否随鼠标视差位移
+            },
+            // 3. 本地贴纸/挂件
+            sticker: {
+                enabled: false,             // 是否开启自定义贴纸
+                imagePath: '',              // 本地贴纸图片路径
+                positionX: 85,              // 屏幕 X 百分比 0 ~ 100
+                positionY: 20,              // 屏幕 Y 百分比 0 ~ 100
+                size: 180,                  // 尺寸像素 60 ~ 500
+                opacity: 0.9,               // 透明度 0.1 ~ 1.0
+                depth: 0.7,                 // 视差深度层级 0.0 (远景) ~ 1.0 (近景)
+            },
+            // 4. 视频特效覆盖层（支持滤色/绿幕抠图）
+            videoOverlay: {
+                enabled: false,             // 是否开启视频覆盖特效
+                presetId: 'snow2',          // 预设 ID: 'rain1' | 'rain2' | 'snow1' | 'snow2' | 'snow3' | 'old1' | 'old2' | 'old3' | 'custom'
+                customPath: '',             // 本地导入视频文件路径
+                customName: '',             // 本地导入视频文件名
+                blendMode: 'auto',          // 混合模式: 'auto' | 'screen' | 'chroma'
+                opacity: 0.85,              // 不透明度 0.1 ~ 1.0
+                speed: 1.0,                 // 播放速度 0.5 ~ 2.0
+            },
         };
     }
 
