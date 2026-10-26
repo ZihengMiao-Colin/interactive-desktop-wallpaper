@@ -1,0 +1,47 @@
+{
+  "_说明": "浏览器开发预览用的假配置：venv/Scripts/python.exe -m http.server 8765 后打开 http://localhost:8765/index.html（摆放模式加 ?mode=edit）",
+  "customElements": {
+    "library": [
+      { "id": "user:dev-image", "name": "背景 2", "type": "image", "file": "background2.png", "thumb": null, "builtin": false },
+      { "id": "user:dev-gif", "name": "示例 GIF", "type": "animated", "file": "dev/sample.gif", "thumb": null, "builtin": false },
+      { "id": "user:dev-missing", "name": "丢失的文件", "type": "image", "file": "dev/missing.png", "thumb": null, "builtin": false }
+    ],
+    "instances": [
+      {
+        "id": "dev-bomb", "assetId": "builtin:bomb1", "visible": true,
+        "transform": { "x": 0.72, "y": 0.42, "width": 0.25, "rotation": 0 },
+        "depth": 0.45, "depthAuto": false, "opacity": 1,
+        "playback": { "mode": "interval", "intervalSec": 10, "jitterSec": 3 },
+        "chroma": { "enabled": true, "strength": 0.5 }, "effects": {}
+      },
+      {
+        "id": "dev-image", "assetId": "user:dev-image", "visible": true,
+        "transform": { "x": 0.15, "y": 0.25, "width": 0.18, "rotation": 0 },
+        "depth": 0.9, "depthAuto": false, "opacity": 0.9,
+        "playback": { "mode": "static", "intervalSec": 10, "jitterSec": 3 },
+        "chroma": { "enabled": false, "strength": 0.5 }, "effects": {}
+      },
+      {
+        "id": "dev-gif", "assetId": "user:dev-gif", "visible": true,
+        "transform": { "x": 0.4, "y": 0.75, "width": 0.2, "rotation": 0 },
+        "depth": 0.3, "depthAuto": false, "opacity": 1,
+        "playback": { "mode": "loop", "intervalSec": 10, "jitterSec": 3 },
+        "chroma": { "enabled": true, "strength": 0.5 }, "effects": {}
+      }
+    ]
+  },
+  "draft": {
+    "instance": {
+      "id": "dev-draft", "assetId": "builtin:bomb2", "visible": true,
+      "transform": { "x": 0.5, "y": 0.5, "width": 0.25, "rotation": 0 },
+      "depth": 0.5, "depthAuto": true, "opacity": 1,
+      "playback": { "mode": "interval", "intervalSec": 10, "jitterSec": 3 },
+      "chroma": { "enabled": true, "strength": 0.5 }, "effects": {}
+    },
+    "asset": {
+      "id": "builtin:bomb2", "name": "爆炸 2", "type": "video", "file": "elements/bomb2_cut.mp4",
+      "thumb": "elements/bomb2_thumb.jpg", "builtin": true, "aspect": 1.8893,
+      "defaults": { "width": 0.25, "playback": { "mode": "interval", "intervalSec": 10, "jitterSec": 3 }, "chroma": { "enabled": true, "strength": 0.5 } }
+    }
+  }
+}

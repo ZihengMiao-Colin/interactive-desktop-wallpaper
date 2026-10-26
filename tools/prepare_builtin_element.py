@@ -138,7 +138,7 @@ def main():
 
     subprocess.check_call([
         'ffmpeg', '-v', 'error', '-y', '-i', args.input,
-        '-vf', f'crop={crop_w}:{crop_h}:{left}:{top},scale={out_w}:{out_h},fps={OUTPUT_FPS}',
+        '-vf', f'crop={crop_w}:{crop_h}:{left}:{top},scale={out_w}:{out_h},setsar=1,fps={OUTPUT_FPS}',
         '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart',
         video_path,
     ])
