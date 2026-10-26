@@ -115,3 +115,16 @@ test('saveThumbnail 写出 jpg 并返回路径', () => {
     assert.equal(p, path.join(dir, 'abc_thumb.jpg'));
     assert.equal(fs.readFileSync(p, 'utf8'), 'jpeg!');
 });
+
+test('项目自带的 manifest 能读出两个爆炸视频素材', () => {
+    const assets = lib.loadBuiltinAssets(path.join(__dirname, '..', 'elements'));
+    assert.deepEqual(assets.map((a) => a.id), ['builtin:bomb1', 'builtin:bomb2']);
+    for (const a of assets) {
+        assert.equal(a.type, 'video');
+        assert.ok(fs.existsSync(a.file), a.file);
+        assert.ok(a.thumb && fs.existsSync(a.thumb), a.thumb);
+        assert.equal(a.defaults.playback.mode, 'interval');
+        assert.equal(a.defaults.chroma.enabled, true);
+        assert.ok(a.aspect > 0);
+    }
+});

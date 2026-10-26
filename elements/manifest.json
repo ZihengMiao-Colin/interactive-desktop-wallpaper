@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "elements": [
+    {
+      "id": "bomb1",
+      "name": "爆炸 1",
+      "type": "video",
+      "file": "bomb1_cut.mp4",
+      "thumb": "bomb1_thumb.jpg",
+      "aspect": 1.087,
+      "width": 0.25,
+      "playback": {
+        "mode": "interval",
+        "intervalSec": 10,
+        "jitterSec": 3
+      },
+      "chroma": {
+        "enabled": true,
+        "strength": 0.5
+      }
+    },
+    {
+      "id": "bomb2",
+      "name": "爆炸 2",
+      "type": "video",
+      "file": "bomb2_cut.mp4",
+      "thumb": "bomb2_thumb.jpg",
+      "aspect": 1.8893,
+      "width": 0.25,
+      "playback": {
+        "mode": "interval",
+        "intervalSec": 10,
+        "jitterSec": 3
+      },
+      "chroma": {
+        "enabled": true,
+        "strength": 0.5
+      }
+    }
+  ]
+}
