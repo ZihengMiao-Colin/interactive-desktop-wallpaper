@@ -1,237 +1,74 @@
-# 互动桌面壁纸 — 伪 3D 深度视差
+# 互动3D壁纸
 
-基于 **Pixi.js DisplacementFilter** 实现的全屏交互式桌面壁纸。鼠标移动时，画面会根据深度图产生伪 3D 视差效果。
+Windows 桌面上的伪 3D 视差动态壁纸：选一张图片，AI 自动生成深度图，移动鼠标时画面按远近产生视差，像透过窗户看一个立体场景。还可以往壁纸上放自己的图片、GIF、视频，它们会和场景一起移动，并被前景物体自然遮挡。
 
----
+## 功能
 
-## 项目文件结构
+- **深度视差壁纸**：Depth Anything V2 生成深度图，自定义着色器按深度偏移画面；可调视差强度、平滑度、对焦深度。
+- **自定义元素**：导入图片 / GIF / 动态 WebP / APNG / MP4 / WebM，或使用自带的默认元素（爆炸）。
+  - 点元素进入摆放模式：拖动移动、拖动角点缩放、调深度，Enter 确认、Esc 取消。
+  - 元素随鼠标和同深度的背景一起移动，被更近的物体遮挡；新元素默认"贴地"取深度。
+  - 支持绿幕抠像、循环 / 间隔播放、不透明度、显示 / 隐藏，可以同时放多个。
+- **其他装饰**：黑胶唱片机（播放本地音乐）、全屏视频特效（雨、雪、老电影）、天气粒子。
+- **桌面集成**：注入到桌面图标下方的 WorkerW 层；全屏应用、锁屏、睡眠时自动暂停；托盘菜单、开机自启。
 
-```
-壁纸/
-├── index.html              # 壁纸主页面（全屏 Canvas + 调试面板）
-├── settings.html           # 设置窗口页面（Electron）
-├── style.css               # 样式（全屏无滚动 + 加载动画 + Toast）
-├── app.js                  # 核心逻辑（Pixi.js + DisplacementFilter + IPC）
-├── main.js                 # Electron 主进程入口
-├── preload.js              # IPC 桥接脚本（安全隔离）
-├── package.json            # Electron 项目配置与依赖
-├── src/
-│   ├── wallpaper-native.js # WorkerW 壁纸层注入模块（Win32 API）
-│   ├── tray-manager.js     # 系统托盘管理
-│   ├── fullscreen-detector.js # 全屏检测 / 性能守卫
-│   └── store.js            # 数据持久化与缓存
-├── assets/
-│   └── icon.png            # 托盘图标
-├── background.png          # 原图（彩色壁纸）—— 你可以替换
-├── depth_map.png           # 深度图（黑白灰）—— AI 自动生成或手动制作
-├── generate_depth_map.py   # 深度图 AI 生成工具 (Depth Anything V2)
-├── 生成深度图.bat           # Windows 一键生成脚本
-├── requirements.txt        # Python 依赖清单
-└── README.md               # 本文件
-```
+## 运行
 
----
-
-## 如何用自己的图片替换素材
-
-### 1. 准备原图（background.png）
-
-将你喜欢的彩色壁纸图片重命名为 `background.png`，放到项目目录中。
-
-- 支持格式：PNG / JPG
-- 推荐分辨率：与你的屏幕分辨率一致（如 1920×1080、2560×1440 等）
-- 没有严格限制，任何尺寸都可以（代码会自动使用 Cover 模式缩放）
-
-### 2. 准备深度图（depth_map.png）
-
-**这是整个效果的关键。** 你需要一张与 `background.png` 尺寸相同的灰度图：
-
-| 颜色 | 含义 | 位移效果 |
-|------|------|---------|
-| **白色** (RGB 255,255,255) | 近景（离观察者最近） | 鼠标移动时偏移最大 |
-| **灰色** (RGB ~128,128,128) | 中景 | 偏移量中等 |
-| **黑色** (RGB 0,0,0) | 远景（离观察者最远） | 几乎不动 |
-
-#### 方法 A：AI 自动生成（推荐）
-
-项目内置了 **Depth Anything V2** 深度图生成工具，一键将任意图片转为黑白深度图。
-
-**Windows 用户 — 双击运行（最简单）：**
-
-1. 双击 `生成深度图.bat`
-2. 将你的壁纸图片拖入窗口，按回车
-3. 选择模型大小（推荐选 1 = Small）
-4. 等待生成完成 → 自动输出 `depth_map.png`
-
-**命令行方式：**
+需要 Windows、Node.js 和项目内的 Python 虚拟环境 `venv/`（装有 onnxruntime / numpy / pillow），以及放在项目根目录的 Depth Anything V2 ONNX 模型（`depth_anything_v2_small*.onnx`，不进仓库，可以用 `export_onnx.py` 导出）。
 
 ```bash
-# 1. 安装依赖（仅首次需要）
-pip install -r requirements.txt
-
-# 2. 生成深度图（Small 模型，最快）
-python generate_depth_map.py 你的壁纸.jpg
-
-# 3. 使用更高质量的模型
-python generate_depth_map.py 你的壁纸.jpg -m base    # 均衡
-python generate_depth_map.py 你的壁纸.jpg -m large   # 最佳质量
+npm install
 ```
-
-**模型选择参考：**
-
-| 模型 | 参数量 | 下载大小 | 速度 | 质量 |
-|------|--------|----------|------|------|
-| small | 25M | ~100MB | 快（CPU 可用） | 良好 |
-| base | 98M | ~390MB | 中等 | 优秀 |
-| large | 335M | ~1.3GB | 慢（建议 GPU） | 最佳 |
-
-> **首次运行**会自动从 Hugging Face 下载模型文件。
-> 如果下载慢，可设置环境变量使用镜像站点：`set HF_ENDPOINT=https://hf-mirror.com`
-
----
-
-#### 方法 B：其他 AI 深度估算工具
-
-- [Depth Anything V2 官方 Demo](https://huggingface.co/spaces/depth-anything/Depth-Anything-V2) — 在线体验
-- [LeiaPix Converter](https://convert.leiapix.com/) — 在线工具，上传图片自动生成深度图
-- [MiDaS](https://github.com/isl-org/MiDaS) — 经典深度估计模型
-- Photoshop "神经滤镜" → "深度模糊" → 导出深度图
-
----
-
-#### 方法 C：手动在 Photoshop 中绘制
-
-1. 打开 `background.png`
-2. 新建图层，用黑白灰画笔绘制深度信息
-3. 近处的物体涂白，远处的背景涂黑，中间涂灰色
-4. 导出为 `depth_map.png`
-
-### 3. 调整参数
-
-在 `app.js` 文件顶部的 `CONFIG` 对象中修改默认参数：
-
-```javascript
-const CONFIG = {
-    parallaxMultiplier: 30,   // 视差强度：更大 = 更明显的3D效果（建议 10~60）
-    smoothness: 0.08,         // 平滑度：更小 = 更平滑但有延迟（建议 0.05~0.15）
-    hideDebugPanel: false,    // 设为 true 隐藏调试面板
-};
-```
-
-或者在壁纸运行时通过右上角的调试面板实时调整。
-
----
-
-## 如何在 Lively Wallpaper 中使用
-
-### 步骤 1：安装 Lively Wallpaper
-
-- [Microsoft Store 免费下载](https://www.microsoft.com/store/productId/9NTM2QC6QWS7)
-- 或从 [GitHub Releases](https://github.com/rocksdanister/lively/releases) 下载
-
-### 步骤 2：添加壁纸
-
-1. 打开 Lively Wallpaper
-2. 点击左下角 **"+"（添加壁纸）** 按钮
-3. 选择 **"网页 / Web"** 类型
-4. 在 URL 字段中输入本地 HTML 文件路径，例如：
-   ```
-   file:///C:/Users/你的用户名/Desktop/项目/壁纸/index.html
-   ```
-5. 点击 **"确定"** 或 **"添加"**
-
-### 步骤 3：配置壁纸行为
-
-在 Lively 中对新添加的壁纸右键 → 设置：
-
-- **当桌面获得焦点时暂停**：建议关闭（这样鼠标移动时始终有视差效果）
-- **在全屏应用时暂停**：建议开启（游戏/全屏视频时节省资源）
-
-### 步骤 4：隐藏调试面板
-
-壁纸配置好后，修改 `app.js` 中的配置：
-
-```javascript
-hideDebugPanel: true,
-```
-
----
-
-## 在 Wallpaper Engine 中使用
-
-1. 打开 Wallpaper Engine
-2. 点击右下角 **"从文件安装"** → **"打开本地壁纸"**
-3. 选择项目中的 `index.html`
-4. 确认导入即可
-
-同样建议在导入前将 `hideDebugPanel` 设为 `true`。
-
----
-
-## 深度图生成工具 — 命令行参考
 
 ```bash
-# 查看帮助
-python generate_depth_map.py --help
-
-# 基本用法
-python generate_depth_map.py wallpaper.jpg
-
-# 指定输出路径
-python generate_depth_map.py photo.png -o my_depth_map.png
-
-# 使用 Base 模型（更高质量）
-python generate_depth_map.py photo.jpg -m base
-
-# 反转深度图（黑色=近景，白色=远景）
-python generate_depth_map.py photo.jpg --invert
-
-# 强制使用 CPU
-python generate_depth_map.py photo.jpg --device cpu
+npm start
 ```
 
----
+- `npm run dev`：同时打开 DevTools。
+- 托盘图标左键或右键菜单 → "打开设置"：选择壁纸、生成深度图、调整参数、管理自定义元素。
 
-## 技术架构说明
+## 开发
 
-| 层级 | 技术 | 作用 |
-|------|------|------|
-| 渲染引擎 | **Pixi.js v7** (CDN) | WebGL 加速的 2D 渲染 |
-| 核心滤镜 | **DisplacementFilter** | 基于深度图的像素位移 |
-| 动画算法 | **Lerp 线性插值** | 平滑的惯性阻尼效果 |
-| 交互输入 | **mousemove** 事件 | 实时鼠标位置追踪 |
-| 坐标归一化 | **[-1, 1] 映射** | 屏幕分辨率无关的偏移计算 |
-| 缩放模式 | **Cover** | 图片始终填满屏幕不留黑边 |
-| 深度生成 | **Depth Anything V2** | AI 自动从图片生成深度图 |
-
-### DisplacementFilter 原理简述
-
-1. 滤镜读取深度图（`depth_map.png`）每个像素的颜色值
-2. 颜色值决定该位置的"位移量"：白色位移最大，黑色不动
-3. 根据鼠标位置动态改变滤镜的 `scale`（强度）
-4. 白色区域（近景）大幅偏移 → 黑色区域（远景）几乎不动 → 形成视差
-
-### Lerp 平滑原理
-
-```
-currentX += (targetX - currentX) × smoothness
+```bash
+npm test
 ```
 
-每帧只移动"剩余距离"的一部分，smoothness 控制追赶速度。值越小越平滑但延迟越大。
+```bash
+venv/Scripts/python.exe -m unittest tools/test_prepare_builtin_element.py
+```
 
----
+**浏览器预览**：不启动 Electron 也能看渲染效果和摆放模式，数据来自 `dev/dev-config.json`。
 
-## 离线使用说明
+```bash
+venv/Scripts/python.exe -m http.server 8765
+```
 
-当前项目使用 CDN 引入 Pixi.js（需要联网）。如需完全离线使用：
+然后打开 `http://localhost:8765/index.html`，摆放模式加 `?mode=edit`。
 
-1. 下载 [pixi.min.js v7.4.2](https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js)
-2. 放到项目目录中
-3. 修改 `index.html` 中的 script 标签：
-   ```html
-   <!-- 从 CDN -->
-   <!-- <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script> -->
+**添加默认元素**：绿幕视频先用脚本裁到主体区域并生成缩略图，再把它打印出的条目加进 `elements/manifest.json`。
 
-   <!-- 改为本地 -->
-   <script src="pixi.min.js"></script>
-   ```
+```bash
+venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id xxx --name "名称"
+```
+
+## 目录结构
+
+| 路径 | 内容 |
+|---|---|
+| `main.js`、`preload.js`、`src/` | Electron 主进程、IPC、WorkerW 注入、全屏检测、配置存储、自定义元素素材库与摆放窗口 |
+| `index.html`、`renderer/` | 壁纸页面（也是摆放窗口）：Pixi 场景、着色器、自定义元素渲染层、摆放模式 |
+| `settings.html`、`settings/` | 设置窗口 |
+| `shared/` | 主进程、渲染进程和测试共用的纯逻辑 |
+| `elements/` | 默认元素素材与 `manifest.json` |
+| `overlay/` | 全屏视频特效素材 |
+| `generate_depth_map.py` | 深度图生成（优先本地 ONNX） |
+| `test/`、`tools/`、`dev/` | 测试、素材预处理脚本、浏览器预览数据 |
+
+更详细的架构说明、已知问题和开发计划见 [PROJECT_NOTES.md](PROJECT_NOTES.md)。
+
+## 技术要点
+
+- **视差公式**：`offset = mouse × (depth − focus) × strength`，带软截断；背景和元素共用同一段 GLSL（`renderer/shaders.js`）和 JS 版本（`shared/parallax-math.js`）。
+- **深度遮挡**：元素像素和"该像素上实际显示的背景内容"的深度比较，鼠标移动时遮挡边缘跟着前景物体走。
+- **动图**：用 Chromium 自带的 WebCodecs `ImageDecoder` 解码，不依赖第三方库。
+- **数据**：配置在 `%APPDATA%/interactive-desktop-wallpaper/config.json`；导入的素材复制到同目录的 `custom_elements/`，原文件挪走也不影响。
