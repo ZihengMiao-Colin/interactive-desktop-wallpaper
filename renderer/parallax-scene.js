@@ -98,21 +98,7 @@ const Scene = (() => {
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
         if (!screenW || !screenH) return;
-        const imgW = bgWidth || screenW;
-        const imgH = bgHeight || screenH;
-        const screenAspect = screenW / screenH;
-        const imgAspect = imgW / imgH;
-
-        cover = { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
-        if (screenAspect > imgAspect) {
-            // 屏幕比图片更宽：上下居中裁切
-            cover.scaleY = imgAspect / screenAspect;
-            cover.offsetY = (1 - cover.scaleY) * 0.5;
-        } else {
-            // 屏幕比图片更高：左右居中裁切
-            cover.scaleX = screenAspect / imgAspect;
-            cover.offsetX = (1 - cover.scaleX) * 0.5;
-        }
+        cover = Shared.parallax.coverTransform(screenW, screenH, bgWidth || screenW, bgHeight || screenH);
 
         if (filter) {
             // 必须整体赋值数组，才能触发 Pixi UniformGroup 的脏标记

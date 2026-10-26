@@ -30,16 +30,30 @@ void main(void) {
 `;
 
 /**
- * 专属 2.5D 深度视差着色器源码
+ * 视差位移公式（GLSL 版），背景和自定义元素的着色器共用。
+ * 与 shared/parallax-math.js 的 parallaxUV 是同一公式，改一边必须同步另一边。
  *
- * 核心设计：
- * 1. 数学级精确 Cover 坐标映射：彻底杜绝深度图与原图因缩放错位产生的直线刀痕
- * 2. 真实 2D 物理透视位移：X/Y 轴与鼠标方向 100% 严密对应
- * 3. 对焦平面锚定 (uFocus)：主体深度处位移为 0，消灭前后两极相反对拉的剪切割裂
- * 4. 软截断阻尼 (Soft Clamping)：限制最大相对位移，防止大幅度运动拉开大缝隙
+ * - 对焦平面：depth == focus 时位移为 0，主体不撕裂
+ * - 软截断：位移超过 maxDist 后只按 20% 继续增长，避免大幅移动拉出缝隙
+ */
+const PARALLAX_GLSL = `
+vec2 parallaxUV(vec2 mouse, float depth, float focus, float strength) {
+    vec2 p = mouse * (depth - focus) * strength;
+    float maxDist = max(0.035, strength * 1.6);
+    float len = length(p);
+    if (len > maxDist) {
+        p = (p / len) * (maxDist + (len - maxDist) * 0.2);
+    }
+    return p;
+}
+`;
+
+/**
+ * 背景片元着色器：屏幕 UV 先按 Cover 映射到图片 UV，
+ * 再按该处深度偏移采样坐标。
  */
 const PARALLAX_FRAGMENT_SHADER = `
-precision mediump float;
+precision highp float;
 
 varying vec2 vTextureCoord;
 
@@ -50,31 +64,11 @@ uniform float uStrength;
 uniform float uFocus;
 uniform vec2 uCoverScale;
 uniform vec2 uCoverOffset;
-
+${PARALLAX_GLSL}
 void main(void) {
-    // 1. 将全屏 UV 映射为完美的 Cover 模式下的图片 UV 坐标 (0.0 ~ 1.0)
     vec2 baseUV = vTextureCoord * uCoverScale + uCoverOffset;
-
-    // 2. 采样深度信息 (灰度图取 R 通道)
     float depth = texture2D(uDepth, baseUV).r;
-
-    // 3. 计算相对视觉焦点的位移：当 depth == uFocus 时完全静止，主体绝不撕裂
-    float diff = depth - uFocus;
-
-    // 4. 2D 真实物理视差：鼠标向右看(uMouse.x>0)，近景(diff>0)向相反方向移动
-    vec2 parallax = uMouse * diff * uStrength;
-
-    // 5. 软截断阻尼 (Soft Clamping)：根据视差强度自适应最大位移，强度调大时位移大幅放开
-    float maxDist = max(0.035, uStrength * 1.6);
-    float pLen = length(parallax);
-    if (pLen > maxDist) {
-        parallax = (parallax / pLen) * (maxDist + (pLen - maxDist) * 0.2);
-    }
-
-    // 6. 最终采样坐标 + 安全微钳制
-    vec2 finalUV = clamp(baseUV + parallax, vec2(0.001), vec2(0.999));
-
-    // 7. 采样并输出真实原图色彩
+    vec2 finalUV = clamp(baseUV + parallaxUV(uMouse, depth, uFocus, uStrength), vec2(0.001), vec2(0.999));
     gl_FragColor = texture2D(uImage, finalUV);
 }
 `;

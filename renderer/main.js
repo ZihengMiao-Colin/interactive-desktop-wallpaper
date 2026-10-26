@@ -131,7 +131,7 @@ function updateLoop(delta) {
     currentY += (targetY - currentY) * k;
 
     // 鼠标右移时近景向左偏，所以传入取反后的值
-    const strength = (CONFIG.parallaxMultiplier / 1000) * 1.25;
+    const strength = Shared.parallax.strengthFromMultiplier(CONFIG.parallaxMultiplier);
     Scene.setParallax(-currentX, -currentY, strength, Number(CONFIG.focusDepth));
 
     weatherManager.update(delta, currentX, currentY);
