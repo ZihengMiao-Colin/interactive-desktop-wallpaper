@@ -32,7 +32,7 @@
       "index.html",
       "settings.html",
       "style.css",
-      "app.js",
+      "renderer/**/*",
       "assets/**/*",
       "background.png",
       "depth_map.png"

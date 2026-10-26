@@ -39,9 +39,9 @@
         <div id="debug-panel-body">
             <div class="debug-row">
                 <label for="parallax-strength">
-                    视差强度 <span id="parallax-value">30</span>
+                    视差强度 <span id="parallax-value">20</span>
                 </label>
-                <input type="range" id="parallax-strength" min="5" max="100" value="30" step="1">
+                <input type="range" id="parallax-strength" min="5" max="100" value="20" step="1">
             </div>
             <div class="debug-row">
                 <label for="smoothness">
@@ -118,7 +118,14 @@
     <!-- 音频播放器 -->
     <audio id="bg-audio" loop preload="auto"></audio>
 
-    <!-- 主逻辑脚本 -->
-    <script src="app.js"></script>
+    <!-- 壁纸逻辑（普通全局脚本，按依赖顺序加载） -->
+    <script src="renderer/shaders.js"></script>
+    <script src="renderer/ui.js"></script>
+    <script src="renderer/parallax-scene.js"></script>
+    <script src="renderer/weather.js"></script>
+    <script src="renderer/sticker.js"></script>
+    <script src="renderer/vinyl.js"></script>
+    <script src="renderer/video-overlay.js"></script>
+    <script src="renderer/main.js"></script>
 </body>
 </html>
