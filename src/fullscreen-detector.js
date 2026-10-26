@@ -77,6 +77,7 @@ public class WCheck {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
     [DllImport("user32.dll")] public static extern int GetClassName(IntPtr hWnd, StringBuilder cls, int count);
     [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
 }
 "@
 
@@ -102,7 +103,12 @@ while ($true) {
         $name = $cls.ToString()
         $isShell = ($name -eq 'Progman' -or $name -eq 'WorkerW' -or $name -eq 'Shell_TrayWnd' -or $name -eq 'MSTaskSwWClass')
         $coverage = ([double]$w * [double]$h) / $screenArea
-        if ($coverage -ge 0.90 -and -not $isShell) { $state = 'FULLSCREEN' }
+        if ($coverage -ge 0.90 -and -not $isShell) {
+            # 带上前台窗口的进程号，主进程据此忽略本程序自己的窗口（例如摆放窗口）
+            $fgPid = [uint32]0
+            [void][WCheck]::GetWindowThreadProcessId($hwnd, [ref]$fgPid)
+            $state = 'FULLSCREEN ' + $fgPid
+        }
     }
     [Console]::Out.WriteLine($state)
     [Console]::Out.Flush()
@@ -122,12 +128,14 @@ class FullscreenDetector {
      * @param {number} options.debounceCount - 防抖次数（默认 2）
      * @param {Function} options.onFullscreenStart - 全屏开始回调
      * @param {Function} options.onFullscreenEnd - 全屏结束回调
+     * @param {number} [options.ignorePid] - 属于这个进程的全屏窗口不算全屏应用（传主进程 pid）
      */
     constructor(options = {}) {
         this.pollInterval = options.pollInterval || 1000;
         this.debounceCount = options.debounceCount || 2;
         this.onFullscreenStart = options.onFullscreenStart || (() => {});
         this.onFullscreenEnd = options.onFullscreenEnd || (() => {});
+        this.ignorePid = options.ignorePid || null;
 
         /** 常驻助手进程 */
         this._proc = null;
@@ -248,7 +256,7 @@ class FullscreenDetector {
     }
 
     /**
-     * 解析助手输出。助手每秒写一行 FULLSCREEN / NORMAL。
+     * 解析助手输出。助手每秒写一行 "FULLSCREEN <前台窗口进程号>" 或 NORMAL。
      * @param {string} chunk
      */
     _onStdout(chunk) {
@@ -265,7 +273,8 @@ class FullscreenDetector {
                 this._restarts = 0;   // 正常跑起来了，重置重启计数
                 console.log('[FullscreenDetector] Helper ready');
             } else if (line.startsWith('FULLSCREEN')) {
-                this._report(true);
+                const pid = parseInt(line.slice('FULLSCREEN'.length), 10);
+                this._report(!(this.ignorePid && pid === this.ignorePid));
             } else if (line.startsWith('NORMAL')) {
                 this._report(false);
             }

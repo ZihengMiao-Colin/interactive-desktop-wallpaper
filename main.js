@@ -759,6 +759,7 @@ function registerIpcHandlers() {
 function startFullscreenDetection() {
     fullscreenDetector = new FullscreenDetector({
         pollInterval: 1000,          // 每秒检测一次
+        ignorePid: process.pid,      // 本程序的窗口（全屏摆放窗口）不算全屏应用
         onFullscreenStart: () => {
             console.log('[Main] Fullscreen app detected, pausing render');
             isRenderingActive = false;
