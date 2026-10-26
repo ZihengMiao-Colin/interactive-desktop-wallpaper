@@ -5,12 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>互动桌面壁纸 - 伪3D深度视差</title>
 
-    <!--
-        Pixi.js v7 通过 CDN 引入。
-        Electron 环境中也可以使用本地安装的 pixi.js，
-        但 CDN 更简单且兼容两种运行模式（浏览器预览 / Electron 打包）。
-    -->
-    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
+    <!-- Pixi.js 用本地依赖（npm 安装，版本锁定 7.4.2），开机自启时没网也能正常显示 -->
+    <script src="node_modules/pixi.js/dist/pixi.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
