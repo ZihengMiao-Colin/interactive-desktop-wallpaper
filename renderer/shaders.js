@@ -72,3 +72,74 @@ void main(void) {
     gl_FragColor = texture2D(uImage, finalUV);
 }
 `;
+
+/**
+ * 自定义元素的顶点着色器：元素是一个单位方形 Mesh，按屏幕像素缩放平移。
+ * 额外输出屏幕归一化坐标 vScreenUV，片元着色器用它去查背景深度。
+ */
+const ELEMENT_VERTEX_SHADER = `
+precision highp float;
+
+attribute vec2 aVertexPosition;
+attribute vec2 aUvs;
+
+uniform mat3 translationMatrix;
+uniform mat3 projectionMatrix;
+uniform vec2 uScreenSize;
+
+varying vec2 vUvs;
+varying vec2 vScreenUV;
+
+void main(void) {
+    vec3 world = translationMatrix * vec3(aVertexPosition, 1.0);
+    vScreenUV = world.xy / uScreenSize;
+    vUvs = aUvs;
+    gl_Position = vec4((projectionMatrix * world).xy, 0.0, 1.0);
+}
+`;
+
+/**
+ * 自定义元素的片元着色器：绿幕抠像 + 深度遮挡 + 不透明度。
+ *
+ * 遮挡：比较元素深度和"这个像素上实际显示的背景内容"的深度。
+ * 背景在屏幕点 p 显示的是图片 baseUV + parallax 处的颜色，所以要在同一位置取深度，
+ * 否则鼠标移动时前景物体动了、遮挡边缘却还停在原地。
+ */
+const ELEMENT_FRAGMENT_SHADER = `
+precision highp float;
+
+varying vec2 vUvs;
+varying vec2 vScreenUV;
+
+uniform sampler2D uSampler;
+uniform sampler2D uDepth;
+uniform vec2 uCoverScale;
+uniform vec2 uCoverOffset;
+uniform vec2 uMouse;
+uniform float uStrength;
+uniform float uFocus;
+uniform float uElemDepth;
+uniform float uOpacity;
+uniform float uChromaEnabled;
+uniform float uChromaStrength;
+${PARALLAX_GLSL}
+void main(void) {
+    // 深度遮挡：场景比元素近的地方把元素挡住，边缘柔和过渡；+0.02 避免贴地时底边自己挡自己
+    vec2 baseUV = vScreenUV * uCoverScale + uCoverOffset;
+    float d0 = texture2D(uDepth, baseUV).r;
+    vec2 shownUV = clamp(baseUV + parallaxUV(uMouse, d0, uFocus, uStrength), vec2(0.001), vec2(0.999));
+    float sceneDepth = texture2D(uDepth, shownUV).r;
+    float vis = smoothstep(-0.03, 0.03, (uElemDepth + 0.02) - sceneDepth);
+
+    vec4 c = texture2D(uSampler, vUvs);
+    float k = 1.0;
+    if (uChromaEnabled > 0.5) {
+        // 绿幕：绿色分量超出红蓝越多越透明；强度越大，阈值越低、抠得越狠
+        float lo = mix(0.20, 0.02, uChromaStrength);
+        float g = c.g - max(c.r, c.b);
+        k = 1.0 - smoothstep(lo, lo + 0.10, g);
+        c.g = min(c.g, max(c.r, c.b));   // 去溢色：消除边缘反射的绿光
+    }
+    gl_FragColor = c * (k * vis * uOpacity);   // 预乘 alpha 输出
+}
+`;

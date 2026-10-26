@@ -61,6 +61,21 @@ const stickerManager = new StickerManager();
 const vinylManager = new VinylPlayerManager();
 const videoOverlayManager = new VideoOverlayManager();
 
+/** 用户自定义元素（图片 / 动图 / 视频），在 Pixi 场景内渲染 */
+const elementsLayer = new ElementsLayer(Scene);
+/** 默认素材列表（启动时读取一次） */
+let builtinAssets = [];
+
+/** 读取配置并同步自定义元素；之后配置变化时自动刷新 */
+async function loadCustomElements() {
+    const [config, builtin] = await Promise.all([Host.getConfig(), Host.getBuiltinAssets()]);
+    builtinAssets = builtin;
+    await elementsLayer.setElements(config.customElements, builtinAssets);
+    Host.onConfig((next) => {
+        if (next && next.customElements) elementsLayer.setElements(next.customElements, builtinAssets);
+    });
+}
+
 function applyCustomElementsConfig(config) {
     if (!config) return;
     if (config.weather) weatherManager.setConfig(config.weather);
@@ -132,7 +147,9 @@ function updateLoop(delta) {
 
     // 鼠标右移时近景向左偏，所以传入取反后的值
     const strength = Shared.parallax.strengthFromMultiplier(CONFIG.parallaxMultiplier);
-    Scene.setParallax(-currentX, -currentY, strength, Number(CONFIG.focusDepth));
+    const focus = Number(CONFIG.focusDepth);
+    Scene.setParallax(-currentX, -currentY, strength, focus);
+    elementsLayer.update(performance.now(), -currentX, -currentY, strength, focus);
 
     weatherManager.update(delta, currentX, currentY);
     stickerManager.update(currentX, currentY);
@@ -146,12 +163,14 @@ function registerIpcListeners() {
     window.electronAPI.onPauseRender((info) => {
         Scene.app.ticker.stop();
         videoOverlayManager.pause();
+        elementsLayer.pause(performance.now());
         if (!info.silent) UI.showToast('壁纸已暂停（检测到全屏应用）', 2000);
     });
 
     window.electronAPI.onResumeRender((info) => {
         Scene.app.ticker.start();
         videoOverlayManager.resume();
+        elementsLayer.resume(performance.now());
         if (!info.silent) UI.showToast('壁纸已恢复', 1500);
     });
 
@@ -225,6 +244,13 @@ async function start() {
         } catch (err2) {
             UI.showError('没有找到可用的壁纸图片。\n' + err2.message);
         }
+    }
+
+    try {
+        await loadCustomElements();
+    } catch (err) {
+        // 自定义元素出问题不能影响壁纸本身
+        console.error('[App] 自定义元素加载失败:', err);
     }
 
     bindEvents();
