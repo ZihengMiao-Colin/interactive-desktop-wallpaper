@@ -49,3 +49,56 @@ test('getElementsDir 在 userData 下并自动创建', () => {
     assert.equal(elementsDir, path.join(dir, 'custom_elements'));
     assert.ok(fs.existsSync(elementsDir));
 });
+
+// ==================== 深度图缓存校验 ====================
+
+const DEPTH_URL = 'data:image/png;base64,' + Buffer.from('depth-bytes').toString('base64');
+
+function storeWithImage() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-depth-'));
+    const image = path.join(dir, '壁纸 #1.png');
+    fs.writeFileSync(image, 'AAAA');
+    return { store: new AppStore({ userDataPath: dir }), image, dir };
+}
+
+/** 把原图换成同样大小的内容，并把修改时间往后挪 */
+function replaceSameSize(image) {
+    fs.writeFileSync(image, 'BBBB');
+    const later = new Date(Date.now() + 60 * 1000);
+    fs.utimesSync(image, later, later);
+}
+
+test('深度缓存：原图没变时命中', () => {
+    const { store, image } = storeWithImage();
+    assert.equal(store.saveDepthCache(image, DEPTH_URL), true);
+    assert.equal(store.hasDepthCache(image), true);
+    assert.equal(store.getDepthCache(image), DEPTH_URL);
+});
+
+test('深度缓存：原图换成同样大小的另一张图后失效', () => {
+    const { store, image } = storeWithImage();
+    store.saveDepthCache(image, DEPTH_URL);
+    replaceSameSize(image);
+    assert.equal(store.hasDepthCache(image), false);
+    assert.equal(store.getDepthCache(image), null);
+});
+
+test('深度缓存：旧版索引没有记录修改时间时只按大小判断', () => {
+    const { store, image, dir } = storeWithImage();
+    store.saveDepthCache(image, DEPTH_URL);
+    const indexPath = path.join(dir, 'cache_index.json');
+    const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    for (const entry of Object.values(index)) delete entry.imageMtimeMs;
+    fs.writeFileSync(indexPath, JSON.stringify(index));
+
+    const reopened = new AppStore({ userDataPath: dir });
+    assert.equal(reopened.getDepthCache(image), DEPTH_URL);
+});
+
+test('深度缓存：原图被删除时不命中', () => {
+    const { store, image } = storeWithImage();
+    store.saveDepthCache(image, DEPTH_URL);
+    fs.unlinkSync(image);
+    assert.equal(store.hasDepthCache(image), false);
+    assert.equal(store.getDepthCache(image), null);
+});

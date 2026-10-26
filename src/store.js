@@ -217,12 +217,14 @@ class AppStore {
                 fs.writeFileSync(depthFile, buffer);
             }
 
-            // 更新缓存索引
+            // 更新缓存索引：记下原图的大小和修改时间，用来判断原图之后有没有被换掉
+            const stat = fs.statSync(imagePath);
             this._cacheIndex[cacheKey] = {
                 imagePath: imagePath,
                 depthFile: depthFile,
                 cachedAt: new Date().toISOString(),
-                imageSize: fs.statSync(imagePath).size,
+                imageSize: stat.size,
+                imageMtimeMs: Math.round(stat.mtimeMs),
             };
 
             this._saveJSON(this._cacheIndexPath, this._cacheIndex);
@@ -242,27 +244,9 @@ class AppStore {
      */
     getDepthCache(imagePath) {
         try {
-            const cacheKey = this._hashPath(imagePath);
-            const entry = this._cacheIndex[cacheKey];
-
-            if (!entry || !fs.existsSync(entry.depthFile)) {
-                return null;
-            }
-
-            // 验证原图是否被修改（通过文件大小快速判断）
-            if (fs.existsSync(imagePath)) {
-                const currentSize = fs.statSync(imagePath).size;
-                if (currentSize !== entry.imageSize) {
-                    console.log('[Store] Image changed, cache invalidated');
-                    this._invalidateCache(cacheKey);
-                    return null;
-                }
-            }
-
-            // 读取深度图文件并转为 Data URL
-            const buffer = fs.readFileSync(entry.depthFile);
-            const base64 = buffer.toString('base64');
-            console.log('[Store] Depth cache hit:', cacheKey);
+            const entry = this._validCacheEntry(imagePath);
+            if (!entry) return null;
+            const base64 = fs.readFileSync(entry.depthFile).toString('base64');
             return `data:image/png;base64,${base64}`;
         } catch (err) {
             console.error('[Store] Read depth cache failed:', err.message);
@@ -271,14 +255,16 @@ class AppStore {
     }
 
     /**
-     * 检查是否有某个图片的深度图缓存。
+     * 检查是否有某个图片的有效深度图缓存（规则与 getDepthCache 相同）。
      * @param {string} imagePath
      * @returns {boolean}
      */
     hasDepthCache(imagePath) {
-        const cacheKey = this._hashPath(imagePath);
-        const entry = this._cacheIndex[cacheKey];
-        return !!(entry && fs.existsSync(entry.depthFile));
+        try {
+            return !!this._validCacheEntry(imagePath);
+        } catch (_) {
+            return false;
+        }
     }
 
     /**
@@ -385,6 +371,28 @@ class AppStore {
             hash |= 0; // 32-bit int
         }
         return 'depth_' + Math.abs(hash).toString(16);
+    }
+
+    /**
+     * 找到图片对应的缓存条目，并确认它仍然有效：深度图文件还在、原图还在，
+     * 且原图的大小和修改时间都和生成时一致。原图被改过就删掉这条缓存。
+     * 旧版索引没有记录修改时间，这种条目只比较大小。
+     * @returns {object|null}
+     */
+    _validCacheEntry(imagePath) {
+        const cacheKey = this._hashPath(imagePath);
+        const entry = this._cacheIndex[cacheKey];
+        if (!entry || !fs.existsSync(entry.depthFile) || !fs.existsSync(imagePath)) return null;
+
+        const stat = fs.statSync(imagePath);
+        const sizeChanged = stat.size !== entry.imageSize;
+        const mtimeChanged = entry.imageMtimeMs !== undefined && Math.round(stat.mtimeMs) !== entry.imageMtimeMs;
+        if (sizeChanged || mtimeChanged) {
+            console.log('[Store] Image changed, cache invalidated');
+            this._invalidateCache(cacheKey);
+            return null;
+        }
+        return entry;
     }
 
     /**
