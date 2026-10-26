@@ -20,12 +20,18 @@
 const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
+const { emptyCustomElements, normalizeCustomElements } = require('../shared/elements-model');
+
+/** 需要按字段合并保存的嵌套配置项 */
+const NESTED_KEYS = ['vinyl', 'weather', 'sticker', 'videoOverlay'];
 
 class AppStore {
 
-    constructor() {
-        // 用户数据目录: %APPDATA%/interactive-desktop-wallpaper/
-        this._userDataPath = app.getPath('userData');
+    /**
+     * @param {{userDataPath?: string}} [options] - 测试时传入临时目录；默认 %APPDATA%/interactive-desktop-wallpaper/
+     */
+    constructor({ userDataPath } = {}) {
+        this._userDataPath = userDataPath || app.getPath('userData');
         this._configPath = path.join(this._userDataPath, 'config.json');
         this._cacheIndexPath = path.join(this._userDataPath, 'cache_index.json');
 
@@ -143,8 +149,8 @@ class AppStore {
             ...this._config,
             vinyl: { ...defaults.vinyl, ...(this._config.vinyl || {}) },
             weather: { ...defaults.weather, ...(this._config.weather || {}) },
-            sticker: { ...defaults.sticker, ...(this._config.sticker || {}) },
             videoOverlay: { ...defaults.videoOverlay, ...(this._config.videoOverlay || {}) },
+            customElements: normalizeCustomElements(this._config.customElements),
         };
     }
 
@@ -155,15 +161,32 @@ class AppStore {
     saveConfig(partial) {
         if (!partial) return;
         const current = this.getConfig();
-        this._config = {
-            ...current,
-            ...partial,
-            vinyl: partial.vinyl ? { ...current.vinyl, ...partial.vinyl } : current.vinyl,
-            weather: partial.weather ? { ...current.weather, ...partial.weather } : current.weather,
-            sticker: partial.sticker ? { ...current.sticker, ...partial.sticker } : current.sticker,
-            videoOverlay: partial.videoOverlay ? { ...current.videoOverlay, ...partial.videoOverlay } : current.videoOverlay,
-        };
+        const next = { ...current, ...partial };
+        for (const key of NESTED_KEYS) {
+            if (partial[key]) next[key] = { ...(current[key] || {}), ...partial[key] };
+        }
+        // customElements 的 library / instances 是数组，给了哪个就整体替换哪个
+        if (partial.customElements) {
+            next.customElements = normalizeCustomElements({ ...current.customElements, ...partial.customElements });
+        }
+        this._config = next;
         this._saveJSON(this._configPath, this._config);
+    }
+
+    /**
+     * 从配置里彻底删除某些键（例如迁移完成后的旧 sticker 配置）。
+     * @param {string[]} keys
+     */
+    deleteConfigKeys(keys) {
+        for (const key of keys) delete this._config[key];
+        this._saveJSON(this._configPath, this._config);
+    }
+
+    /** 用户导入的自定义元素素材存放目录：userData/custom_elements（不存在就创建） */
+    getElementsDir() {
+        const dir = path.join(this._userDataPath, 'custom_elements');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        return dir;
     }
 
     // ==================== 深度图缓存 ====================
@@ -315,17 +338,7 @@ class AppStore {
                 speed: 1.0,                 // 速度倍率 0.5 ~ 2.0
                 parallax: true,             // 是否随鼠标视差位移
             },
-            // 3. 本地贴纸/挂件
-            sticker: {
-                enabled: false,             // 是否开启自定义贴纸
-                imagePath: '',              // 本地贴纸图片路径
-                positionX: 85,              // 屏幕 X 百分比 0 ~ 100
-                positionY: 20,              // 屏幕 Y 百分比 0 ~ 100
-                size: 180,                  // 尺寸像素 60 ~ 500
-                opacity: 0.9,               // 透明度 0.1 ~ 1.0
-                depth: 0.7,                 // 视差深度层级 0.0 (远景) ~ 1.0 (近景)
-            },
-            // 4. 视频特效覆盖层（支持滤色/绿幕抠图）
+            // 3. 视频特效覆盖层（支持滤色/绿幕抠图）
             videoOverlay: {
                 enabled: false,             // 是否开启视频覆盖特效
                 presetId: 'snow2',          // 预设 ID: 'rain1' | 'rain2' | 'snow1' | 'snow2' | 'snow3' | 'old1' | 'old2' | 'old3' | 'custom'
@@ -335,6 +348,8 @@ class AppStore {
                 opacity: 0.85,              // 不透明度 0.1 ~ 1.0
                 speed: 1.0,                 // 播放速度 0.5 ~ 2.0
             },
+            // 自定义元素（素材库 + 壁纸上的实例），结构见 shared/elements-model.js
+            customElements: emptyCustomElements(),
         };
     }
 
