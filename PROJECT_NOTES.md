@@ -25,7 +25,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | 项 | 现状 |
 |---|---|
 | 桌面框架 | Electron ^28.3.3（Chromium 120），electron-builder ^24.9.1 |
-| 渲染 | Pixi.js **7.4.2，走 jsDelivr CDN**（`index.html`），自定义 Filter / Mesh 着色器 |
+| 渲染 | Pixi.js 7.4.2（npm 本地依赖，版本锁定），自定义 Filter / Mesh 着色器 |
 | 动图解码 | Chromium 自带的 WebCodecs `ImageDecoder`（没有引入 `@pixi/gif`） |
 | 深度模型 | Depth Anything V2 Small；`generate_depth_map.py` 先找本地 ONNX，找不到再走 HuggingFace |
 | Python | 项目内 `venv/`（3.11.9），只装了 onnxruntime / numpy / pillow |
@@ -120,7 +120,8 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 
 | 通道 | 方向 | 作用 |
 |---|---|---|
-| `dialog:selectImage` / `selectAudio` / `selectCover` / `selectOverlayVideo` | R→M | 文件对话框（selectImage 仍会顺带发 `image:new`，见 §8 #3） |
+| `dialog:selectImage` / `selectAudio` / `selectCover` / `selectOverlayVideo` | R→M | 文件对话框，只返回路径 |
+| `settings:prepareImage` | M→R | 托盘选了一张没有深度图的图片：设置窗口生成深度图后自动应用 |
 | `overlay:getPresets` | R→M | 全屏视频特效列表 |
 | `depth:generate` / `depth:progress` | R→M / M→R | 生成深度图 / 进度 |
 | `cache:*`、`depth:*CacheDir` | R→M | 深度图缓存与目录 |
@@ -165,7 +166,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | 深度图生成（ONNX） | ✅（仅开发环境） | 依赖项目内 `venv` + 根目录 onnx 文件 |
 | 深度图缓存 / 迁移目录 | ✅ | |
 | 全屏 / 锁屏暂停 | ✅ | 自定义元素的视频和间隔计时也会暂停 |
-| 托盘、开机自启 | ✅ 基本可用 | 托盘"更换壁纸"流程不完整（§8 #4） |
+| 托盘、开机自启 | ✅ | 托盘"更换壁纸"：有缓存直接应用，没有就在设置窗口生成后自动应用 |
 | 黑胶唱片机 / 视频特效 / 天气粒子 | ✅ | |
 | **自定义元素系统** | ✅ | 图片 / GIF / 动态 webp / apng / mp4 / webm；默认两个爆炸；摆放模式；深度遮挡；间隔播放；抠绿幕 |
 | 自定义贴纸 | ♻️ 已移除 | 被自定义元素取代，旧配置自动迁移 |
@@ -179,9 +180,9 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 
 ### 🔴 P0
 1. ⏸（暂缓到打包时）打包产物无法生成深度图、无法播放内置素材：`build.files` 不含 Python 脚本、模型、`overlay/`、`elements/`；`main.js` 用 `__dirname` 找 `venv`。
-2. **Pixi.js 走 CDN**：开机自启时没网，壁纸直接出不来。
-3. **"选择"等于"应用"**：`dialog:selectImage` 选完就给壁纸窗口发 `image:new`，但 `currentImage` 只在"应用"时保存，重启后会变回去。
-4. **托盘"更换壁纸..."**：不保存 `currentImage`，没缓存时也不触发生成。
+2. ~~Pixi.js 走 CDN~~ ✅ 改为 npm 本地依赖
+3. ~~"选择"等于"应用"~~ ✅ 选择只返回路径，只有"应用壁纸"会换壁纸并保存 `currentImage`
+4. ~~托盘"更换壁纸"流程不完整~~ ✅ 有缓存直接应用；没有缓存在设置窗口生成后自动应用
 
 ### 🟠 P1
 5. ~~preload 的 `getUserDataPath` 必抛异常~~ ✅ 已删除
@@ -190,7 +191,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 8. 拖动滑块时每次 `input` 都写盘并广播完整配置（自定义元素页签自己做了 150ms 防抖，其他页签还没有）。
 9. 注入失败的兜底模式 `moveTop()` 会把全屏窗口提到所有程序上面。
 10. 单实例锁写在 `whenReady` 之后。
-11. 深度缓存只按文件大小判断原图是否变化。
+11. ~~深度缓存只按文件大小判断~~ ✅ 改为大小 + 修改时间（旧索引没有修改时间的条目仍只比大小）
 12. 设置页生成深度图写死 `'small'`。
 
 ### 🟡 P2
@@ -212,13 +213,13 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 - 设计：[docs/superpowers/specs/2026-10-25-custom-elements-design.md](docs/superpowers/specs/2026-10-25-custom-elements-design.md)
 - 计划：[docs/superpowers/plans/2026-10-25-custom-elements.md](docs/superpowers/plans/2026-10-25-custom-elements.md)
 
-### 阶段 1 — 修核心流程（剩余：P0 #2 #3 #4、P1 #11）
-- [ ] Pixi 改成本地文件，摆脱 CDN。
-- [ ] 把"选择图片"和"应用壁纸"分开。
-- [ ] 托盘"更换壁纸"走完整流程。
+### ✅ 阶段 1 — 修核心流程（已完成）
+- [x] Pixi 改成本地依赖，摆脱 CDN。
+- [x] 把"选择图片"和"应用壁纸"分开。
+- [x] 托盘"更换壁纸"走完整流程。
 - [x] 修 `getUserDataPath`。
 - [x] 换纹理时销毁旧纹理。
-- [ ] 缓存校验改成 mtime + size。
+- [x] 缓存校验改成大小 + 修改时间。
 
 ### 阶段 3 — 性能（P1 #7 #8）
 - [ ] 空闲降帧：鼠标静止、Lerp 收敛、且没有播放中的视频 / 动图时停 ticker。
