@@ -33,9 +33,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** 打开系统文件对话框，选择唱片中心封面 */
     selectCover: () => ipcRenderer.invoke('dialog:selectCover'),
 
-    /** 打开系统文件对话框，选择本地贴纸图片 */
-    selectSticker: () => ipcRenderer.invoke('dialog:selectSticker'),
-
     /** 打开系统文件对话框，选择本地视频特效 */
     selectOverlayVideo: () => ipcRenderer.invoke('dialog:selectOverlayVideo'),
 

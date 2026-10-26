@@ -270,21 +270,6 @@ body > canvas {
     z-index: 100;
 }
 
-/* ==================== 自定义贴纸挂件 ==================== */
-.sticker-widget {
-    position: fixed;
-    pointer-events: none;
-    z-index: 120;
-    user-select: none;
-    will-change: transform, left, top;
-}
-.sticker-widget img {
-    display: block;
-    width: 100%;
-    height: auto;
-    filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.5));
-}
-
 /* ==================== 黑胶唱片机组件 ==================== */
 .vinyl-widget {
     position: fixed;

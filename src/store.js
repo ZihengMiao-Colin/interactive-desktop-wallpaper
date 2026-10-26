@@ -23,7 +23,7 @@ const { app } = require('electron');
 const { emptyCustomElements, normalizeCustomElements } = require('../shared/elements-model');
 
 /** 需要按字段合并保存的嵌套配置项 */
-const NESTED_KEYS = ['vinyl', 'weather', 'sticker', 'videoOverlay'];
+const NESTED_KEYS = ['vinyl', 'weather', 'videoOverlay'];
 
 class AppStore {
 

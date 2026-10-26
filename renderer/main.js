@@ -60,7 +60,6 @@ function saveParallaxConfig() {
 // ==================== 自定义元素管理器 ====================
 
 const weatherManager = new WeatherParticleManager();
-const stickerManager = new StickerManager();
 const vinylManager = new VinylPlayerManager();
 const videoOverlayManager = new VideoOverlayManager();
 
@@ -82,7 +81,6 @@ async function loadCustomElements() {
 function applyCustomElementsConfig(config) {
     if (!config) return;
     if (config.weather) weatherManager.setConfig(config.weather);
-    if (config.sticker) stickerManager.setConfig(config.sticker);
     if (config.vinyl) vinylManager.setConfig(config.vinyl);
     if (config.videoOverlay) videoOverlayManager.setConfig(config.videoOverlay);
 }
@@ -157,7 +155,6 @@ function updateLoop(delta) {
     elementsLayer.update(performance.now(), -currentX, -currentY, strength, focus);
 
     weatherManager.update(delta, currentX, currentY);
-    stickerManager.update(currentX, currentY);
     vinylManager.update(currentX, currentY);
 }
 

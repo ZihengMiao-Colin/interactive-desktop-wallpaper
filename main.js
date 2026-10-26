@@ -45,6 +45,7 @@ const { AppStore } = require('./src/store');
 const { registerElementsIpc } = require('./src/elements/ipc');
 const { PlacementController } = require('./src/elements/placement-controller');
 const { upsertInstance } = require('./shared/elements-model');
+const { migrateLegacySticker } = require('./src/elements/migrate');
 
 // ==================== 全局状态 ====================
 
@@ -435,24 +436,6 @@ function registerIpcHandlers() {
             title: '选择唱片中心封面图片',
             filters: [
                 { name: '图片文件', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'] },
-            ],
-            properties: ['openFile'],
-        });
-
-        if (result.canceled || result.filePaths.length === 0) {
-            return null;
-        }
-
-        return result.filePaths[0];
-    });
-
-    // ---- 选择本地贴纸/挂件图片 ----
-    ipcMain.handle('dialog:selectSticker', async () => {
-        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
-            title: '选择本地贴纸/挂件图片 (建议透明 PNG)',
-            filters: [
-                { name: '图片文件', extensions: ['png', 'webp', 'gif', 'jpg', 'jpeg'] },
-                { name: '所有文件', extensions: ['*'] }
             ],
             properties: ['openFile'],
         });
@@ -868,6 +851,16 @@ app.whenReady().then(() => {
     // 1. 初始化数据存储
     store = new AppStore();
     console.log('[Main] Data store path:', store.getStorePath());
+
+    // 旧版"自定义贴纸"配置迁移为自定义元素（只会执行一次）
+    migrateLegacySticker({
+        store,
+        screenSize: screen.getPrimaryDisplay().bounds,
+        getImageAspect: (imagePath) => {
+            const { width, height } = nativeImage.createFromPath(imagePath).getSize();
+            return width && height ? width / height : 1;
+        },
+    });
 
     // 2. 注册 IPC 处理器
     registerIpcHandlers();

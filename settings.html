@@ -486,6 +486,142 @@
             text-overflow: ellipsis;
         }
 
+        /* ---- 自定义元素 ---- */
+        .el-group-title {
+            font-size: 12px;
+            color: #9aa0b4;
+            margin: 14px 0 8px;
+        }
+        .el-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .el-card {
+            position: relative;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .el-card:hover {
+            border-color: rgba(126, 207, 255, 0.5);
+            transform: translateY(-2px);
+        }
+        .el-card.missing {
+            border-color: rgba(255, 107, 107, 0.6);
+            cursor: not-allowed;
+        }
+        .el-thumb {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: #2b2d38;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .el-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .el-thumb-icon { font-size: 24px; opacity: 0.6; }
+        .el-badge {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.6);
+        }
+        .el-badge-image { color: #9ec5ff; }
+        .el-badge-animated { color: #f2b880; }
+        .el-badge-video { color: #8fd3a4; }
+        .el-card-name {
+            font-size: 11px;
+            padding: 4px 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .el-card-missing {
+            font-size: 10px;
+            color: #ff6b6b;
+            padding: 0 6px 4px;
+        }
+        .el-card-remove {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            margin: 0;
+            border-radius: 50%;
+            font-size: 13px;
+            line-height: 18px;
+            background: rgba(0, 0, 0, 0.6);
+            opacity: 0;
+        }
+        .el-card:hover .el-card-remove { opacity: 1; }
+        .el-empty {
+            grid-column: 1 / -1;
+            font-size: 12px;
+            color: #666;
+            padding: 8px 0;
+        }
+        .el-instance-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .el-instance {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 6px 8px;
+        }
+        .el-instance.missing { border-color: rgba(255, 107, 107, 0.6); }
+        .el-instance-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .el-instance-head .el-thumb {
+            width: 44px;
+            flex-shrink: 0;
+            border-radius: 4px;
+        }
+        .el-instance-text { flex: 1; min-width: 0; }
+        .el-instance-name {
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .el-instance-sub { font-size: 10px; color: #888; }
+        .el-instance-actions { display: flex; gap: 4px; }
+        .el-mini-btn {
+            width: auto;
+            margin: 0;
+            padding: 3px 8px;
+            font-size: 11px;
+        }
+        .el-instance-details {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .el-hint {
+            font-size: 11px;
+            color: #666;
+            margin-top: 10px;
+        }
+
         .status {
             text-align: center;
             font-size: 11px;
@@ -567,7 +703,7 @@
             <button class="element-tab-btn active" data-tab="vinyl">🎵 黑胶唱片机</button>
             <button class="element-tab-btn" data-tab="video">🎬 视频特效</button>
             <button class="element-tab-btn" data-tab="weather">🌦️ 天气特效</button>
-            <button class="element-tab-btn" data-tab="sticker">🖼️ 自定义贴纸</button>
+            <button class="element-tab-btn" data-tab="elements">🧩 自定义元素</button>
         </div>
 
         <!-- 1. 黑胶唱片机面板 -->
@@ -704,56 +840,20 @@
             </div>
         </div>
 
-        <!-- 3. 自定义贴纸挂件面板 -->
-        <div class="element-tab-content" id="tab-sticker" style="display:none;">
-            <div class="toggle-row">
-                <span>启用贴纸挂件</span>
-                <label class="toggle">
-                    <input type="checkbox" id="sticker-enabled">
-                    <span class="slider"></span>
-                </label>
-            </div>
+        <!-- 4. 自定义元素面板 -->
+        <div class="element-tab-content" id="tab-elements" style="display:none;">
+            <button id="btn-import-element" class="primary">＋ 添加自定义元素（图片 / GIF / 视频）</button>
 
-            <div class="element-sub-box">
-                <div class="path-label-row">
-                    <span>贴纸图片 (透明 PNG/GIF)</span>
-                    <span id="sticker-current-name" style="color: #7ecfff; font-size: 11px;">未导入</span>
-                </div>
-                <div class="btn-row" style="margin-top: 8px;">
-                    <button id="btn-import-sticker" class="primary">📁 导入本地贴纸图片...</button>
-                    <button id="btn-remove-sticker" class="danger">移除贴纸</button>
-                </div>
-            </div>
+            <div class="el-group-title">默认元素</div>
+            <div class="el-grid" id="elements-builtin-grid"></div>
 
-            <div class="row" style="margin-top: 10px;">
-                <label>水平位置 (X)</label>
-                <span class="value" id="sticker-x-val">85%</span>
-                <input type="range" id="sticker-x" min="0" max="100" value="85" step="1">
-            </div>
+            <div class="el-group-title">我添加的</div>
+            <div class="el-grid" id="elements-user-grid"></div>
 
-            <div class="row">
-                <label>垂直位置 (Y)</label>
-                <span class="value" id="sticker-y-val">20%</span>
-                <input type="range" id="sticker-y" min="0" max="100" value="20" step="1">
-            </div>
+            <div class="el-group-title">壁纸上的元素</div>
+            <div class="el-instance-list" id="elements-instance-list"></div>
 
-            <div class="row">
-                <label>贴纸尺寸</label>
-                <span class="value" id="sticker-size-val">180px</span>
-                <input type="range" id="sticker-size" min="60" max="450" value="180" step="10">
-            </div>
-
-            <div class="row">
-                <label title="贴纸参与3D视差的景深：0.0为远景几乎不动，0.5为与焦点同步，1.0为近景大幅摆动">视差深度</label>
-                <span class="value" id="sticker-depth-val">0.70</span>
-                <input type="range" id="sticker-depth" min="0" max="100" value="70" step="5">
-            </div>
-
-            <div class="row">
-                <label>透明度</label>
-                <span class="value" id="sticker-opacity-val">90%</span>
-                <input type="range" id="sticker-opacity" min="20" max="100" value="90" step="5">
-            </div>
+            <div class="el-hint">点击素材进入摆放模式：拖动移动，拖动角点缩放，Enter 确认，Esc 取消。</div>
         </div>
     </div>
 
@@ -788,6 +888,8 @@
 
     <div class="status" id="status-text">设置已加载</div>
 
+    <script src="settings/thumbnail.js"></script>
+    <script src="settings/elements-tab.js"></script>
     <script>
         // ==================== 状态 ====================
         const isElectron = !!(window.electronAPI);
@@ -1039,7 +1141,7 @@
             vinyl: document.getElementById('tab-vinyl'),
             video: document.getElementById('tab-video'),
             weather: document.getElementById('tab-weather'),
-            sticker: document.getElementById('tab-sticker'),
+            elements: document.getElementById('tab-elements'),
         };
 
         elementTabs.forEach(tab => {
@@ -1212,120 +1314,7 @@
             });
         }
 
-        // 4. 自定义贴纸挂件控制
-        const stickerEnabled = document.getElementById('sticker-enabled');
-        const stickerCurrentName = document.getElementById('sticker-current-name');
-        const btnImportSticker = document.getElementById('btn-import-sticker');
-        const btnRemoveSticker = document.getElementById('btn-remove-sticker');
-        const stickerX = document.getElementById('sticker-x');
-        const stickerXVal = document.getElementById('sticker-x-val');
-        const stickerY = document.getElementById('sticker-y');
-        const stickerYVal = document.getElementById('sticker-y-val');
-        const stickerSize = document.getElementById('sticker-size');
-        const stickerSizeVal = document.getElementById('sticker-size-val');
-        const stickerDepth = document.getElementById('sticker-depth');
-        const stickerDepthVal = document.getElementById('sticker-depth-val');
-        const stickerOpacity = document.getElementById('sticker-opacity');
-        const stickerOpacityVal = document.getElementById('sticker-opacity-val');
-
-        if (stickerEnabled) {
-            stickerEnabled.addEventListener('change', () => {
-                if (isElectron) {
-                    window.electronAPI.saveConfig({ sticker: { enabled: stickerEnabled.checked } });
-                }
-                setStatus(stickerEnabled.checked ? '已开启贴纸挂件' : '已关闭贴纸挂件', '');
-            });
-        }
-
-        if (btnImportSticker) {
-            btnImportSticker.addEventListener('click', async () => {
-                if (!isElectron) return;
-                try {
-                    const stickerPath = await window.electronAPI.selectSticker();
-                    if (stickerPath) {
-                        const name = stickerPath.split('\\').pop();
-                        stickerCurrentName.textContent = name;
-                        if (stickerEnabled) stickerEnabled.checked = true;
-                        window.electronAPI.saveConfig({
-                            sticker: {
-                                enabled: true,
-                                imagePath: stickerPath,
-                            }
-                        });
-                        setStatus(`已导入贴纸: ${name}`, 'success');
-                    }
-                } catch (err) {
-                    setStatus('导入贴纸失败: ' + err.message, 'error');
-                }
-            });
-        }
-
-        if (btnRemoveSticker) {
-            btnRemoveSticker.addEventListener('click', () => {
-                if (!isElectron) return;
-                stickerCurrentName.textContent = '未导入';
-                if (stickerEnabled) stickerEnabled.checked = false;
-                window.electronAPI.saveConfig({
-                    sticker: {
-                        enabled: false,
-                        imagePath: '',
-                    }
-                });
-                setStatus('已移除贴纸挂件', '');
-            });
-        }
-
-        if (stickerX) {
-            stickerX.addEventListener('input', () => {
-                const val = parseInt(stickerX.value, 10);
-                stickerXVal.textContent = val + '%';
-                if (isElectron) {
-                    window.electronAPI.saveConfig({ sticker: { positionX: val } });
-                }
-            });
-        }
-
-        if (stickerY) {
-            stickerY.addEventListener('input', () => {
-                const val = parseInt(stickerY.value, 10);
-                stickerYVal.textContent = val + '%';
-                if (isElectron) {
-                    window.electronAPI.saveConfig({ sticker: { positionY: val } });
-                }
-            });
-        }
-
-        if (stickerSize) {
-            stickerSize.addEventListener('input', () => {
-                const val = parseInt(stickerSize.value, 10);
-                stickerSizeVal.textContent = val + 'px';
-                if (isElectron) {
-                    window.electronAPI.saveConfig({ sticker: { size: val } });
-                }
-            });
-        }
-
-        if (stickerDepth) {
-            stickerDepth.addEventListener('input', () => {
-                const val = parseInt(stickerDepth.value, 10) / 100.0;
-                stickerDepthVal.textContent = val.toFixed(2);
-                if (isElectron) {
-                    window.electronAPI.saveConfig({ sticker: { depth: val } });
-                }
-            });
-        }
-
-        if (stickerOpacity) {
-            stickerOpacity.addEventListener('input', () => {
-                const val = parseInt(stickerOpacity.value, 10);
-                stickerOpacityVal.textContent = val + '%';
-                if (isElectron) {
-                    window.electronAPI.saveConfig({ sticker: { opacity: val / 100.0 } });
-                }
-            });
-        }
-
-        // 5. 视频特效覆盖层控制
+        // 4. 视频特效覆盖层控制
         const videoOverlayEnabled = document.getElementById('video-overlay-enabled');
         const videoPresetsGrid = document.getElementById('video-presets-grid');
         const videoCustomName = document.getElementById('video-custom-name');
@@ -1656,36 +1645,6 @@
                         }
                     }
 
-                    // 恢复自定义贴纸配置
-                    if (config.sticker) {
-                        if (stickerEnabled) stickerEnabled.checked = !!config.sticker.enabled;
-                        if (stickerCurrentName) {
-                            stickerCurrentName.textContent = config.sticker.imagePath ? config.sticker.imagePath.split('\\').pop() : '未导入';
-                        }
-                        if (stickerX && config.sticker.positionX !== undefined) {
-                            stickerX.value = config.sticker.positionX;
-                            if (stickerXVal) stickerXVal.textContent = config.sticker.positionX + '%';
-                        }
-                        if (stickerY && config.sticker.positionY !== undefined) {
-                            stickerY.value = config.sticker.positionY;
-                            if (stickerYVal) stickerYVal.textContent = config.sticker.positionY + '%';
-                        }
-                        if (stickerSize && config.sticker.size !== undefined) {
-                            stickerSize.value = config.sticker.size;
-                            if (stickerSizeVal) stickerSizeVal.textContent = config.sticker.size + 'px';
-                        }
-                        if (stickerDepth && config.sticker.depth !== undefined) {
-                            const d = Math.round(config.sticker.depth * 100);
-                            stickerDepth.value = d;
-                            if (stickerDepthVal) stickerDepthVal.textContent = config.sticker.depth.toFixed(2);
-                        }
-                        if (stickerOpacity && config.sticker.opacity !== undefined) {
-                            const op = Math.round(config.sticker.opacity * 100);
-                            stickerOpacity.value = op;
-                            if (stickerOpacityVal) stickerOpacityVal.textContent = op + '%';
-                        }
-                    }
-
                     // 恢复视频特效覆盖层配置
                     if (config.videoOverlay) {
                         if (videoOverlayEnabled) {
@@ -1755,6 +1714,7 @@
         }
 
         // 启动
+        initElementsTab({ api: window.electronAPI, setStatus });
         loadConfig();
     </script>
 
