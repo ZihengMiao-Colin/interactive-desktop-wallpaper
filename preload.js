@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ==================== 图片与文件选择 ====================
 
-    /** 打开系统文件对话框，选择壁纸图片 */
+    /** 打开系统文件对话框，选择壁纸图片（只返回路径，不会应用） */
     selectImage: () => ipcRenderer.invoke('dialog:selectImage'),
 
     /** 打开系统文件对话框，选择本地音乐 */
@@ -153,6 +153,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         const handler = (_event, imagePath) => callback(imagePath);
         ipcRenderer.on('image:new', handler);
         return () => ipcRenderer.removeListener('image:new', handler);
+    },
+
+    /**
+     * 托盘"更换壁纸"选了一张还没有深度图的图片，交给设置窗口生成并应用。
+     * 回调参数: { imagePath: string }
+     */
+    onPrepareImage: (callback) => {
+        const handler = (_event, data) => callback(data);
+        ipcRenderer.on('settings:prepareImage', handler);
+        return () => ipcRenderer.removeListener('settings:prepareImage', handler);
     },
 
     onLoadConfig: (callback) => {

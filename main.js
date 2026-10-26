@@ -383,33 +383,59 @@ function createPlacementController() {
     });
 }
 
+// ==================== 换壁纸 ====================
+
+/**
+ * 弹出选择壁纸图片的对话框。
+ * @returns {Promise<string|null>} 选中的图片路径，取消时为 null
+ */
+async function showImageDialog() {
+    const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+        title: '选择壁纸图片',
+        filters: [{ name: '图片文件', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
+        properties: ['openFile'],
+    });
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
+}
+
+/**
+ * 把图片应用为桌面壁纸：记住它（重启后还是这张），并通知壁纸窗口加载。
+ * 调用前应确保这张图已有深度图缓存。
+ * @returns {boolean}
+ */
+function applyWallpaper(imagePath) {
+    if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return false;
+    store.saveConfig({ currentImage: imagePath });
+    wallpaperWindow.webContents.send('image:new', imagePath);
+    console.log('[Main] Apply wallpaper:', imagePath);
+    return true;
+}
+
+/**
+ * 托盘"更换壁纸..."：有深度图缓存就直接应用；
+ * 没有就打开设置窗口，在那里生成深度图（带进度），生成成功后自动应用。
+ */
+async function changeWallpaperFromTray() {
+    const imagePath = await showImageDialog();
+    if (!imagePath) return;
+
+    if (store.hasDepthCache(imagePath)) {
+        applyWallpaper(imagePath);
+        return;
+    }
+
+    const win = createSettingsWindow();
+    const send = () => win.webContents.send('settings:prepareImage', { imagePath });
+    if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send);
+    else send();
+}
+
 // ==================== IPC 处理器注册 ====================
 
 function registerIpcHandlers() {
 
-    // ---- 选择新图片 ----
-    ipcMain.handle('dialog:selectImage', async () => {
-        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
-            title: '选择壁纸图片',
-            filters: [
-                { name: '图片文件', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] },
-            ],
-            properties: ['openFile'],
-        });
-
-        if (result.canceled || result.filePaths.length === 0) {
-            return null;
-        }
-
-        const imagePath = result.filePaths[0];
-
-        // 通知渲染进程加载新图片
-        if (wallpaperWindow) {
-            wallpaperWindow.webContents.send('image:new', imagePath);
-        }
-
-        return imagePath;
-    });
+    // ---- 选择新图片（只返回路径，应用要等用户点"应用壁纸"） ----
+    ipcMain.handle('dialog:selectImage', () => showImageDialog());
 
     // ---- 选择本地音乐文件 ----
     ipcMain.handle('dialog:selectAudio', async () => {
@@ -719,17 +745,7 @@ function registerIpcHandlers() {
     });
 
     // ---- 应用壁纸（从设置窗口触发） ----
-    ipcMain.handle('wallpaper:apply', async (_event, imagePath) => {
-        if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-            // 保存当前图片路径到配置
-            store.saveConfig({ currentImage: imagePath });
-            // 发送给壁纸窗口（壁纸窗口的 onNewImage 会自动检查缓存）
-            wallpaperWindow.webContents.send('image:new', imagePath);
-            console.log('[Main] Apply wallpaper:', imagePath);
-            return true;
-        }
-        return false;
-    });
+    ipcMain.handle('wallpaper:apply', (_event, imagePath) => applyWallpaper(imagePath));
 
     // ---- 清除深度图缓存 ----
     ipcMain.handle('cache:clearAll', async () => {
@@ -877,16 +893,7 @@ app.whenReady().then(() => {
     // 4. 创建系统托盘
     tray = createTray({
         onOpenSettings: () => createSettingsWindow(),
-        onSelectImage: async () => {
-            const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
-                title: '选择壁纸图片',
-                filters: [{ name: '图片文件', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
-                properties: ['openFile'],
-            });
-            if (!result.canceled && result.filePaths.length > 0 && wallpaperWindow) {
-                wallpaperWindow.webContents.send('image:new', result.filePaths[0]);
-            }
-        },
+        onSelectImage: () => changeWallpaperFromTray(),
         onOpenDepthDir: async () => {
             const dir = store.getDepthCacheDir();
             if (!fs.existsSync(dir)) {
