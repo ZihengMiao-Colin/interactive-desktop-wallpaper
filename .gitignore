@@ -35,3 +35,6 @@ userData/
 
 # 头脑风暴 mockup 与执行计划工作区
 .superpowers/
+
+# 默认壁纸原图 —— 图库实际用的是 wallpapers/ 里由 tools/prepare_wallpapers.py 生成的版本
+default wallpaper/

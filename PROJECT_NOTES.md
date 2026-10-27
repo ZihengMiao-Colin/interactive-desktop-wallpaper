@@ -118,7 +118,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ├── test/                    Node 单元测试
 ├── generate_depth_map.py / export_onnx.py / 生成深度图.bat   Python 版深度图（tools/prepare_wallpapers.py 在用；应用里已换成 src/depth/）
 ├── background.png / background2.png / depth_map.png   默认素材
-└── default wallpaper/       （未跟踪）默认壁纸的原图，图库素材由它生成，可以删除
+└── default wallpaper/       （在 .gitignore 里）默认壁纸的原图，图库素材由它生成，可以删除
 ```
 
 ---
