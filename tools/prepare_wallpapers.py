@@ -4,13 +4,15 @@ prepare_wallpapers.py — 生成默认壁纸图库的素材
 按 wallpapers/manifest.json 里的条目，从原图目录读取原图（字段 origin），生成：
   - wallpapers/<id>.jpg         宽度超过 3840 的缩到 3840，其余原样复制
   - wallpapers/thumbs/<id>.jpg  320×200 的缩略图（居中裁切）
-  - wallpapers/depth/<id>.png   深度图（small 模型；宽度超过 1920 的缩到 1920，够用且省空间）
+  - wallpapers/depth/<id>.png   深度图（small 模型，最长边 1920，见 generate_depth_map.py）
 
-原图目录里的文件不会被修改。改进深度图算法后重新跑一遍即可更新所有深度图。
+原图目录里的文件不会被修改。改进深度图算法后用 --depth-only 重跑即可更新所有深度图，
+这时直接用 wallpapers/ 里的图片，不需要原图目录。
 
 用法：
     venv/Scripts/python.exe tools/prepare_wallpapers.py --source "default wallpaper"
     venv/Scripts/python.exe tools/prepare_wallpapers.py --source "default wallpaper" --only cat lake-forest
+    venv/Scripts/python.exe tools/prepare_wallpapers.py --depth-only
 
 依赖：Pillow、numpy、onnxruntime（与 generate_depth_map.py 相同）。
 """
@@ -27,8 +29,6 @@ GALLERY_DIR = os.path.join(ROOT, 'wallpapers')
 
 # 壁纸最大宽度（4K 屏够用）
 MAX_IMAGE_WIDTH = 3840
-# 深度图最大宽度：深度图本身很平滑，再大也看不出区别
-MAX_DEPTH_WIDTH = 1920
 # 缩略图尺寸（设置页网格是 16:10）
 THUMB_SIZE = (320, 200)
 # 深度图边缘平滑半径，和设置页默认值一致
@@ -83,15 +83,17 @@ def prepare_depth(image_path, dst):
         raw = os.path.join(tmp, 'depth.png')
         generate_depth_map(image_path, raw, model_size='small', blur_radius=DEPTH_BLUR)
         with Image.open(raw) as depth:
-            size = fit_width(depth.width, depth.height, MAX_DEPTH_WIDTH)
-            depth.resize(size, Image.LANCZOS).save(dst, 'PNG', optimize=True)
+            depth.save(dst, 'PNG', optimize=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description='生成默认壁纸图库的图片、缩略图和深度图')
-    parser.add_argument('--source', required=True, help='原图所在目录（不会被修改）')
+    parser.add_argument('--source', help='原图所在目录（不会被修改）')
     parser.add_argument('--only', nargs='*', help='只处理这些 id')
+    parser.add_argument('--depth-only', action='store_true', help='只用 wallpapers/ 里的图片重新生成深度图')
     args = parser.parse_args()
+    if not args.source and not args.depth_only:
+        parser.error('需要 --source，或者用 --depth-only 只更新深度图')
 
     with open(os.path.join(GALLERY_DIR, 'manifest.json'), encoding='utf-8') as f:
         manifest = json.load(f)
@@ -99,14 +101,17 @@ def main():
     for entry in manifest['wallpapers']:
         if args.only and entry['id'] not in args.only:
             continue
-        src = os.path.join(args.source, entry['origin'])
         image = os.path.join(GALLERY_DIR, entry['file'])
         thumb = os.path.join(GALLERY_DIR, entry['thumb'])
         depth = os.path.join(GALLERY_DIR, entry['depth'])
         for p in (image, thumb, depth):
             os.makedirs(os.path.dirname(p), exist_ok=True)
 
-        size = prepare_image(src, image)
+        if args.depth_only:
+            prepare_depth(image, depth)
+            print(f"[OK] {entry['id']:<20} {entry['name']}  深度图已更新", file=sys.stderr)
+            continue
+        size = prepare_image(os.path.join(args.source, entry['origin']), image)
         prepare_thumb(image, thumb)
         prepare_depth(image, depth)
         print(f"[OK] {entry['id']:<20} {entry['name']}  {size[0]}x{size[1]}", file=sys.stderr)

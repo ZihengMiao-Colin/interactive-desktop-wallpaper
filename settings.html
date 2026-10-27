@@ -75,6 +75,31 @@
             display: none;
         }
         .preview-info.visible { display: block; }
+        .preview-mode {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.6);
+        }
+        .preview-mode[hidden] { display: none; }
+        .preview-mode button {
+            width: auto;
+            margin: 0;
+            padding: 4px 10px;
+            font-size: 11px;
+            border: none;
+            border-radius: 0;
+            background: transparent;
+            color: #aaa;
+        }
+        .preview-mode button.active {
+            background: rgba(126, 207, 255, 0.25);
+            color: #7ecfff;
+        }
 
         /* ---- 进度条 ---- */
         .progress-section {
@@ -717,6 +742,10 @@
         <div class="preview-container" id="preview-container">
             <span class="preview-placeholder" id="preview-placeholder">尚未选择壁纸</span>
             <img id="preview-image" style="display:none;" alt="预览">
+            <div class="preview-mode" id="preview-mode" hidden>
+                <button type="button" data-mode="image" class="active">原图</button>
+                <button type="button" data-mode="depth">深度图</button>
+            </div>
             <div class="preview-info" id="preview-info"></div>
         </div>
 
@@ -732,7 +761,7 @@
 
         <!-- 边缘平滑度 (抗撕裂) -->
         <div class="row" style="margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 6px;">
-            <label title="通过对深度图边缘进行高斯平滑，有效消除大幅度视差下的拉丝和撕裂感">边缘平滑</label>
+            <label title="近处物体的轮廓先向外扩一圈再平滑，移动时主体边缘保持完整，拉伸落在背景上。数值越大过渡越柔和，改了要重新生成深度图">边缘平滑</label>
             <span class="value" id="blur-value">8px</span>
             <input type="range" id="depth-blur" min="0" max="30" value="8" step="1">
         </div>
@@ -973,6 +1002,7 @@
 
     <script src="shared/config-sync.js"></script>
     <script src="settings/gallery-panel.js"></script>
+    <script src="settings/depth-preview.js"></script>
     <script src="settings/thumbnail.js"></script>
     <script src="settings/elements-tab.js"></script>
     <script>
@@ -990,10 +1020,7 @@
         let isGenerating = false;
 
         // ==================== DOM 引用 ====================
-        const previewContainer = document.getElementById('preview-container');
-        const previewPlaceholder = document.getElementById('preview-placeholder');
-        const previewImage = document.getElementById('preview-image');
-        const previewInfo = document.getElementById('preview-info');
+        const depthPreview = initDepthPreview();
         const progressSection = document.getElementById('progress-section');
         const progressBar = document.getElementById('progress-bar');
         const progressText = document.getElementById('progress-text');
@@ -1061,20 +1088,12 @@
 
             const fileName = galleryEntry ? `${galleryEntry.name} · 默认壁纸` : imagePath.split('\\').pop();
             const dataUrl = window.electronAPI.readFileAsDataURL(imagePath);
-            if (dataUrl) {
-                previewPlaceholder.style.display = 'none';
-                previewImage.style.display = 'block';
-                previewImage.src = dataUrl;
-                previewInfo.classList.add('visible');
-                previewInfo.textContent = fileName;
-                const img = new Image();
-                img.onload = () => {
-                    previewInfo.textContent = `${fileName}  (${img.naturalWidth}×${img.naturalHeight})`;
-                };
-                img.src = dataUrl;
-            }
+            if (dataUrl) depthPreview.showImage(dataUrl, fileName);
 
             const depth = await window.electronAPI.getDepthCache(imagePath);
+            // 等深度图期间又选了别的图片，这次的结果就不用了
+            if (selectedImagePath !== imagePath) return !!depth;
+            depthPreview.setDepth(depth);
             if (depth) {
                 depthGenerated = true;
                 btnApplyWallpaper.disabled = false;
@@ -1136,6 +1155,7 @@
                 const result = await window.electronAPI.generateDepthMap(selectedImagePath, 'small', blurRadius);
                 if (result.success) {
                     depthGenerated = true;
+                    depthPreview.setDepth(result.depthDataUrl, { show: true });
                     btnApplyWallpaper.disabled = false;
                     progressBar.classList.remove('indeterminate');
                     progressBar.style.width = '100%';

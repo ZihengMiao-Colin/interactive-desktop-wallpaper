@@ -27,14 +27,14 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | 桌面框架 | Electron ^28.3.3（Chromium 120），electron-builder ^24.9.1 |
 | 渲染 | Pixi.js 7.4.2（npm 本地依赖，版本锁定），自定义 Filter / Mesh 着色器 |
 | 动图解码 | Chromium 自带的 WebCodecs `ImageDecoder`（没有引入 `@pixi/gif`） |
-| 深度模型 | Depth Anything V2 Small；`generate_depth_map.py` 先找本地 ONNX，找不到再走 HuggingFace |
+| 深度模型 | Depth Anything V2 Small；`generate_depth_map.py` 先找本地 ONNX，找不到再走 HuggingFace。ONNX 输入固定 518×518（不能保持原图比例）；输出深度图最长边 1920 |
 | Python | 项目内 `venv/`（3.11.9），只装了 onnxruntime / numpy / pillow |
 | ONNX 模型 | 根目录（`.gitignore` 忽略）：`_ir9.onnx` 100MB（实际被选中）、`_int8.onnx` 28MB、2MB 的空壳 |
 | 测试 | Node 内置 `node --test`（`npm test`）；预处理脚本用 Python `unittest` |
 | 平台 | 仅 Windows，仅主显示器 |
 
 - 启动：`npm start`；`npm run dev` 会打开 DevTools。
-- 测试：`npm test`；`venv/Scripts/python.exe -m unittest tools/test_prepare_builtin_element.py`。
+- 测试：`npm test`；Python 用 `venv/Scripts/python.exe -m unittest tools/test_<名字>.py`（`test_generate_depth_map`、`test_prepare_wallpapers`、`test_prepare_builtin_element`）。
 - 浏览器预览（不用启动 Electron 就能看渲染效果）：`venv/Scripts/python.exe -m http.server 8765`，打开 `http://localhost:8765/index.html`；摆放模式加 `?mode=edit`。数据来自 `dev/dev-config.json`。
 
 ---
@@ -51,6 +51,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ├── settings/
 │   ├── elements-tab.js      设置页"自定义元素"页签
 │   ├── gallery-panel.js     设置页可折叠的"默认壁纸"面板
+│   ├── depth-preview.js     设置页预览区：原图 / 深度图切换
 │   └── thumbnail.js         导入素材时生成缩略图
 ├── renderer/                壁纸页脚本（普通全局脚本，按 index.html 里的顺序加载）
 │   ├── shaders.js           背景着色器 + 元素着色器，共用 PARALLAX_GLSL 视差公式
@@ -87,7 +88,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ├── wallpapers/              默认壁纸图库：manifest.json + 图片 + depth/ + thumbs/
 ├── overlay/                 全屏视频特效素材
 ├── tools/prepare_builtin_element.py  默认绿幕元素预处理（裁剪 / 缩放 / 缩略图）
-├── tools/prepare_wallpapers.py       默认壁纸图库素材生成（缩图 / 缩略图 / 深度图）
+├── tools/prepare_wallpapers.py       默认壁纸图库素材生成（缩图 / 缩略图 / 深度图；`--depth-only` 只重算深度图）
 ├── dev/                     浏览器预览用的假配置和示例 GIF
 ├── test/                    Node 单元测试
 ├── generate_depth_map.py / export_onnx.py / 生成深度图.bat
@@ -237,7 +238,12 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 
 ### 阶段 4 — 其他新功能（2026-10-26 确定范围，按此顺序做）
 1. [x] 默认壁纸图库：`wallpapers/`（17 张，带深度图和缩略图，`manifest.json` 记录中文名、来源和原文件名），设置页"壁纸管理"里可折叠的"默认壁纸"面板（默认收起）。素材由 `tools/prepare_wallpapers.py` 从原图生成，改进深度图算法后重跑即可。原图目录 `default wallpaper/` 未改动、未提交，可以删除；删掉后旧的当前壁纸路径会在启动时自动换成图库里的同一张。
-2. [ ] 深度图质量（保边滤波替代高斯模糊）+ 设置页深度图预览。
+2. [x] 深度图质量 + 设置页深度图预览。
+   - 没有用保边滤波：壁纸是按深度挪像素的，深度图边缘越锐利，移动时越容易撕开；用原图引导的保边滤波试过，还会在深度图里留下斑点。
+   - 现在的后处理（`generate_depth_map.py` 的 `postprocess_depth`）：模型输出用浮点放大到输出尺寸 → 近处轮廓向外扩"模糊影响半径"那么多 → 高斯平滑（三次均值滤波逼近）。过渡带整个落在背景一侧，主体轮廓移动时保持完整，拉伸落到背景上。"边缘平滑"滑块是高斯的 σ（按输出深度图像素计），外扩距离由它算出（`blur_support`）。
+   - 输出深度图最长边 1920（原来是原图尺寸），6000px 的大图整个流程约 1.2 秒。
+   - 设置页预览区右上角"原图 | 深度图"切换；有深度图时才出现，刚生成完自动切到深度图。
+   - 17 张默认壁纸的深度图已用新算法重算（`prepare_wallpapers.py --depth-only`）。用户自己图片的旧缓存仍有效，重新点"生成深度图"才会换成新算法。
 3. [ ] 自定义元素进阶：变色、旋转、变形（数据结构已预留 `transform.rotation`、`effects`）；点击桌面触发播放。
 - ~~设置页模型选择~~：不做，只用 small 模型（用户决定）。
 - ~~多显示器~~：不做（用户决定）。
