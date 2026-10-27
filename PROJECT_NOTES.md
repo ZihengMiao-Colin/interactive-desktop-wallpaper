@@ -50,6 +50,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ├── settings.html            设置窗口（内嵌 CSS + 大部分 JS）
 ├── settings/
 │   ├── elements-tab.js      设置页"自定义元素"页签
+│   ├── gallery-panel.js     设置页可折叠的"默认壁纸"面板
 │   └── thumbnail.js         导入素材时生成缩略图
 ├── renderer/                壁纸页脚本（普通全局脚本，按 index.html 里的顺序加载）
 │   ├── shaders.js           背景着色器 + 元素着色器，共用 PARALLAX_GLSL 视差公式
@@ -80,15 +81,18 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 │   ├── wallpaper-native.js  WorkerW 注入
 │   ├── fullscreen-detector.js 全屏检测（常驻 PowerShell）
 │   ├── store.js             config.json / 深度缓存 / custom_elements 目录
+│   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移
 │   └── tray-manager.js      托盘菜单
 ├── elements/                默认元素：manifest.json + 裁剪后的 *_cut.mp4 + 缩略图（原始 bomb*.mp4 保留）
+├── wallpapers/              默认壁纸图库：manifest.json + 图片 + depth/ + thumbs/
 ├── overlay/                 全屏视频特效素材
 ├── tools/prepare_builtin_element.py  默认绿幕元素预处理（裁剪 / 缩放 / 缩略图）
+├── tools/prepare_wallpapers.py       默认壁纸图库素材生成（缩图 / 缩略图 / 深度图）
 ├── dev/                     浏览器预览用的假配置和示例 GIF
 ├── test/                    Node 单元测试
 ├── generate_depth_map.py / export_onnx.py / 生成深度图.bat
 ├── background.png / background2.png / depth_map.png   默认素材
-└── default wallpaper/       （未跟踪）17 张图，留给以后的默认壁纸图库
+└── default wallpaper/       （未跟踪）默认壁纸的原图，图库素材由它生成，可以删除
 ```
 
 ---
@@ -125,8 +129,9 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | `dialog:selectImage` / `selectAudio` / `selectCover` / `selectOverlayVideo` | R→M | 文件对话框，只返回路径 |
 | `settings:prepareImage` | M→R | 托盘选了一张没有深度图的图片：设置窗口生成深度图后自动应用 |
 | `overlay:getPresets` | R→M | 全屏视频特效列表 |
+| `gallery:list` | R→M | 默认壁纸图库列表 |
 | `depth:generate` / `depth:progress` | R→M / M→R | 生成深度图 / 进度 |
-| `cache:*`、`depth:*CacheDir` | R→M | 深度图缓存与目录 |
+| `cache:*`、`depth:*CacheDir` | R→M | 深度图缓存与目录（`cache:getDepthMap` 对默认壁纸返回自带的深度图） |
 | `config:save` / `config:get` / `config:load` | R→M / M→R | 配置读写 + 广播（壁纸窗口和设置窗口） |
 | `wallpaper:apply` / `image:new` | R→M / M→R | 应用壁纸 |
 | `mouse:move` | M→R | 全局鼠标坐标 |
@@ -189,12 +194,12 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ### 🟠 P1
 5. ~~preload 的 `getUserDataPath` 必抛异常~~ ✅ 已删除
 6. ~~换壁纸不释放旧纹理~~ ✅ `Scene.load` 会 `destroy(true)` 旧纹理
-7. ~~一直满帧渲染~~ ✅ 空闲停帧：鼠标静止、视差收敛、没有天气粒子和播放中的视频 / 动图时停掉 ticker（实测静止 3 秒 0 帧）。注意：这台机器屏幕约 240Hz，有动画时仍按刷新率满帧渲染，见 §9 阶段 3 的可选项
+7. ~~一直满帧渲染~~ ✅ 空闲停帧：鼠标静止、视差收敛、没有天气粒子和播放中的视频 / 动图时停掉 ticker（实测静止 3 秒 0 帧）；有动画时帧率上限 60（这台机器屏幕约 240Hz，实测下雪时 2 秒 481 帧 → 118 帧）
 8. ~~拖滑块时每次 input 都写盘并广播~~ ✅ 设置页和调试面板节流保存（首次立即发送，之后每 100ms 最多一次，实测 30 次拖动 → 5 次广播）；壁纸只重新应用变了的配置段
 9. 注入失败的兜底模式 `moveTop()` 会把全屏窗口提到所有程序上面。
 10. 单实例锁写在 `whenReady` 之后。
 11. ~~深度缓存只按文件大小判断~~ ✅ 改为大小 + 修改时间（旧索引没有修改时间的条目仍只比大小）
-12. 设置页生成深度图写死 `'small'`。
+12. 设置页生成深度图写死 `'small'` —— 按用户决定只用 small 模型，保持现状。
 
 ### 🟡 P2
 13. ~~死代码~~ ✅ 拆分 `app.js` 时已清理
@@ -228,14 +233,14 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 - [x] 设置页和调试面板节流保存（`shared/config-sync.js` 的 `createConfigSaver`）；主进程仍广播完整配置，壁纸端用 `changedSections` 只重新应用变了的段。
 - [x] 天气 canvas 按 DPR 缩放。
 - [x] 视差 shader 改用 highp。
-- [ ] 可选：高刷新率屏幕（这台约 240Hz）上，有动画时可以给 ticker 设 `maxFPS = 60`，进一步降低 GPU 占用；代价是鼠标移动时的视差没有那么丝滑。
+- [x] 帧率上限 60（`renderer/parallax-scene.js` 的 `MAX_FPS`），高刷新率屏幕上有动画时不再按刷新率满帧渲染。
 
-### 阶段 4 — 其他新功能
-- [ ] 默认壁纸图库（`default wallpaper/`）。
-- [ ] 自定义元素进阶：变色、旋转、变形（数据结构已预留 `transform.rotation`、`effects`）；点击桌面触发播放。
-- [ ] 深度图质量：保边滤波替代高斯模糊。
-- [ ] 设置页模型选择生效、深度图预览。
-- [ ] 多显示器。
+### 阶段 4 — 其他新功能（2026-10-26 确定范围，按此顺序做）
+1. [x] 默认壁纸图库：`wallpapers/`（17 张，带深度图和缩略图，`manifest.json` 记录中文名、来源和原文件名），设置页"壁纸管理"里可折叠的"默认壁纸"面板（默认收起）。素材由 `tools/prepare_wallpapers.py` 从原图生成，改进深度图算法后重跑即可。原图目录 `default wallpaper/` 未改动、未提交，可以删除；删掉后旧的当前壁纸路径会在启动时自动换成图库里的同一张。
+2. [ ] 深度图质量（保边滤波替代高斯模糊）+ 设置页深度图预览。
+3. [ ] 自定义元素进阶：变色、旋转、变形（数据结构已预留 `transform.rotation`、`effects`）；点击桌面触发播放。
+- ~~设置页模型选择~~：不做，只用 small 模型（用户决定）。
+- ~~多显示器~~：不做（用户决定）。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。
