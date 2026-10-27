@@ -7,6 +7,7 @@
 
     <!-- Pixi.js 用本地依赖（npm 安装，版本锁定 7.4.2），开机自启时没网也能正常显示 -->
     <script src="node_modules/pixi.js/dist/pixi.min.js"></script>
+    <link rel="stylesheet" href="ui/tokens.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,8 +18,10 @@
     <!-- ==================== 加载提示 ==================== -->
     <!-- 深度图生成/加载时显示，完成后隐藏 -->
     <div id="loading-overlay">
-        <div id="loading-spinner"></div>
-        <div id="loading-text">正在加载壁纸...</div>
+        <div class="loading-card glass">
+            <div id="loading-spinner"></div>
+            <div id="loading-text">正在加载壁纸…</div>
+        </div>
     </div>
 
     <!-- ==================== 调试面板 ==================== -->
@@ -27,39 +30,31 @@
         在 Electron 生产模式下自动隐藏。
         浏览器模式下默认显示。
     -->
-    <div id="debug-panel">
+    <div id="debug-panel" class="glass">
         <div id="debug-panel-header">
             <span>调试面板</span>
-            <button id="debug-toggle" title="折叠/展开">-</button>
+            <button id="debug-toggle" class="btn sm icon ghost" title="收起 / 展开"><svg class="i"><use href="#i-chevron-down"/></svg></button>
         </div>
         <div id="debug-panel-body">
             <div class="debug-row">
-                <label for="parallax-strength">
-                    视差强度 <span id="parallax-value">20</span>
-                </label>
+                <label for="parallax-strength">视差强度 <span id="parallax-value">20</span></label>
                 <input type="range" id="parallax-strength" min="5" max="100" value="20" step="1">
             </div>
             <div class="debug-row">
-                <label for="smoothness">
-                    阻尼/平滑度 <span id="smoothness-value">0.08</span>
-                </label>
-                <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
+                <label for="smoothness">跟手程度 <span id="smoothness-value">0.08</span></label>
                 <!-- 实际值为 slider/100，即 0.01 ~ 0.30 -->
+                <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
             </div>
             <div class="debug-row">
-                <label for="focus-depth" title="设置视觉焦点深度，主体深度处不发生位移，彻底消除剪切割裂">
-                    对焦深度 <span id="focus-value">0.50</span>
-                </label>
-                <input type="range" id="focus-depth" min="0" max="100" value="50" step="1">
+                <label for="focus-depth" title="这个深度上的东西完全不动，通常对准画面主体">对焦深度 <span id="focus-value">0.50</span></label>
+                <input type="range" class="depth" id="focus-depth" min="0" max="100" value="50" step="1">
             </div>
-            <div class="debug-row debug-hint">
-                <small>鼠标移动查看视差效果</small>
-            </div>
+            <div class="debug-hint">移动鼠标查看视差效果</div>
         </div>
     </div>
 
     <!-- ==================== 状态提示（Electron 环境） ==================== -->
-    <div id="status-toast"></div>
+    <div id="status-toast" class="glass"></div>
 
     <!-- ==================== 视频特效覆盖层 (滤色 / WebGL绿幕抠图) ==================== -->
     <video id="overlay-video" loop muted playsinline style="display: none;"></video>
@@ -108,7 +103,11 @@
 
     <!-- ==================== 自定义元素摆放模式（仅摆放窗口使用） ==================== -->
     <div id="placement-ui" hidden>
-        <div id="placement-hint">摆放模式 · 拖动移动，角点缩放，边点拉伸，上方圆点旋转（按住 Shift 每次 15°），Enter 确认，Esc 取消</div>
+        <div id="placement-hint" class="glass">
+            <b id="placement-title">摆放元素</b>
+            <span>拖动移动，角点缩放，边点拉伸，圆点旋转（<kbd>Shift</kbd> 每次 15°）</span>
+            <span><kbd>Enter</kbd> 确认 <kbd>Esc</kbd> 取消</span>
+        </div>
         <div id="placement-box">
             <svg class="warp-outline" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <polygon id="placement-warp-outline" points="0,0 100,0 100,100 0,100"></polygon>
@@ -127,19 +126,22 @@
             <span class="handle warp" data-warp="2"></span>
             <span class="handle warp" data-warp="3"></span>
         </div>
-        <div id="placement-toolbar">
-            <label for="placement-depth">深度</label>
-            <input type="range" id="placement-depth" min="0" max="100" value="50" step="1">
-            <span id="placement-depth-value">0.50</span>
+        <div id="placement-toolbar" class="glass">
+            <div class="placement-group">
+                <label for="placement-depth">深度</label>
+                <input type="range" class="depth" id="placement-depth" min="0" max="100" value="50" step="1">
+                <span id="placement-depth-value">0.50</span>
+                <span id="placement-depth-auto" class="chip accent" title="跟着元素底边处的壁纸深度走，拖动深度滑块后改为固定值">自动</span>
+            </div>
             <span class="placement-sep"></span>
             <span id="placement-rotation" title="旋转角度">0°</span>
-            <button id="placement-flip-x" class="placement-btn" title="水平翻转">⇋ 翻转</button>
-            <button id="placement-flip-y" class="placement-btn" title="垂直翻转">⇅ 翻转</button>
-            <button id="placement-warp" class="placement-btn" title="单独拖动四个角，做出透视效果">◇ 自由变形</button>
-            <button id="placement-reset" class="placement-btn" title="清除旋转、拉伸、翻转和变形">↺ 复原</button>
+            <button id="placement-flip-x" class="placement-btn" title="水平翻转" aria-label="水平翻转"><svg class="i"><use href="#i-flip-horizontal-2"/></svg></button>
+            <button id="placement-flip-y" class="placement-btn" title="垂直翻转" aria-label="垂直翻转"><svg class="i"><use href="#i-flip-vertical-2"/></svg></button>
+            <button id="placement-warp" class="placement-btn" title="单独拖动四个角，做出透视效果"><svg class="i"><use href="#i-square-dashed"/></svg>自由变形</button>
+            <button id="placement-reset" class="placement-btn" title="清除旋转、拉伸、翻转和变形"><svg class="i"><use href="#i-rotate-ccw"/></svg>复原</button>
             <span class="placement-sep"></span>
-            <button id="placement-confirm" class="placement-btn primary">✓ 确认</button>
-            <button id="placement-cancel" class="placement-btn">✕ 取消</button>
+            <button id="placement-cancel" class="placement-btn">取消</button>
+            <button id="placement-confirm" class="placement-btn primary"><svg class="i"><use href="#i-check"/></svg>确认</button>
         </div>
     </div>
 
@@ -147,6 +149,7 @@
     <audio id="bg-audio" loop preload="auto"></audio>
 
     <!-- 壁纸逻辑（普通全局脚本，按依赖顺序加载） -->
+    <script src="ui/icons.js"></script>
     <script src="shared/parallax-math.js"></script>
     <script src="shared/elements-model.js"></script>
     <script src="shared/playback.js"></script>

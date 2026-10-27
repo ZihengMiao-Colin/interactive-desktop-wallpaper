@@ -1,8 +1,9 @@
 /**
- * elements-tab.js — 设置窗口的"自定义元素"页签
+ * elements-tab.js — 设置窗口"元素"页
  *
- * 三块内容：添加按钮、素材库（默认元素 / 我添加的）、壁纸上的元素列表。
- * 点素材进入摆放模式；列表里可以调深度、不透明度、颜色、播放方式、抠像，以及重新摆放和删除。
+ * 上面是素材库（默认元素 + 自己添加的 + "添加素材"格），点素材进入摆放模式；
+ * 下面左右两栏：左边是壁纸上的元素列表（可直接显示 / 隐藏），右边是选中元素的调整面板：
+ * 深度、不透明度、颜色、播放方式、抠像，以及重新摆放和删除。
  * 位置、大小、旋转、翻转、变形都在摆放模式里直接在壁纸上调。
  */
 
@@ -10,7 +11,7 @@
 
 /** 滑块改动后等多久再保存 */
 const ELEMENTS_SAVE_DEBOUNCE_MS = 150;
-/** 用户正在操作控件时，推迟这么久再重绘列表，避免拖到一半控件被替换 */
+/** 用户正在操作控件时，推迟这么久再重绘，避免拖到一半控件被替换 */
 const ELEMENTS_RENDER_HOLD_MS = 800;
 
 const TYPE_LABEL = { image: '图片', animated: 'GIF', video: '视频' };
@@ -22,46 +23,41 @@ const CLICK_HINT = {
 };
 
 /**
- * @param {{ api: object, setStatus: (msg: string, cls?: string) => void }} deps
+ * @param {{ api: object, setStatus: (msg: string, cls?: string) => void, setBadge: (page: string, text: string) => void }} deps
  */
-function initElementsTab({ api, setStatus }) {
+function initElementsTab({ api, setStatus, setBadge }) {
     if (!api) return;
+    const { el, button, segmented, switchEl, setRange } = Controls;
 
     const importBtn = document.getElementById('btn-import-element');
-    const builtinGrid = document.getElementById('elements-builtin-grid');
-    const userGrid = document.getElementById('elements-user-grid');
+    const assetGrid = document.getElementById('elements-assets');
     const instanceList = document.getElementById('elements-instance-list');
+    const detail = document.getElementById('elements-detail');
+    const countEl = document.getElementById('elements-count');
 
     let builtinAssets = [];
     let elements = { library: [], instances: [] };
-    /** 展开了属性面板的实例 id */
-    const expanded = new Set();
+    /** 右栏正在显示的元素 */
+    let selectedId = null;
     let holdUntil = 0;
     let pendingRender = null;
     const saveTimers = new Map();
 
     // ---------- 小工具 ----------
 
-    function el(tag, className, text) {
-        const node = document.createElement(tag);
-        if (className) node.className = className;
-        if (text !== undefined) node.textContent = text;
-        return node;
-    }
-
     function findAsset(assetId) {
         return builtinAssets.find((a) => a.id === assetId) || elements.library.find((a) => a.id === assetId) || null;
     }
 
     function thumbNode(asset) {
-        const wrap = el('div', 'el-thumb');
+        const wrap = el('span', 'thumb');
         if (asset && asset.thumb && api.fileExists(asset.thumb)) {
             const img = el('img');
             img.src = api.toFileUrl(asset.thumb);
-            img.alt = asset.name;
+            img.alt = '';
             wrap.appendChild(img);
         } else {
-            wrap.appendChild(el('span', 'el-thumb-icon', asset && asset.type === 'video' ? '🎬' : '🖼️'));
+            wrap.appendChild(Icons.svg(asset && asset.type === 'video' ? 'play' : 'image'));
         }
         return wrap;
     }
@@ -79,239 +75,327 @@ function initElementsTab({ api, setStatus }) {
         else saveTimers.set(instanceId, setTimeout(run, ELEMENTS_SAVE_DEBOUNCE_MS));
     }
 
+    function startPlacement(target, name) {
+        return api.elements.startPlacement(target).then((started) => {
+            setStatus(started ? `正在摆放「${name}」：拖动移动，角点缩放，上方圆点旋转，Enter 确认` : '摆放窗口已经打开', started ? '' : 'error');
+        });
+    }
+
     // ---------- 素材库 ----------
 
     function renderAssetCard(asset) {
         const missing = !api.fileExists(asset.file);
-        const card = el('div', 'el-card' + (missing ? ' missing' : ''));
-        card.title = missing ? '文件丢失：' + asset.file : '点击放到壁纸上';
+        const card = el('div', 'asset' + (missing ? ' missing' : ''));
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.title = missing ? '文件丢失：' + asset.file : '放到壁纸上';
         card.appendChild(thumbNode(asset));
-        card.appendChild(el('span', 'el-badge el-badge-' + asset.type, TYPE_LABEL[asset.type] || asset.type));
-        card.appendChild(el('div', 'el-card-name', asset.name));
-        if (missing) card.appendChild(el('div', 'el-card-missing', '文件丢失'));
+        const place = el('span', 'place');
+        const pill = el('span');
+        pill.append(Icons.svg('move'), '放到壁纸上');
+        place.appendChild(pill);
+        if (!missing) card.appendChild(place);
+        const name = el('span', 'name');
+        name.append(el('b', '', asset.name), el('span', 'type', missing ? '文件丢失' : (TYPE_LABEL[asset.type] || asset.type)));
+        card.appendChild(name);
 
-        card.addEventListener('click', async () => {
+        const activate = () => {
             if (missing) {
-                setStatus('素材文件丢失，无法使用：' + asset.name, 'error');
+                setStatus('素材文件丢失，用不了：' + asset.name, 'error');
                 return;
             }
-            const started = await api.elements.startPlacement({ assetId: asset.id });
-            setStatus(started ? `正在摆放「${asset.name}」：拖动移动，角点缩放，上方圆点旋转，Enter 确认` : '摆放窗口已经打开', started ? '' : 'error');
+            startPlacement({ assetId: asset.id }, asset.name);
+        };
+        card.addEventListener('click', activate);
+        card.addEventListener('keydown', (e) => {
+            if (e.target !== card || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            activate();
         });
 
         if (!asset.builtin) {
-            const remove = el('button', 'el-card-remove', '×');
-            remove.title = '从素材库移除';
+            const remove = button('remove', 'x', '', '从素材库移除');
             remove.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const count = elements.instances.filter((i) => i.assetId === asset.id).length;
                 if (count > 0 && !confirm(`壁纸上有 ${count} 个这个元素，会一起删除，确定吗？`)) return;
                 await api.elements.removeAsset(asset.id);
-                setStatus('已移除：' + asset.name, '');
+                setStatus('已移除：' + asset.name);
             });
             card.appendChild(remove);
         }
         return card;
     }
 
-    function renderLibrary() {
-        builtinGrid.replaceChildren(...builtinAssets.map(renderAssetCard));
-        const userAssets = elements.library;
-        if (userAssets.length) userGrid.replaceChildren(...userAssets.map(renderAssetCard));
-        else userGrid.replaceChildren(el('div', 'el-empty', '还没有添加过元素'));
+    function renderAddCard() {
+        const card = el('button', 'asset add');
+        card.type = 'button';
+        const inner = el('span');
+        inner.append(Icons.svg('image-plus'), '添加素材');
+        card.appendChild(inner);
+        card.addEventListener('click', importAsset);
+        return card;
     }
 
-    // ---------- 壁纸上的元素 ----------
+    function renderAssets() {
+        assetGrid.replaceChildren(...builtinAssets.map(renderAssetCard), ...elements.library.map(renderAssetCard), renderAddCard());
+    }
 
-    function sliderRow(label, min, max, value, format, onInput) {
-        const row = el('div', 'row');
-        row.appendChild(el('label', '', label));
-        const valueEl = el('span', 'value', format(value));
-        const input = el('input');
+    // ---------- 壁纸上的元素：左栏列表 ----------
+
+    function playbackSummary(instance, asset) {
+        if (!asset) return '素材已丢失';
+        const mode = asset.type === 'image' ? 'static' : instance.playback.mode;
+        let text = MODE_LABEL[mode] || mode;
+        if (mode === 'interval') text = `间隔播放，每 ${instance.playback.intervalSec} 秒`;
+        else if (mode === 'click') text = instance.playback.followClick ? '点击播放，在点击处出现' : '点击播放';
+        return instance.visible ? text : text + '，已隐藏';
+    }
+
+    function renderListItem(instance) {
+        const asset = findAsset(instance.assetId);
+        // 列表项里还有一个"显示 / 隐藏"按钮，所以列表项本身不用 <button>
+        const item = el('div', 'inst');
+        item.tabIndex = 0;
+        item.setAttribute('role', 'button');
+        item.classList.toggle('on', instance.id === selectedId);
+        item.classList.toggle('off', !instance.visible);
+        item.classList.toggle('missing', !asset);
+        item.appendChild(thumbNode(asset));
+        const tx = el('span', 'tx');
+        tx.append(el('b', '', asset ? asset.name : '素材已丢失'), el('small', '', playbackSummary(instance, asset)));
+        item.appendChild(tx);
+
+        const eye = button('eye', instance.visible ? 'eye' : 'eye-off', '', instance.visible ? '隐藏' : '显示');
+        eye.addEventListener('click', (e) => {
+            e.stopPropagation();
+            api.elements.updateInstance(instance.id, { visible: !instance.visible });
+        });
+        item.appendChild(eye);
+
+        const select = () => {
+            if (selectedId === instance.id) return;
+            selectedId = instance.id;
+            renderInstances();
+        };
+        item.addEventListener('click', select);
+        item.addEventListener('keydown', (e) => {
+            if (e.target !== item || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            select();
+        });
+        return item;
+    }
+
+    // ---------- 壁纸上的元素：右栏调整面板 ----------
+
+    /** 一行：标签 + 控件 + 数值 */
+    function drow(label, control, valueEl) {
+        const row = el('div', 'drow');
+        row.append(el('label', '', label), control, valueEl || el('span'));
+        return row;
+    }
+
+    function rangeRow(label, min, max, value, format, onInput, className) {
+        const input = el('input', className || '');
         input.type = 'range';
         input.min = min;
         input.max = max;
-        input.value = value;
+        setRange(input, value);
+        const valueEl = el('span', 'value', format(value));
         input.addEventListener('input', () => {
             const v = parseInt(input.value, 10);
             valueEl.textContent = format(v);
             onInput(v);
         });
-        row.append(valueEl, input);
-        return row;
+        let control = input;
+        if (className === 'depth') {
+            control = el('div', 'depth-range');
+            control.append('远', input, '近');
+        }
+        return drow(label, control, valueEl);
     }
 
-    function toggle(checked, onChange) {
-        const label = el('label', 'toggle');
-        const input = el('input');
-        input.type = 'checkbox';
-        input.checked = checked;
-        input.addEventListener('change', () => onChange(input.checked));
-        label.append(input, el('span', 'slider'));
-        return label;
+    function section(title, endNode) {
+        const box = el('div', 'dsec');
+        const h3 = el('h3', '', title);
+        if (endNode) {
+            const end = el('span', 'end');
+            end.appendChild(endNode);
+            h3.appendChild(end);
+        }
+        box.appendChild(h3);
+        return box;
     }
 
-    function playbackSummary(instance, asset) {
-        if (!asset) return '素材丢失';
-        const mode = asset.type === 'image' ? 'static' : instance.playback.mode;
-        if (mode === 'interval') return `间隔播放 · 每 ${instance.playback.intervalSec} 秒`;
-        if (mode === 'click') return instance.playback.followClick ? '点击播放 · 在点击位置出现' : '点击播放 · 点中时播放';
-        return MODE_LABEL[mode] || mode;
+    function renderPositionSection(instance) {
+        const id = instance.id;
+        const box = section('位置');
+        box.appendChild(rangeRow('深度', 0, 100, Math.round(instance.depth * 100),
+            (v) => (v / 100).toFixed(2), (v) => saveInstance(id, { depth: v / 100 }), 'depth'));
+        box.appendChild(rangeRow('不透明度', 10, 100, Math.round(instance.opacity * 100),
+            (v) => v + '%', (v) => saveInstance(id, { opacity: v / 100 })));
+        box.appendChild(el('div', 'note', '大小、旋转、翻转和变形在摆放模式里直接拖。'));
+        return box;
     }
 
     /** 颜色：色相、饱和度、亮度、染色 */
-    function renderColorControls(instance) {
+    function renderColorSection(instance) {
         const id = instance.id;
         const fx = Shared.elements.effectsOf(instance);
-        const group = el('div', 'el-color-group');
-        group.appendChild(el('div', 'el-group-title', '颜色'));
-        group.appendChild(sliderRow('色相', -180, 180, Math.round(fx.hue),
-            (v) => (v > 0 ? '+' : '') + v + '°', (v) => saveInstance(id, { effects: { hue: v } })));
-        group.appendChild(sliderRow('饱和度', 0, 200, Math.round(fx.saturation * 100),
-            (v) => v + '%', (v) => saveInstance(id, { effects: { saturation: v / 100 } })));
-        group.appendChild(sliderRow('亮度', 20, 200, Math.round(fx.brightness * 100),
-            (v) => v + '%', (v) => saveInstance(id, { effects: { brightness: v / 100 } })));
-
-        const tintRow = el('div', 'row');
-        tintRow.appendChild(el('label', '', '染色颜色'));
-        const tint = el('input', 'el-color-input');
-        tint.type = 'color';
-        tint.value = fx.tint;
-        tint.addEventListener('input', () => saveInstance(id, { effects: { tint: tint.value } }));
-        tintRow.appendChild(tint);
-        group.appendChild(tintRow);
-        group.appendChild(sliderRow('染色强度', 0, 100, Math.round(fx.tintAmount * 100),
-            (v) => v + '%', (v) => saveInstance(id, { effects: { tintAmount: v / 100 } })));
-
-        const actions = el('div', 'el-detail-actions');
-        const reset = el('button', 'el-mini-btn', '恢复原色');
+        const reset = button('btn sm ghost', null, '恢复原色');
         reset.addEventListener('click', () => {
             // 不走 hold：希望收到新配置后立刻重绘，滑块回到默认位置
             clearTimeout(saveTimers.get(id));
             holdUntil = 0;
             api.elements.updateInstance(id, { effects: { ...Shared.elements.DEFAULT_EFFECTS } });
         });
-        actions.appendChild(reset);
-        group.appendChild(actions);
-        return group;
+        const box = section('颜色', reset);
+        box.appendChild(rangeRow('色相', -180, 180, Math.round(fx.hue),
+            (v) => (v > 0 ? '+' : '') + v + '°', (v) => saveInstance(id, { effects: { hue: v } }), 'hue'));
+        box.appendChild(rangeRow('饱和度', 0, 200, Math.round(fx.saturation * 100),
+            (v) => v + '%', (v) => saveInstance(id, { effects: { saturation: v / 100 } })));
+        box.appendChild(rangeRow('亮度', 20, 200, Math.round(fx.brightness * 100),
+            (v) => v + '%', (v) => saveInstance(id, { effects: { brightness: v / 100 } })));
+
+        // 染色：色块（点开选颜色）+ 强度滑块
+        const swatch = el('label', 'swatch');
+        swatch.title = '染色颜色';
+        swatch.style.background = fx.tint;
+        const color = el('input');
+        color.type = 'color';
+        color.value = fx.tint;
+        color.addEventListener('input', () => {
+            swatch.style.background = color.value;
+            saveInstance(id, { effects: { tint: color.value } });
+        });
+        swatch.appendChild(color);
+        const amount = el('input');
+        amount.type = 'range';
+        amount.min = 0;
+        amount.max = 100;
+        setRange(amount, Math.round(fx.tintAmount * 100));
+        const amountVal = el('span', 'value', amount.value + '%');
+        amount.addEventListener('input', () => {
+            amountVal.textContent = amount.value + '%';
+            saveInstance(id, { effects: { tintAmount: parseInt(amount.value, 10) / 100 } });
+        });
+        const tint = el('div', 'tint');
+        tint.append(swatch, amount);
+        box.appendChild(drow('染色', tint, amountVal));
+        return box;
     }
 
-    function renderInstanceDetails(instance, asset) {
-        const box = el('div', 'el-instance-details');
+    function renderPlaybackSection(instance) {
         const id = instance.id;
+        const box = section('播放');
 
-        box.appendChild(el('div', 'el-detail-hint', '位置、大小、旋转、翻转和变形：点"重新摆放"直接在壁纸上调'));
-        box.appendChild(sliderRow('深度', 0, 100, Math.round(instance.depth * 100),
-            (v) => (v / 100).toFixed(2), (v) => saveInstance(id, { depth: v / 100 })));
-        box.appendChild(sliderRow('不透明度', 10, 100, Math.round(instance.opacity * 100),
-            (v) => v + '%', (v) => saveInstance(id, { opacity: v / 100 })));
-        box.appendChild(renderColorControls(instance));
-
-        if (asset.type === 'image') return box;
-
-        // 播放方式
-        box.appendChild(el('div', 'el-group-title', '播放'));
-        const modeRow = el('div', 'row');
-        modeRow.appendChild(el('label', '', '播放方式'));
-        const select = el('select', 'custom-select');
+        const seg = el('div', 'seg');
         for (const mode of ['loop', 'interval', 'click']) {
-            const option = el('option', '', MODE_LABEL[mode]);
-            option.value = mode;
-            select.appendChild(option);
+            const b = el('button', '', MODE_LABEL[mode]);
+            b.type = 'button';
+            b.dataset.value = mode;
+            seg.appendChild(b);
         }
-        select.value = ['interval', 'click'].includes(instance.playback.mode) ? instance.playback.mode : 'loop';
-        modeRow.appendChild(select);
-        box.appendChild(modeRow);
+        const segWrap = el('div');
+        segWrap.appendChild(seg);
+        box.appendChild(drow('方式', segWrap));
 
-        const intervalRow = sliderRow('播放间隔（播完后等待）', 1, 120, instance.playback.intervalSec,
+        const intervalRow = rangeRow('播完等待', 1, 120, instance.playback.intervalSec,
             (v) => v + ' 秒', (v) => saveInstance(id, { playback: { intervalSec: v } }));
         box.appendChild(intervalRow);
 
         // 点击播放：在点击位置出现，或者点中元素时播放
-        const followRow = el('div', 'toggle-row');
-        followRow.appendChild(el('span', '', '在点击位置出现'));
-        const clickHint = el('div', 'el-detail-hint');
-        let follow = !!instance.playback.followClick;
-        followRow.appendChild(toggle(follow, (on) => {
-            follow = on;
+        const clickHint = el('div', 'note');
+        const follow = switchEl(!!instance.playback.followClick, (on) => {
             clickHint.textContent = on ? CLICK_HINT.follow : CLICK_HINT.element;
             saveInstance(id, { playback: { followClick: on } }, true);
-        }));
-        clickHint.textContent = follow ? CLICK_HINT.follow : CLICK_HINT.element;
+        });
+        clickHint.textContent = follow.input.checked ? CLICK_HINT.follow : CLICK_HINT.element;
+        const followWrap = el('div');
+        followWrap.appendChild(follow.root);
+        const followRow = drow('点击处出现', followWrap);
         box.append(followRow, clickHint);
 
+        let mode = ['interval', 'click'].includes(instance.playback.mode) ? instance.playback.mode : 'loop';
         const showModeRows = () => {
-            intervalRow.style.display = select.value === 'interval' ? '' : 'none';
-            followRow.style.display = select.value === 'click' ? '' : 'none';
-            clickHint.style.display = select.value === 'click' ? '' : 'none';
+            intervalRow.hidden = mode !== 'interval';
+            followRow.hidden = mode !== 'click';
+            clickHint.hidden = mode !== 'click';
         };
-        showModeRows();
-        select.addEventListener('change', () => {
+        const control = segmented(seg, (value) => {
+            mode = value;
             showModeRows();
-            saveInstance(id, { playback: { mode: select.value } }, true);
+            saveInstance(id, { playback: { mode: value } }, true);
         });
-
-        // 绿幕抠像
-        const chromaRow = el('div', 'toggle-row');
-        chromaRow.appendChild(el('span', '', '绿幕抠像'));
-        const strengthRow = sliderRow('抠像强度', 0, 100, Math.round(instance.chroma.strength * 100),
-            (v) => v + '%', (v) => saveInstance(id, { chroma: { strength: v / 100 } }));
-        strengthRow.style.display = instance.chroma.enabled ? '' : 'none';
-        chromaRow.appendChild(toggle(instance.chroma.enabled, (on) => {
-            strengthRow.style.display = on ? '' : 'none';
-            saveInstance(id, { chroma: { enabled: on } }, true);
-        }));
-        box.append(chromaRow, strengthRow);
+        control.set(mode);
+        showModeRows();
         return box;
     }
 
-    function renderInstance(instance) {
-        const asset = findAsset(instance.assetId);
-        const item = el('div', 'el-instance' + (asset ? '' : ' missing'));
+    /** 绿幕抠像 */
+    function renderChromaSection(instance) {
+        const id = instance.id;
+        let strengthRow = null;
+        const toggle = switchEl(instance.chroma.enabled, (on) => {
+            strengthRow.hidden = !on;
+            saveInstance(id, { chroma: { enabled: on } }, true);
+        }, '绿幕抠像');
+        const box = section('绿幕抠像', toggle.root);
+        strengthRow = rangeRow('抠像强度', 0, 100, Math.round(instance.chroma.strength * 100),
+            (v) => v + '%', (v) => saveInstance(id, { chroma: { strength: v / 100 } }));
+        strengthRow.hidden = !instance.chroma.enabled;
+        box.appendChild(strengthRow);
+        return box;
+    }
 
-        const head = el('div', 'el-instance-head');
-        head.appendChild(thumbNode(asset));
-        const text = el('div', 'el-instance-text');
-        text.append(el('div', 'el-instance-name', asset ? asset.name : '素材已丢失'),
-            el('div', 'el-instance-sub', playbackSummary(instance, asset)));
-        head.appendChild(text);
-
-        const visible = toggle(instance.visible, (on) => saveInstance(instance.id, { visible: on }, true));
-        visible.title = '显示 / 隐藏';
-        head.appendChild(visible);
-
-        const actions = el('div', 'el-instance-actions');
-        if (asset) {
-            const replace = el('button', 'el-mini-btn', '重新摆放');
-            replace.addEventListener('click', () => api.elements.startPlacement({ instanceId: instance.id }));
-            const more = el('button', 'el-mini-btn', expanded.has(instance.id) ? '收起' : '调整');
-            more.addEventListener('click', () => {
-                if (expanded.has(instance.id)) expanded.delete(instance.id);
-                else expanded.add(instance.id);
-                render();
-            });
-            actions.append(replace, more);
+    function renderDetail(instance) {
+        if (!instance) {
+            detail.replaceChildren(el('div', 'empty', '壁纸上还没有元素。点上面的素材，把它放到壁纸上。'));
+            return;
         }
-        const del = el('button', 'el-mini-btn danger', '删除');
+        const asset = findAsset(instance.assetId);
+        const head = el('div', 'detail-head');
+        head.appendChild(el('b', '', asset ? asset.name : '素材已丢失'));
+        if (asset) head.appendChild(el('span', 'chip', TYPE_LABEL[asset.type] || asset.type));
+        const end = el('div', 'end');
+        if (asset) {
+            const replace = button('btn sm', 'move', '重新摆放');
+            replace.addEventListener('click', () => startPlacement({ instanceId: instance.id }, asset.name));
+            const eye = button('btn sm icon ghost', instance.visible ? 'eye' : 'eye-off', '', instance.visible ? '隐藏' : '显示');
+            eye.addEventListener('click', () => api.elements.updateInstance(instance.id, { visible: !instance.visible }));
+            end.append(replace, eye);
+        }
+        const del = button('btn sm icon ghost danger', 'trash-2', '', '从壁纸上删除');
         del.addEventListener('click', async () => {
             await api.elements.removeInstance(instance.id);
-            setStatus('已从壁纸上删除', '');
+            setStatus('已从壁纸上删除');
         });
-        actions.appendChild(del);
-        head.appendChild(actions);
-        item.appendChild(head);
+        end.appendChild(del);
+        head.appendChild(end);
 
-        if (asset && expanded.has(instance.id)) item.appendChild(renderInstanceDetails(instance, asset));
-        return item;
+        if (!asset) {
+            detail.replaceChildren(head, el('div', 'empty', '素材文件找不到了，只能删除。'));
+            return;
+        }
+        const parts = [head, renderPositionSection(instance), renderColorSection(instance)];
+        // 图片没有播放和抠像（和以前一致）
+        if (asset.type !== 'image') parts.push(renderPlaybackSection(instance), renderChromaSection(instance));
+        detail.replaceChildren(...parts);
     }
 
     function renderInstances() {
-        if (elements.instances.length) instanceList.replaceChildren(...elements.instances.map(renderInstance));
-        else instanceList.replaceChildren(el('div', 'el-empty', '壁纸上还没有元素，点击上面的素材开始摆放'));
+        const { instances } = elements;
+        if (!instances.some((i) => i.id === selectedId)) selectedId = instances.length ? instances[0].id : null;
+        instanceList.replaceChildren(...instances.map(renderListItem));
+        instanceList.parentElement.classList.toggle('none', instances.length === 0);
+        renderDetail(instances.find((i) => i.id === selectedId) || null);
+        countEl.textContent = instances.length || '';
+        setBadge('elements', instances.length ? String(instances.length) : '');
     }
 
     function render() {
-        renderLibrary();
+        renderAssets();
         renderInstances();
     }
 
@@ -325,9 +409,9 @@ function initElementsTab({ api, setStatus }) {
         else render();
     }
 
-    // ---------- 添加元素 ----------
+    // ---------- 添加素材 ----------
 
-    importBtn.addEventListener('click', async () => {
+    async function importAsset() {
         const result = await api.elements.importFile();
         if (result.canceled) return;
         if (result.error) {
@@ -338,13 +422,15 @@ function initElementsTab({ api, setStatus }) {
         try {
             const dataUrl = await makeThumbnail(api.toFileUrl(asset.file), asset.type);
             await api.elements.saveThumb(asset.id, dataUrl);
-            setStatus(`已添加「${asset.name}」，点击它放到壁纸上`, 'success');
+            setStatus(`已添加「${asset.name}」，点它放到壁纸上`, 'success');
         } catch (err) {
             // 缩略图都生成不了，说明 Chromium 读不了这个文件，壁纸上也播放不了
             await api.elements.removeAsset(asset.id);
-            setStatus('无法读取这个文件（格式不支持或文件已损坏）', 'error');
+            setStatus('读不了这个文件（格式不支持或文件已损坏）', 'error');
         }
-    });
+    }
+
+    importBtn.addEventListener('click', importAsset);
 
     // ---------- 启动 ----------
 

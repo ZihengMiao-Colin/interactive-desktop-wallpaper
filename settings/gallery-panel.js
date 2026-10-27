@@ -1,81 +1,78 @@
 /**
- * gallery-panel.js — 设置窗口里可折叠的"默认壁纸"面板
+ * gallery-panel.js — 壁纸页下方的默认壁纸图库
  *
- * 默认收起；点标题栏展开 / 收起。点某张壁纸只是选中（预览跟着变），
- * 和自己的图片一样要点"应用壁纸"才会换上。正在用的那张标"当前"。
+ * 平铺显示，最后一格是"从电脑选择…"。点某张壁纸只是选中（预览跟着变），
+ * 和自己的图片一样要点"应用壁纸"才会换上。正在用的那张标"使用中"。
  */
 
 'use strict';
 
+/** Windows 路径比较：不区分大小写和分隔符写法 */
+const normalizePath = (p) => (p || '').toLowerCase().replace(/\//g, '\\');
+const samePath = (a, b) => !!a && !!b && normalizePath(a) === normalizePath(b);
+
 /**
- * @param {{ api: object, onSelect: (entry: object) => void }} deps
- * @returns {{ ready: Promise<void>, find: (imagePath: string) => object|null, setSelected: (imagePath: string) => void }}
+ * @param {{ api: object, onSelect: (entry: object) => void, onPickFile: () => void }} deps
+ * @returns {{
+ *   ready: Promise<void>,
+ *   find: (imagePath: string) => object|null,
+ *   setSelected: (imagePath: string) => void,
+ *   setBusy: (busy: boolean) => void,
+ * }}
  */
-function initGalleryPanel({ api, onSelect }) {
-    const panel = document.getElementById('gallery-panel');
-    const toggle = document.getElementById('gallery-toggle');
+function initGalleryPanel({ api, onSelect, onPickFile }) {
+    const { el } = Controls;
     const grid = document.getElementById('gallery-grid');
+    const titleEl = document.getElementById('gallery-title');
     const countEl = document.getElementById('gallery-count');
     const hintEl = document.getElementById('gallery-hint');
 
     let entries = [];
     let currentPath = '';
     let selectedPath = '';
-    let expanded = false;
+    let busy = false;
 
-    /** Windows 路径比较：不区分大小写和分隔符写法 */
-    const normalize = (p) => (p || '').toLowerCase().replace(/\//g, '\\');
-    const samePath = (a, b) => !!a && !!b && normalize(a) === normalize(b);
     const find = (imagePath) => entries.find((e) => samePath(e.file, imagePath)) || null;
 
-    function renderHint() {
-        const current = find(currentPath);
-        if (expanded) hintEl.textContent = '点击收起';
-        else hintEl.textContent = current ? `当前：${current.name} · 点击展开` : '点击展开';
-    }
-
     function renderCard(entry) {
-        const card = document.createElement('button');
+        const card = el('button', 'wp' + (samePath(entry.file, selectedPath) ? ' sel' : ''));
         card.type = 'button';
-        card.className = 'gallery-card' + (samePath(entry.file, selectedPath) ? ' selected' : '');
+        card.disabled = busy;
         card.title = entry.credit ? `${entry.name}（${entry.credit}）` : entry.name;
 
-        if (entry.thumb) {
-            const img = document.createElement('img');
-            img.src = api.toFileUrl(entry.thumb);
-            img.alt = entry.name;
-            img.loading = 'lazy';
-            card.appendChild(img);
-        }
+        const img = el('img');
+        img.src = api.toFileUrl(entry.thumb);
+        img.alt = '';
+        img.loading = 'lazy';
+        card.appendChild(img);
         if (samePath(entry.file, currentPath)) {
-            const badge = document.createElement('span');
-            badge.className = 'gallery-current-badge';
-            badge.textContent = '当前';
+            const badge = el('span', 'chip using');
+            badge.append(Icons.svg('check'), '使用中');
             card.appendChild(badge);
         }
-        const name = document.createElement('div');
-        name.className = 'gallery-card-name';
-        name.textContent = entry.name;
-        card.appendChild(name);
-
+        card.appendChild(el('span', 'name', entry.name));
         card.addEventListener('click', () => onSelect(entry));
         return card;
     }
 
-    function render() {
-        grid.replaceChildren(...entries.map(renderCard));
-        renderHint();
+    function renderAddCard() {
+        const card = el('button', 'wp add');
+        card.type = 'button';
+        card.disabled = busy;
+        const box = el('span', 'box');
+        const inner = el('span');
+        inner.append(Icons.svg('image-plus'), '从电脑选择…');
+        box.appendChild(inner);
+        card.append(box, el('span', 'name', ' '));
+        card.addEventListener('click', () => onPickFile());
+        return card;
     }
 
-    toggle.addEventListener('click', () => {
-        expanded = !expanded;
-        grid.hidden = !expanded;
-        panel.classList.toggle('open', expanded);
-        toggle.setAttribute('aria-expanded', String(expanded));
-        renderHint();
-    });
+    function render() {
+        grid.replaceChildren(...entries.map(renderCard), renderAddCard());
+    }
 
-    // 应用了别的壁纸后，"当前"标记跟着走
+    // 应用了别的壁纸后，"使用中"标记跟着走
     api.onLoadConfig((config) => {
         const next = (config && config.currentImage) || '';
         if (next === currentPath) return;
@@ -86,8 +83,10 @@ function initGalleryPanel({ api, onSelect }) {
     const ready = Promise.all([api.getGallery(), api.getConfig()]).then(([list, config]) => {
         entries = list || [];
         currentPath = (config && config.currentImage) || '';
-        countEl.textContent = entries.length;
-        panel.hidden = entries.length === 0;
+        // 没有图库素材时只剩"从电脑选择"
+        titleEl.textContent = entries.length ? '默认壁纸' : '选择壁纸';
+        countEl.textContent = entries.length || '';
+        hintEl.hidden = entries.length === 0;
         render();
     });
 
@@ -96,6 +95,11 @@ function initGalleryPanel({ api, onSelect }) {
         find,
         setSelected(imagePath) {
             selectedPath = imagePath || '';
+            render();
+        },
+        /** 生成深度图期间不让换图 */
+        setBusy(value) {
+            busy = value;
             render();
         },
     };

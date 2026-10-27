@@ -1,0 +1,256 @@
+/* ============================================================================
+ * tokens.css — 设置窗口和壁纸页共用的颜色、字体和基础控件
+ * 页面自己的布局分别在 settings/settings.css 和 style.css 里
+ * ============================================================================ */
+
+:root {
+    --ink: #0b0f15;              /* 侧边栏、标题栏、分段按钮底 */
+    --bg: #10161e;               /* 内容区 */
+    --surface: #161e28;          /* 列表 / 分组底色 */
+    --raised: #1d2733;           /* 按钮、输入框 */
+    --raised-hover: #243140;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.13);
+    --text: #e6ebf2;
+    --text-2: #97a3b4;
+    --text-3: #627084;
+    --accent: #7ecfff;
+    --accent-hover: #9adaff;
+    --accent-soft: rgba(126, 207, 255, 0.14);
+    --accent-ink: #062033;       /* 强调色底上的文字 */
+    --success: #6fe0a6;
+    --danger: #ff7d7d;
+    --warn: #ffcc6a;
+    --warp: #ffcc6a;             /* 自由变形 */
+    --far: #161a21;              /* 深度图：远 */
+    --near: #eef2f6;             /* 深度图：近 */
+    --track: #2d3946;            /* 滑块轨道、关闭的开关 */
+    --r-lg: 12px;
+    --r-md: 8px;
+    --r-sm: 6px;
+    --font: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+}
+
+/* 控件都设了 display，hidden 属性要压过它们 */
+[hidden] { display: none !important; }
+
+/* ---------- 图标 ---------- */
+svg.i {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ---------- 按钮 ---------- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--raised);
+    color: var(--text);
+    font: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:hover { background: var(--raised-hover); }
+.btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.ghost { background: none; border-color: transparent; color: var(--text-2); }
+.btn.ghost:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+.btn.danger { color: var(--danger); }
+.btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.btn.icon { width: 32px; padding: 0; }
+.btn.sm.icon { width: 28px; }
+.btn:disabled,
+.btn:disabled:hover {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--raised);
+    border-color: var(--line-strong);
+}
+.btn.primary:disabled,
+.btn.primary:disabled:hover { background: var(--accent); border-color: var(--accent); }
+.btn.ghost:disabled,
+.btn.ghost:disabled:hover { background: none; border-color: transparent; }
+
+/* ---------- 开关 ---------- */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 22px;
+    flex-shrink: 0;
+}
+.switch input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+.switch span {
+    position: absolute;
+    inset: 0;
+    border-radius: 22px;
+    background: var(--track);
+    transition: background 0.2s;
+}
+.switch span::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #c5cdd8;
+    transition: transform 0.2s, background 0.2s;
+}
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(16px); background: var(--accent-ink); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- 分段按钮 ---------- */
+.seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--r-md);
+    background: var(--ink);
+}
+.seg button {
+    height: 26px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--text-2);
+    font: inherit;
+    font-size: 12.5px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.seg button:hover { color: var(--text); }
+.seg button.on {
+    background: var(--raised-hover);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ---------- 滑块：已走过的部分用强调色（--p 由 UIControls.paintRange 设置） ---------- */
+input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 200px;
+    height: 18px;
+    margin: 0;
+    background: none;
+    cursor: pointer;
+    --p: 50%;
+}
+input[type=range]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent) var(--p), var(--track) var(--p));
+}
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background: var(--text);
+    box-shadow: 0 0 0 3px var(--bg), 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+input[type=range]:hover::-webkit-slider-thumb { background: #fff; }
+input[type=range]:focus-visible { outline: none; }
+input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent); }
+
+/* 深度滑块：轨道就是一段深度图，左远右近 */
+.depth-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-3);
+    font-size: 11.5px;
+}
+input[type=range].depth::-webkit-slider-runnable-track {
+    height: 6px;
+    background: linear-gradient(90deg, var(--far), var(--near));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+input[type=range].depth::-webkit-slider-thumb {
+    width: 16px;
+    height: 16px;
+    margin-top: -5px;
+    border: 3px solid var(--accent);
+    background: transparent;
+    box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* ---------- 标签胶囊、键帽 ---------- */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-2);
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+.chip svg.i { width: 13px; height: 13px; }
+.chip.ok { background: rgba(111, 224, 166, 0.12); color: var(--success); }
+.chip.accent { background: var(--accent-soft); color: var(--accent); }
+.chip.warn { background: rgba(255, 204, 106, 0.12); color: var(--warn); }
+.chip.error { background: rgba(255, 125, 125, 0.12); color: var(--danger); }
+
+kbd {
+    padding: 1px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+}
+
+/* ---------- 毛玻璃浮层（壁纸页的提示、工具条、Toast） ---------- */
+.glass {
+    background: rgba(14, 19, 26, 0.78);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    backdrop-filter: blur(14px) saturate(1.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    color: var(--text);
+}
+
+/* 系统关了动画效果时去掉界面过渡（不动唱片机、天气这些壁纸内容本身的动画） */
+@media (prefers-reduced-motion: reduce) {
+    .btn, .switch span, .switch span::after, .seg button { transition: none; }
+}

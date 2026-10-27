@@ -25,6 +25,8 @@ async function startEditMode({ scene, layer, host }) {
     const toolbar = document.getElementById('placement-toolbar');
     const depthSlider = document.getElementById('placement-depth');
     const depthValue = document.getElementById('placement-depth-value');
+    const depthAuto = document.getElementById('placement-depth-auto');
+    const title = document.getElementById('placement-title');
     const rotationValue = document.getElementById('placement-rotation');
     const flipXBtn = document.getElementById('placement-flip-x');
     const flipYBtn = document.getElementById('placement-flip-y');
@@ -41,6 +43,7 @@ async function startEditMode({ scene, layer, host }) {
     }
 
     const asset = draft.asset;
+    title.textContent = `摆放「${asset.name}」`;
     let instance = { ...draft.instance, transform: Shared.elements.transformOf(draft.instance) };
     const sampler = createDepthSampler(scene.getDepthImage());
     const P = Shared.placement;
@@ -101,7 +104,9 @@ async function startEditMode({ scene, layer, host }) {
         toolbar.style.left = `${left}px`;
 
         depthSlider.value = Math.round(instance.depth * 100);
-        depthValue.textContent = instance.depth.toFixed(2) + (instance.depthAuto ? '（自动）' : '');
+        UIControls.paintRange(depthSlider);
+        depthValue.textContent = instance.depth.toFixed(2);
+        depthAuto.hidden = !instance.depthAuto;
         rotationValue.textContent = `${Math.round(t.rotation)}°`;
         flipXBtn.classList.toggle('active', t.flipX);
         flipYBtn.classList.toggle('active', t.flipY);

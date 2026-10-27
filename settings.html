@@ -4,1886 +4,357 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>互动3D壁纸 - 设置</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
-            background: #1a1a2e;
-            color: #e0e0e0;
-            padding: 24px;
-            user-select: none;
-        }
-
-        h2 {
-            font-size: 18px;
-            margin-bottom: 20px;
-            color: #7ecfff;
-            text-align: center;
-        }
-
-        .section {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px;
-            padding: 16px;
-            margin-bottom: 16px;
-        }
-
-        .section-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: #aaa;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* ---- 壁纸预览 ---- */
-        .preview-container {
-            width: 100%;
-            height: 200px;
-            border-radius: 8px;
-            overflow: hidden;
-            background: rgba(0,0,0,0.3);
-            border: 1px dashed rgba(255,255,255,0.15);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 12px;
-            position: relative;
-        }
-        .preview-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .preview-placeholder {
-            color: #555;
-            font-size: 13px;
-            text-align: center;
-        }
-        .preview-info {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0,0,0,0.7);
-            padding: 6px 10px;
-            font-size: 11px;
-            color: #aaa;
-            display: none;
-        }
-        .preview-info.visible { display: block; }
-        .preview-mode {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            display: flex;
-            border-radius: 6px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            background: rgba(0, 0, 0, 0.6);
-        }
-        .preview-mode[hidden] { display: none; }
-        .preview-mode button {
-            width: auto;
-            margin: 0;
-            padding: 4px 10px;
-            font-size: 11px;
-            border: none;
-            border-radius: 0;
-            background: transparent;
-            color: #aaa;
-        }
-        .preview-mode button.active {
-            background: rgba(126, 207, 255, 0.25);
-            color: #7ecfff;
-        }
-
-        /* ---- 进度条 ---- */
-        .progress-section {
-            display: none;
-            margin-bottom: 12px;
-        }
-        .progress-section.visible { display: block; }
-
-        .progress-bar-outer {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: rgba(255,255,255,0.1);
-            overflow: hidden;
-            margin-bottom: 6px;
-        }
-        .progress-bar-inner {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #7ecfff, #5eb8e8);
-            border-radius: 3px;
-            transition: width 0.3s;
-        }
-        .progress-bar-inner.indeterminate {
-            width: 30%;
-            animation: indeterminate 1.5s ease-in-out infinite;
-        }
-        @keyframes indeterminate {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(400%); }
-        }
-        .progress-text {
-            font-size: 11px;
-            color: #888;
-            text-align: center;
-        }
-
-        /* ---- 按钮 ---- */
-        .btn-row {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-        .btn-row button {
-            flex: 1;
-        }
-        .btn-row:last-child { margin-bottom: 0; }
-
-        button {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 8px;
-            background: rgba(255,255,255,0.08);
-            color: #e0e0e0;
-            font-size: 13px;
-            cursor: pointer;
-            transition: background 0.2s, border-color 0.2s, opacity 0.2s;
-            margin-bottom: 8px;
-            font-family: inherit;
-        }
-        button:hover {
-            background: rgba(255,255,255,0.15);
-            border-color: rgba(255,255,255,0.3);
-        }
-        button:last-child { margin-bottom: 0; }
-
-        button.primary {
-            background: rgba(126, 207, 255, 0.2);
-            border-color: rgba(126, 207, 255, 0.3);
-            color: #7ecfff;
-        }
-        button.primary:hover {
-            background: rgba(126, 207, 255, 0.3);
-        }
-        button.primary:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-        button.primary:disabled:hover {
-            background: rgba(126, 207, 255, 0.2);
-        }
-
-        button.success {
-            background: rgba(100, 255, 160, 0.2);
-            border-color: rgba(100, 255, 160, 0.3);
-            color: #64ffa0;
-        }
-        button.success:hover {
-            background: rgba(100, 255, 160, 0.3);
-        }
-        button.success:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-        button.success:disabled:hover {
-            background: rgba(100, 255, 160, 0.2);
-        }
-
-        button.danger {
-            color: #ff6b6b;
-        }
-
-        /* ---- 参数滑块 ---- */
-        .row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        .row:last-child { margin-bottom: 0; }
-
-        .row label {
-            font-size: 13px;
-            color: #ccc;
-        }
-        .row .value {
-            font-size: 12px;
-            color: #7ecfff;
-            font-family: 'Consolas', 'Cascadia Code', monospace;
-            min-width: 32px;
-            text-align: right;
-        }
-
-        input[type="range"] {
-            -webkit-appearance: none;
-            width: 140px;
-            height: 5px;
-            border-radius: 3px;
-            background: rgba(255,255,255,0.15);
-            outline: none;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #7ecfff;
-            cursor: pointer;
-        }
-
-        /* ---- 开机自启 ---- */
-        .toggle-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-        }
-        .toggle-row span { font-size: 13px; }
-
-        .toggle {
-            position: relative;
-            width: 40px;
-            height: 22px;
-        }
-        .toggle input { opacity: 0; width: 0; height: 0; }
-        .toggle .slider {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.2);
-            border-radius: 22px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .toggle .slider::before {
-            content: '';
-            position: absolute;
-            width: 16px; height: 16px;
-            left: 3px; bottom: 3px;
-            background: white;
-            border-radius: 50%;
-            transition: 0.3s;
-        }
-        .toggle input:checked + .slider { background: #7ecfff; }
-        .toggle input:checked + .slider::before { transform: translateX(18px); }
-
-        /* ---- 深度图存储路径卡片 ---- */
-        .path-container {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            margin-bottom: 10px;
-        }
-        .path-label-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #aaa;
-        }
-        .path-box {
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 6px;
-            padding: 8px 10px;
-            font-family: 'Consolas', 'Segoe UI Mono', monospace;
-            font-size: 11px;
-            color: #7ecfff;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: all 0.2s;
-            user-select: text;
-        }
-        .path-box:hover {
-            border-color: rgba(126, 207, 255, 0.4);
-            background: rgba(126, 207, 255, 0.05);
-        }
-
-        /* ---- 恢复推荐设置按钮与标题排版 ---- */
-        .section-header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        .section-header-row .section-title {
-            margin-bottom: 0;
-        }
-        .btn-reset-link {
-            font-size: 11px;
-            color: #7ecfff;
-            background: rgba(126, 207, 255, 0.1);
-            border: 1px solid rgba(126, 207, 255, 0.25);
-            border-radius: 4px;
-            padding: 3px 8px;
-            width: auto;
-            margin-bottom: 0;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-reset-link:hover {
-            background: rgba(126, 207, 255, 0.2);
-            border-color: rgba(126, 207, 255, 0.4);
-        }
-
-        /* ---- 壁纸自定义元素样式 ---- */
-        .element-tabs {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 14px;
-            background: rgba(0, 0, 0, 0.28);
-            padding: 4px;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .element-tab-btn {
-            flex: 1;
-            padding: 7px 4px;
-            font-size: 11px;
-            border: none;
-            border-radius: 6px;
-            background: transparent;
-            color: #aaa;
-            cursor: pointer;
-            margin-bottom: 0;
-            transition: all 0.2s;
-            font-family: inherit;
-        }
-        .element-tab-btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.06);
-        }
-        .element-tab-btn.active {
-            background: rgba(126, 207, 255, 0.18);
-            color: #7ecfff;
-            font-weight: 600;
-        }
-
-        .element-sub-box {
-            background: rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 12px;
-        }
-
-        .custom-select {
-            background: rgba(0, 0, 0, 0.45);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #7ecfff;
-            border-radius: 6px;
-            padding: 4px 8px;
-            font-size: 12px;
-            outline: none;
-            cursor: pointer;
-            width: 140px;
-            font-family: inherit;
-        }
-        .custom-select option {
-            background: #1a1e28;
-            color: #e0e0e0;
-        }
-
-        .weather-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            margin-bottom: 12px;
-        }
-        .weather-btn {
-            padding: 8px 4px;
-            font-size: 11px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.04);
-            color: #bbb;
-            cursor: pointer;
-            margin-bottom: 0;
-            text-align: center;
-            transition: all 0.2s;
-            font-family: inherit;
-        }
-        .weather-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            border-color: rgba(255, 255, 255, 0.25);
-        }
-        .weather-btn.active {
-            background: rgba(126, 207, 255, 0.18);
-            border-color: #7ecfff;
-            color: #7ecfff;
-            font-weight: 600;
-        }
-
-        /* ---- 视频特效卡片网格 ---- */
-        .video-overlay-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        .video-card {
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            text-align: left;
-            padding: 0;
-            margin-bottom: 0;
-            user-select: none;
-        }
-        .video-card:hover {
-            border-color: rgba(126, 207, 255, 0.4);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-        }
-        .video-card.active {
-            border-color: #7ecfff;
-            background: rgba(126, 207, 255, 0.12);
-            box-shadow: 0 0 10px rgba(126, 207, 255, 0.3);
-        }
-        .video-card-thumb-wrap {
-            width: 100%;
-            height: 62px;
-            background: #000;
-            position: relative;
-            overflow: hidden;
-        }
-        .video-card-thumb-wrap img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-        .video-card-badge {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            font-size: 9px;
-            padding: 2px 5px;
-            border-radius: 4px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-        }
-        .video-card-badge.badge-screen {
-            background: rgba(16, 120, 200, 0.85);
-            color: #d0f0ff;
-        }
-        .video-card-badge.badge-chroma {
-            background: rgba(20, 160, 60, 0.85);
-            color: #dffff0;
-        }
-        .video-card-body {
-            padding: 5px 6px;
-        }
-        .video-card-title {
-            font-size: 11px;
-            font-weight: 600;
-            color: #e0e0e0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .video-card.active .video-card-title {
-            color: #7ecfff;
-        }
-        .video-card-desc {
-            font-size: 9px;
-            color: #888;
-            margin-top: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* ---- 默认壁纸图库 ---- */
-        .gallery-panel { margin-bottom: 12px; }
-        .gallery-panel[hidden] { display: none; }
-        .gallery-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 0;
-            padding: 9px 12px;
-            text-align: left;
-            background: rgba(0, 0, 0, 0.28);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .gallery-arrow {
-            color: #7ecfff;
-            transition: transform 0.2s;
-        }
-        .gallery-panel.open .gallery-arrow { transform: rotate(90deg); }
-        .gallery-hint {
-            margin-left: auto;
-            font-size: 11px;
-            color: #888;
-        }
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            max-height: 236px;
-            overflow-y: auto;
-            padding: 10px 4px 0 0;
-        }
-        .gallery-grid[hidden] { display: none; }
-        .gallery-card {
-            position: relative;
-            margin: 0;
-            padding: 0;
-            border: 2px solid rgba(255, 255, 255, 0.08);
-            border-radius: 6px;
-            overflow: hidden;
-            background: #111;
-            text-align: left;
-        }
-        .gallery-card:hover { border-color: rgba(126, 207, 255, 0.5); }
-        .gallery-card.selected {
-            border-color: #7ecfff;
-            box-shadow: 0 0 10px rgba(126, 207, 255, 0.35);
-        }
-        .gallery-card img {
-            display: block;
-            width: 100%;
-            aspect-ratio: 16 / 10;
-            object-fit: cover;
-        }
-        .gallery-card-name {
-            font-size: 11px;
-            padding: 3px 6px;
-            color: #ccc;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .gallery-card.selected .gallery-card-name { color: #7ecfff; }
-        .gallery-current-badge {
-            position: absolute;
-            top: 4px;
-            left: 4px;
-            font-size: 9px;
-            padding: 1px 5px;
-            border-radius: 4px;
-            background: #2f9e5b;
-            color: #fff;
-        }
-
-        /* ---- 自定义元素 ---- */
-        .el-group-title {
-            font-size: 12px;
-            color: #9aa0b4;
-            margin: 14px 0 8px;
-        }
-        .el-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-        }
-        .el-card {
-            position: relative;
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: border-color 0.2s, transform 0.2s;
-        }
-        .el-card:hover {
-            border-color: rgba(126, 207, 255, 0.5);
-            transform: translateY(-2px);
-        }
-        .el-card.missing {
-            border-color: rgba(255, 107, 107, 0.6);
-            cursor: not-allowed;
-        }
-        .el-thumb {
-            width: 100%;
-            aspect-ratio: 4 / 3;
-            background: #2b2d38;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        .el-thumb img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .el-thumb-icon { font-size: 24px; opacity: 0.6; }
-        .el-badge {
-            position: absolute;
-            top: 4px;
-            left: 4px;
-            font-size: 9px;
-            padding: 1px 5px;
-            border-radius: 4px;
-            background: rgba(0, 0, 0, 0.6);
-        }
-        .el-badge-image { color: #9ec5ff; }
-        .el-badge-animated { color: #f2b880; }
-        .el-badge-video { color: #8fd3a4; }
-        .el-card-name {
-            font-size: 11px;
-            padding: 4px 6px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .el-card-missing {
-            font-size: 10px;
-            color: #ff6b6b;
-            padding: 0 6px 4px;
-        }
-        .el-card-remove {
-            position: absolute;
-            top: 3px;
-            right: 3px;
-            width: 20px;
-            height: 20px;
-            padding: 0;
-            margin: 0;
-            border-radius: 50%;
-            font-size: 13px;
-            line-height: 18px;
-            background: rgba(0, 0, 0, 0.6);
-            opacity: 0;
-        }
-        .el-card:hover .el-card-remove { opacity: 1; }
-        .el-empty {
-            grid-column: 1 / -1;
-            font-size: 12px;
-            color: #666;
-            padding: 8px 0;
-        }
-        .el-instance-list {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .el-instance {
-            background: rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 6px 8px;
-        }
-        .el-instance.missing { border-color: rgba(255, 107, 107, 0.6); }
-        .el-instance-head {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .el-instance-head .el-thumb {
-            width: 44px;
-            flex-shrink: 0;
-            border-radius: 4px;
-        }
-        .el-instance-text { flex: 1; min-width: 0; }
-        .el-instance-name {
-            font-size: 12px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .el-instance-sub { font-size: 10px; color: #888; }
-        .el-instance-actions { display: flex; gap: 4px; }
-        .el-mini-btn {
-            width: auto;
-            margin: 0;
-            padding: 3px 8px;
-            font-size: 11px;
-        }
-        .el-instance-details {
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .el-hint {
-            font-size: 11px;
-            color: #666;
-            margin-top: 10px;
-        }
-        .el-detail-hint {
-            font-size: 11px;
-            color: #777;
-            margin-bottom: 10px;
-        }
-        .el-group-title {
-            font-size: 12px;
-            color: #9ec5ff;
-            margin: 12px 0 8px;
-        }
-        .el-color-input {
-            width: 140px;
-            height: 22px;
-            padding: 0;
-            margin: 0;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 4px;
-            background: transparent;
-            cursor: pointer;
-        }
-        .el-detail-actions {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 4px;
-        }
-
-        .status {
-            text-align: center;
-            font-size: 11px;
-            color: #666;
-            margin-top: 12px;
-        }
-        .status.error { color: #ff6b6b; }
-        .status.success { color: #64ffa0; }
-    </style>
+    <link rel="stylesheet" href="ui/tokens.css">
+    <link rel="stylesheet" href="settings/settings.css">
 </head>
 <body>
 
-    <h2>互动3D壁纸 - 设置</h2>
+    <!-- 标题栏：可拖动，右边留给系统的最小化 / 最大化 / 关闭按钮（titleBarOverlay） -->
+    <header class="titlebar"><span class="logo"></span>互动 3D 壁纸</header>
 
-    <!-- 壁纸选择与深度图生成 -->
-    <div class="section">
-        <div class="section-title">壁纸管理</div>
-
-        <!-- 预览 -->
-        <div class="preview-container" id="preview-container">
-            <span class="preview-placeholder" id="preview-placeholder">尚未选择壁纸</span>
-            <img id="preview-image" style="display:none;" alt="预览">
-            <div class="preview-mode" id="preview-mode" hidden>
-                <button type="button" data-mode="image" class="active">原图</button>
-                <button type="button" data-mode="depth">深度图</button>
-            </div>
-            <div class="preview-info" id="preview-info"></div>
-        </div>
-
-        <!-- 默认壁纸图库（可折叠，默认收起） -->
-        <div class="gallery-panel" id="gallery-panel" hidden>
-            <button type="button" class="gallery-toggle" id="gallery-toggle" aria-expanded="false">
-                <span class="gallery-arrow">▸</span>
-                <span>默认壁纸（<span id="gallery-count">0</span>）</span>
-                <span class="gallery-hint" id="gallery-hint">点击展开</span>
+    <div class="shell">
+        <!-- ==================== 左侧导航 ==================== -->
+        <nav class="sidebar" aria-label="设置分类">
+            <button type="button" class="nav-item on" data-page="wallpaper"><svg class="i"><use href="#i-image"/></svg>壁纸</button>
+            <button type="button" class="nav-item" data-page="parallax"><svg class="i"><use href="#i-layers"/></svg>视差</button>
+            <button type="button" class="nav-item" data-page="elements"><svg class="i"><use href="#i-shapes"/></svg>元素<span class="badge" data-badge="elements"></span></button>
+            <button type="button" class="nav-item" data-page="effects"><svg class="i"><use href="#i-sparkles"/></svg>特效</button>
+            <button type="button" class="nav-item" data-page="music"><svg class="i"><use href="#i-disc-3"/></svg>唱片机</button>
+            <div class="nav-spacer"></div>
+            <button type="button" class="now-using" id="now-using" title="查看当前壁纸" hidden>
+                <img id="now-using-thumb" alt="">
+                <span><small>正在使用</small><b id="now-using-name"></b></span>
             </button>
-            <div class="gallery-grid" id="gallery-grid" hidden></div>
-        </div>
+            <button type="button" class="nav-item" data-page="system"><svg class="i"><use href="#i-settings"/></svg>设置</button>
+        </nav>
 
-        <!-- 边缘平滑度 (抗撕裂) -->
-        <div class="row" style="margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 6px;">
-            <label title="近处物体的轮廓先向外扩一圈再平滑，移动时主体边缘保持完整，拉伸落在背景上。数值越大过渡越柔和，改了要重新生成深度图">边缘平滑</label>
-            <span class="value" id="blur-value">8px</span>
-            <input type="range" id="depth-blur" min="0" max="30" value="8" step="1">
-        </div>
+        <main class="content" id="content">
 
-        <!-- 进度条 -->
-        <div class="progress-section" id="progress-section">
-            <div class="progress-bar-outer">
-                <div class="progress-bar-inner indeterminate" id="progress-bar"></div>
-            </div>
-            <div class="progress-text" id="progress-text">准备中...</div>
-        </div>
-
-        <!-- 操作按钮 -->
-        <div class="btn-row">
-            <button id="btn-select-image">📁 选择壁纸...</button>
-            <button id="btn-generate-depth" class="primary" disabled>🔬 生成深度图</button>
-        </div>
-        <button id="btn-apply-wallpaper" class="success" disabled>✅ 应用壁纸</button>
-    </div>
-
-    <!-- 视差参数 -->
-    <div class="section">
-        <div class="section-header-row">
-            <div class="section-title">视差参数</div>
-            <button class="btn-reset-link" id="btn-reset-default" title="恢复为标准推荐设置 (强度: 20, 阻尼: 0.08, 对焦: 0.50)">恢复推荐设置</button>
-        </div>
-
-        <div class="row">
-            <label>视差强度</label>
-            <span class="value" id="parallax-value">20</span>
-            <input type="range" id="parallax-strength" min="5" max="100" value="20" step="1">
-        </div>
-        <div class="row">
-            <label>阻尼平滑度</label>
-            <span class="value" id="smoothness-value">0.08</span>
-            <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
-        </div>
-        <div class="row">
-            <label title="设置视觉主体深度，该深度的物体保持完全静止，彻底消除割裂线">对焦深度</label>
-            <span class="value" id="focus-value">0.50</span>
-            <input type="range" id="focus-depth" min="0" max="100" value="50" step="1">
-        </div>
-    </div>
-
-    <!-- ==================== 壁纸自定义元素 ==================== -->
-    <div class="section">
-        <div class="section-title">壁纸自定义元素</div>
-
-        <!-- 子功能标签页导航 -->
-        <div class="element-tabs">
-            <button class="element-tab-btn active" data-tab="vinyl">🎵 黑胶唱片机</button>
-            <button class="element-tab-btn" data-tab="video">🎬 视频特效</button>
-            <button class="element-tab-btn" data-tab="weather">🌦️ 天气特效</button>
-            <button class="element-tab-btn" data-tab="elements">🧩 自定义元素</button>
-        </div>
-
-        <!-- 1. 黑胶唱片机面板 -->
-        <div class="element-tab-content active" id="tab-vinyl">
-            <div class="toggle-row">
-                <span>启用黑胶唱片机</span>
-                <label class="toggle">
-                    <input type="checkbox" id="vinyl-enabled">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="element-sub-box">
-                <div class="path-label-row">
-                    <span>当前音乐</span>
-                    <span id="vinyl-current-music-name" style="color: #7ecfff; font-size: 11px;">未导入</span>
+            <!-- ==================== 壁纸 ==================== -->
+            <section class="page on" id="page-wallpaper" aria-label="壁纸">
+                <div class="preview-slot" id="preview-slot-wallpaper">
+                    <!-- 实时视差预览：只有一份，切到视差页时整个移过去（settings/depth-preview.js） -->
+                    <div class="preview" id="preview">
+                        <canvas id="preview-canvas"></canvas>
+                        <img id="preview-image" alt="" hidden>
+                        <div class="preview-empty" id="preview-placeholder">
+                            <svg class="i"><use href="#i-image"/></svg>还没有选择壁纸
+                        </div>
+                        <div class="preview-shade" id="preview-shade" hidden></div>
+                        <div class="preview-hint" id="preview-hint" hidden>
+                            <svg class="i"><use href="#i-mouse-pointer-click"/></svg><span id="preview-hint-text"></span>
+                        </div>
+                        <div class="seg preview-mode" id="preview-mode" hidden>
+                            <button type="button" data-mode="image" class="on">原图</button>
+                            <button type="button" data-mode="depth">深度图</button>
+                        </div>
+                        <div class="preview-meta" id="preview-meta" hidden>
+                            <b id="preview-name"></b>
+                            <span class="chip" id="preview-tag"></span>
+                            <span class="chip ok" id="preview-using" hidden><svg class="i"><use href="#i-check"/></svg>使用中</span>
+                            <span class="preview-size" id="preview-size"></span>
+                        </div>
+                    </div>
                 </div>
-                <div class="btn-row" style="margin-top: 8px;">
-                    <button id="btn-import-audio" class="primary">📁 导入本地音乐...</button>
-                    <button id="btn-play-pause-toggle">▶️ 播放 / 暂停</button>
+
+                <!-- 深度图状态 + 生成 / 应用 -->
+                <div class="depth-bar">
+                    <div class="depth-state" id="depth-state"></div>
+                    <label class="smooth" title="近处物体的轮廓先向外扩一圈再平滑，移动时主体边缘保持完整，拉伸落在背景上。数值越大过渡越柔和，改了要重新生成深度图">
+                        边缘平滑
+                        <input type="range" id="depth-blur" min="0" max="30" value="8" step="1">
+                        <span class="value" id="blur-value">8px</span>
+                    </label>
+                    <div class="depth-actions">
+                        <button type="button" class="btn" id="btn-generate-depth" disabled><svg class="i"><use href="#i-wand-sparkles"/></svg>生成深度图</button>
+                        <button type="button" class="btn primary" id="btn-apply-wallpaper" disabled><svg class="i"><use href="#i-check"/></svg>应用壁纸</button>
+                    </div>
                 </div>
-            </div>
 
-            <div class="row">
-                <label>播放音量</label>
-                <span class="value" id="vinyl-volume-val">60%</span>
-                <input type="range" id="vinyl-volume" min="0" max="100" value="60" step="5">
-            </div>
-
-            <div class="row">
-                <label>停靠位置</label>
-                <select id="vinyl-position" class="custom-select">
-                    <option value="bottom-right" selected>右下角 (推荐)</option>
-                    <option value="bottom-left">左下角</option>
-                    <option value="top-right">右上角</option>
-                    <option value="top-left">左上角</option>
-                </select>
-            </div>
-
-            <div class="row">
-                <label>缩放大小</label>
-                <span class="value" id="vinyl-scale-val">100%</span>
-                <input type="range" id="vinyl-scale" min="70" max="130" value="100" step="5">
-            </div>
-
-            <div class="btn-row" style="margin-top: 8px;">
-                <button id="btn-import-cover">🖼️ 更换唱片封面...</button>
-                <button id="btn-reset-cover">重置封面</button>
-            </div>
-        </div>
-
-        <!-- 2. 视频特效覆盖层面版 -->
-        <div class="element-tab-content" id="tab-video" style="display:none;">
-            <div class="toggle-row">
-                <span>启用视频特效覆盖层</span>
-                <label class="toggle">
-                    <input type="checkbox" id="video-overlay-enabled">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- 内置特效卡片网格 -->
-            <div class="video-overlay-grid" id="video-presets-grid">
-                <!-- 预设卡片动态渲染 -->
-            </div>
-
-            <!-- 自定义视频导入 -->
-            <div class="element-sub-box">
-                <div class="path-label-row">
-                    <span>自定义本地视频 (MP4/WebM)</span>
-                    <span id="video-custom-name" style="color: #7ecfff; font-size: 11px;">未导入</span>
+                <!-- 默认壁纸图库 + 从电脑选择 -->
+                <div class="group">
+                    <div class="group-head">
+                        <h2 id="gallery-title">默认壁纸</h2>
+                        <span class="count" id="gallery-count"></span>
+                        <span class="hint" id="gallery-hint">自带深度图，选中后直接应用</span>
+                    </div>
+                    <div class="gallery" id="gallery-grid"></div>
                 </div>
-                <div class="btn-row" style="margin-top: 8px;">
-                    <button id="btn-import-video" class="primary">📁 导入本地视频...</button>
-                    <button id="btn-select-custom-preset" disabled>使用此视频</button>
+            </section>
+
+            <!-- ==================== 视差 ==================== -->
+            <section class="page" id="page-parallax" aria-label="视差">
+                <div class="page-head">
+                    <div>
+                        <h1>视差</h1>
+                        <p>画面跟着鼠标移动的幅度和手感。拖动滑块，上面的预览会立刻变化。</p>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn sm ghost" id="btn-reset-default" title="视差强度 20、跟手程度 0.08、对焦深度 0.50、边缘平滑 8px"><svg class="i"><use href="#i-rotate-ccw"/></svg>恢复推荐值</button>
+                    </div>
                 </div>
-            </div>
+                <div class="preview-slot compact" id="preview-slot-parallax"></div>
+                <div class="list">
+                    <div class="row">
+                        <div class="row-label"><div class="t">视差强度</div><div class="d">越大，近处和远处错开得越多</div></div>
+                        <div class="row-ctrl">
+                            <input type="range" id="parallax-strength" min="5" max="100" value="20" step="1">
+                            <span class="value" id="parallax-value">20</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="row-label"><div class="t">跟手程度</div><div class="d">越小越柔和、拖尾越长；越大越紧跟鼠标</div></div>
+                        <div class="row-ctrl">
+                            <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
+                            <span class="value" id="smoothness-value">0.08</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="row-label"><div class="t">对焦深度</div><div class="d">这个深度上的东西完全不动，通常对准画面主体</div></div>
+                        <div class="row-ctrl">
+                            <div class="depth-range">远<input type="range" class="depth" id="focus-depth" min="0" max="100" value="50" step="1">近</div>
+                            <span class="value" id="focus-value">0.50</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-            <!-- 调节参数 -->
-            <div class="row">
-                <label>混合模式</label>
-                <select id="video-blend-mode" class="custom-select">
-                    <option value="auto" selected>自动识别 (推荐)</option>
-                    <option value="screen">滤色混合 (黑底视频)</option>
-                    <option value="chroma">绿幕抠图 (绿底视频)</option>
-                </select>
-            </div>
+            <!-- ==================== 元素 ==================== -->
+            <section class="page" id="page-elements" aria-label="元素">
+                <div class="page-head">
+                    <div>
+                        <h1>元素</h1>
+                        <p>把图片、GIF 或视频放到壁纸上，它们会和背景一起动，也会被更近的东西挡住。</p>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn primary" id="btn-import-element"><svg class="i"><use href="#i-plus"/></svg>添加素材</button>
+                    </div>
+                </div>
+                <div class="group first">
+                    <div class="group-head">
+                        <h2>素材库</h2>
+                        <span class="hint">点一下进入摆放：拖动移动，角点缩放，Enter 确认，Esc 取消</span>
+                    </div>
+                    <div class="assets" id="elements-assets"></div>
+                </div>
+                <div class="group">
+                    <div class="group-head">
+                        <h2>壁纸上的元素</h2>
+                        <span class="count" id="elements-count"></span>
+                    </div>
+                    <div class="md">
+                        <div class="inst-list" id="elements-instance-list"></div>
+                        <div class="detail" id="elements-detail"></div>
+                    </div>
+                </div>
+            </section>
 
-            <div class="row">
-                <label>特效不透明度</label>
-                <span class="value" id="video-opacity-val">85%</span>
-                <input type="range" id="video-opacity" min="10" max="100" value="85" step="5">
-            </div>
+            <!-- ==================== 特效 ==================== -->
+            <section class="page" id="page-effects" aria-label="特效">
+                <div class="page-head">
+                    <div>
+                        <h1>特效</h1>
+                        <p>天气粒子和全屏视频特效，可以同时开。</p>
+                    </div>
+                </div>
 
-            <div class="row">
-                <label>播放速度</label>
-                <span class="value" id="video-speed-val">1.0x</span>
-                <input type="range" id="video-speed" min="5" max="20" value="10" step="1">
-            </div>
-        </div>
+                <div class="group first">
+                    <div class="group-head"><h2>天气</h2></div>
+                    <div class="weather" id="weather-grid">
+                        <button type="button" class="wt on" data-weather="none"><svg class="i"><use href="#i-ban"/></svg>无</button>
+                        <button type="button" class="wt" data-weather="rain"><svg class="i"><use href="#i-cloud-rain"/></svg>细雨</button>
+                        <button type="button" class="wt" data-weather="snow"><svg class="i"><use href="#i-snowflake"/></svg>落雪</button>
+                        <button type="button" class="wt" data-weather="sakura"><svg class="i"><use href="#i-flower-2"/></svg>落樱</button>
+                        <button type="button" class="wt" data-weather="leaves"><svg class="i"><use href="#i-leaf"/></svg>枫叶</button>
+                        <button type="button" class="wt" data-weather="sunlight"><svg class="i"><use href="#i-sun"/></svg>光斑</button>
+                    </div>
+                    <div class="list">
+                        <div class="row">
+                            <div class="row-label"><div class="t">密度</div></div>
+                            <div class="row-ctrl">
+                                <div class="seg" id="weather-density">
+                                    <button type="button" data-value="low">稀疏</button>
+                                    <button type="button" data-value="medium" class="on">适中</button>
+                                    <button type="button" data-value="high">浓密</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="row-label"><div class="t">飘落速度</div></div>
+                            <div class="row-ctrl">
+                                <input type="range" id="weather-speed" min="5" max="20" value="10" step="1">
+                                <span class="value" id="weather-speed-val">1.0×</span>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="row-label"><div class="t">粒子跟着视差移动</div><div class="d">近处的粒子移动得多，远处的少</div></div>
+                            <div class="row-ctrl"><label class="switch"><input type="checkbox" id="weather-parallax-toggle" checked><span></span></label></div>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- 2. 天气粒子特效面板 -->
-        <div class="element-tab-content" id="tab-weather" style="display:none;">
-            <div class="weather-grid">
-                <button class="weather-btn active" data-weather="none">🚫 无特效</button>
-                <button class="weather-btn" data-weather="rain">🌧️ 绵绵细雨</button>
-                <button class="weather-btn" data-weather="snow">❄️ 浪漫冬雪</button>
-                <button class="weather-btn" data-weather="sakura">🌸 唯美落樱</button>
-                <button class="weather-btn" data-weather="leaves">🍂 秋日枫叶</button>
-                <button class="weather-btn" data-weather="sunlight">✨ 暖目光斑</button>
-            </div>
+                <div class="group">
+                    <div class="group-head">
+                        <h2>视频特效</h2>
+                        <span class="hint">盖在整张壁纸上的一层视频</span>
+                        <div class="end"><label class="switch" title="开启视频特效"><input type="checkbox" id="video-overlay-enabled"><span></span></label></div>
+                    </div>
+                    <div class="video-area" id="video-area">
+                        <div class="presets" id="video-presets-grid"></div>
+                        <div class="list">
+                            <div class="row">
+                                <div class="row-label"><div class="t">自己的视频</div><div class="d" id="video-custom-name">还没有导入，支持 MP4 / WebM</div></div>
+                                <div class="row-ctrl">
+                                    <button type="button" class="btn sm" id="btn-select-custom-preset" hidden>使用这个视频</button>
+                                    <button type="button" class="btn sm" id="btn-import-video"><svg class="i"><use href="#i-folder-open"/></svg>导入视频…</button>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="row-label"><div class="t">混合方式</div><div class="d">黑底视频用滤色，绿底视频用绿幕</div></div>
+                                <div class="row-ctrl">
+                                    <div class="seg" id="video-blend-mode">
+                                        <button type="button" data-value="auto" class="on">自动</button>
+                                        <button type="button" data-value="screen">滤色</button>
+                                        <button type="button" data-value="chroma">绿幕</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="row-label"><div class="t">不透明度</div></div>
+                                <div class="row-ctrl">
+                                    <input type="range" id="video-opacity" min="10" max="100" value="85" step="5">
+                                    <span class="value" id="video-opacity-val">85%</span>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="row-label"><div class="t">播放速度</div></div>
+                                <div class="row-ctrl">
+                                    <input type="range" id="video-speed" min="5" max="20" value="10" step="1">
+                                    <span class="value" id="video-speed-val">1.0×</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-            <div class="row" style="margin-top: 10px;">
-                <label>粒子密度</label>
-                <select id="weather-density" class="custom-select">
-                    <option value="low">稀疏 (低)</option>
-                    <option value="medium" selected>适中 (推荐)</option>
-                    <option value="high">浓密 (高)</option>
-                </select>
-            </div>
+            <!-- ==================== 唱片机 ==================== -->
+            <section class="page" id="page-music" aria-label="唱片机">
+                <div class="page-head">
+                    <div>
+                        <h1>唱片机</h1>
+                        <p>在壁纸一角放一台转动的黑胶唱片机，播放本地音乐。</p>
+                    </div>
+                    <div class="actions">
+                        <label class="switch" title="显示唱片机"><input type="checkbox" id="vinyl-enabled"><span></span></label>
+                    </div>
+                </div>
+                <div class="player">
+                    <div class="disc"><span class="disc-cover" id="vinyl-disc-cover"></span></div>
+                    <div class="player-text">
+                        <b id="vinyl-current-music-name">还没有导入音乐</b>
+                        <small id="vinyl-play-state">导入一首本地音乐就会开始播放</small>
+                    </div>
+                    <div class="player-actions">
+                        <button type="button" class="btn" id="btn-import-audio"><svg class="i"><use href="#i-music"/></svg>导入音乐…</button>
+                        <button type="button" class="play-btn" id="btn-play-pause-toggle" title="播放"><svg class="i"><use href="#i-play"/></svg></button>
+                    </div>
+                </div>
+                <div class="list">
+                    <div class="row">
+                        <div class="row-label"><div class="t">音量</div></div>
+                        <div class="row-ctrl">
+                            <input type="range" id="vinyl-volume" min="0" max="100" value="60" step="5">
+                            <span class="value" id="vinyl-volume-val">60%</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="row-label"><div class="t">位置</div><div class="d">停在屏幕的哪个角</div></div>
+                        <div class="row-ctrl">
+                            <div class="corner-pick" id="vinyl-position" role="radiogroup" aria-label="位置">
+                                <button type="button" data-value="top-left" title="左上角" aria-label="左上角"></button>
+                                <button type="button" data-value="top-right" title="右上角" aria-label="右上角"></button>
+                                <button type="button" data-value="bottom-left" title="左下角" aria-label="左下角"></button>
+                                <button type="button" data-value="bottom-right" title="右下角" aria-label="右下角" class="on"></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="row-label"><div class="t">大小</div></div>
+                        <div class="row-ctrl">
+                            <input type="range" id="vinyl-scale" min="70" max="130" value="100" step="5">
+                            <span class="value" id="vinyl-scale-val">100%</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="row-label"><div class="t">唱片封面</div><div class="d">贴在唱片中间的图</div></div>
+                        <div class="row-ctrl">
+                            <span class="cover-thumb" id="vinyl-cover-thumb"></span>
+                            <button type="button" class="btn sm" id="btn-import-cover">更换…</button>
+                            <button type="button" class="btn sm ghost" id="btn-reset-cover">用默认</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-            <div class="row">
-                <label>飘落速度</label>
-                <span class="value" id="weather-speed-val">1.0x</span>
-                <input type="range" id="weather-speed" min="5" max="20" value="10" step="1">
-            </div>
-
-            <div class="toggle-row" style="margin-top: 4px;">
-                <span title="粒子根据前后景深随鼠标移动产生立体视差位移">粒子随鼠标视差位移</span>
-                <label class="toggle">
-                    <input type="checkbox" id="weather-parallax-toggle" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-
-        <!-- 4. 自定义元素面板 -->
-        <div class="element-tab-content" id="tab-elements" style="display:none;">
-            <button id="btn-import-element" class="primary">＋ 添加自定义元素（图片 / GIF / 视频）</button>
-
-            <div class="el-group-title">默认元素</div>
-            <div class="el-grid" id="elements-builtin-grid"></div>
-
-            <div class="el-group-title">我添加的</div>
-            <div class="el-grid" id="elements-user-grid"></div>
-
-            <div class="el-group-title">壁纸上的元素</div>
-            <div class="el-instance-list" id="elements-instance-list"></div>
-
-            <div class="el-hint">点击素材进入摆放模式：拖动移动，角点缩放，边点拉伸，上方圆点旋转，"自由变形"单独拖四个角，Enter 确认，Esc 取消。</div>
-        </div>
+            <!-- ==================== 设置 ==================== -->
+            <section class="page" id="page-system" aria-label="设置">
+                <div class="page-head"><div><h1>设置</h1></div></div>
+                <div class="list">
+                    <div class="row">
+                        <div class="row-label"><div class="t">开机自动启动</div><div class="d">登录 Windows 后自动显示壁纸</div></div>
+                        <div class="row-ctrl"><label class="switch"><input type="checkbox" id="auto-launch-toggle"><span></span></label></div>
+                    </div>
+                </div>
+                <div class="group">
+                    <div class="group-head">
+                        <h2>深度图缓存</h2>
+                        <span class="hint">你自己的图片生成的深度图存在这里</span>
+                    </div>
+                    <div class="list">
+                        <div class="row">
+                            <div class="row-label"><div class="t">存放位置</div></div>
+                            <div class="row-ctrl"><button type="button" class="path" id="depth-dir-path" title="点击在文件资源管理器中打开">读取中…</button></div>
+                        </div>
+                        <div class="row">
+                            <div class="row-label"><div class="d">换位置时会把已有的深度图一起搬过去</div></div>
+                            <div class="row-ctrl">
+                                <button type="button" class="btn sm" id="btn-open-depth-dir"><svg class="i"><use href="#i-folder-open"/></svg>打开文件夹</button>
+                                <button type="button" class="btn sm" id="btn-change-depth-dir">更改位置…</button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="row-label"><div class="t">清除缓存</div><div class="d">删掉所有深度图，下次换壁纸要重新生成。默认壁纸不受影响</div></div>
+                            <div class="row-ctrl"><button type="button" class="btn sm danger" id="btn-clear-cache"><svg class="i"><use href="#i-trash-2"/></svg>清除…</button></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
-    <!-- 深度图存储与缓存 -->
-    <div class="section">
-        <div class="section-title">深度图存储与缓存</div>
-        <div class="path-container">
-            <div class="path-label-row">
-                <span>存放位置</span>
-                <span style="font-size: 11px; color: #777;">(点击路径可直接打开)</span>
-            </div>
-            <div class="path-box" id="depth-dir-path" title="点击在文件资源管理器中打开">读取中...</div>
-        </div>
-        <div class="btn-row">
-            <button id="btn-open-depth-dir">📂 打开文件夹</button>
-            <button id="btn-change-depth-dir">🔄 更改位置...</button>
-        </div>
-        <button id="btn-clear-cache" class="danger" style="margin-top:8px;">🗑 清除所有深度图缓存</button>
+    <!-- 操作结果提示 -->
+    <div class="toast" id="toast" role="status" aria-live="polite">
+        <svg class="i"><use id="toast-icon" href="#i-info"/></svg><span id="toast-text"></span>
     </div>
 
-    <!-- 系统 -->
-    <div class="section">
-        <div class="section-title">系统</div>
-        <div class="toggle-row">
-            <span>开机自启</span>
-            <label class="toggle">
-                <input type="checkbox" id="auto-launch-toggle">
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
-
-    <div class="status" id="status-text">设置已加载</div>
-
+    <script src="ui/icons.js"></script>
     <script src="shared/config-sync.js"></script>
-    <script src="settings/gallery-panel.js"></script>
-    <script src="settings/depth-preview.js"></script>
-    <script src="settings/thumbnail.js"></script>
+    <script src="shared/parallax-math.js"></script>
+    <script src="shared/frame-pacing.js"></script>
     <script src="shared/elements-model.js"></script>
+    <script src="renderer/shaders.js"></script>
+    <script src="settings/controls.js"></script>
+    <script src="settings/shell.js"></script>
+    <script src="settings/depth-preview.js"></script>
+    <script src="settings/gallery-panel.js"></script>
+    <script src="settings/thumbnail.js"></script>
+    <script src="settings/wallpaper-page.js"></script>
+    <script src="settings/parallax-page.js"></script>
     <script src="settings/elements-tab.js"></script>
-    <script>
-        // ==================== 状态 ====================
-        const isElectron = !!(window.electronAPI);
-
-        // 拖滑块时节流保存：第一次立即发送，之后每 100ms 最多一次，最后的值一定会发出去。
-        // 否则每个 input 事件都会写一次 config.json 并把完整配置广播给壁纸
-        const configSaver = Shared.configSync.createConfigSaver(
-            (partial) => window.electronAPI.saveConfig(partial), 100);
-        window.addEventListener('beforeunload', () => configSaver.flush());
-
-        let selectedImagePath = null;
-        let depthGenerated = false;
-        let isGenerating = false;
-
-        // ==================== DOM 引用 ====================
-        const depthPreview = initDepthPreview();
-        const progressSection = document.getElementById('progress-section');
-        const progressBar = document.getElementById('progress-bar');
-        const progressText = document.getElementById('progress-text');
-        const statusText = document.getElementById('status-text');
-        const btnSelectImage = document.getElementById('btn-select-image');
-        const btnGenerateDepth = document.getElementById('btn-generate-depth');
-        const btnApplyWallpaper = document.getElementById('btn-apply-wallpaper');
-        const parallaxSlider = document.getElementById('parallax-strength');
-        const smoothnessSlider = document.getElementById('smoothness');
-        const parallaxValue = document.getElementById('parallax-value');
-        const smoothnessValue = document.getElementById('smoothness-value');
-        const focusSlider = document.getElementById('focus-depth');
-        const focusValue = document.getElementById('focus-value');
-        const autoLaunchToggle = document.getElementById('auto-launch-toggle');
-        const depthBlurSlider = document.getElementById('depth-blur');
-        const blurValueEl = document.getElementById('blur-value');
-        const depthDirPath = document.getElementById('depth-dir-path');
-        const btnOpenDepthDir = document.getElementById('btn-open-depth-dir');
-        const btnChangeDepthDir = document.getElementById('btn-change-depth-dir');
-        const btnResetDefault = document.getElementById('btn-reset-default');
-
-        // ==================== 对焦深度滑块 ====================
-        if (focusSlider) {
-            focusSlider.addEventListener('input', () => {
-                const val = parseInt(focusSlider.value, 10) / 100.0;
-                focusValue.textContent = val.toFixed(2);
-                if (isElectron) {
-                    configSaver.save({ focusDepth: val });
-                }
-            });
-        }
-
-        // ==================== 边缘平滑滑块 ====================
-        if (depthBlurSlider) {
-            depthBlurSlider.addEventListener('input', () => {
-                const val = parseInt(depthBlurSlider.value, 10);
-                blurValueEl.textContent = val === 0 ? '关闭' : val + 'px';
-                if (isElectron) {
-                    configSaver.save({ blurRadius: val });
-                }
-                if (selectedImagePath && !galleryPanel.find(selectedImagePath)) {
-                    depthGenerated = false;
-                    btnApplyWallpaper.disabled = true;
-                    setStatus('平滑参数已变更，请重新点击"生成深度图"', '');
-                }
-            });
-        }
-
-        // ==================== 选择壁纸 ====================
-
-        /**
-         * 选中一张图片：显示预览并检查深度图（只选中，不应用到桌面）。
-         * 默认壁纸自带深度图，"生成深度图"按钮保持灰色。
-         * @param {string} imagePath
-         * @param {{quiet?: boolean}} [options] - quiet 为 true 时不改状态栏（打开设置窗口时恢复当前壁纸用）
-         * @returns {Promise<boolean>} 是否已有可用的深度图
-         */
-        async function selectImagePath(imagePath, { quiet = false } = {}) {
-            const galleryEntry = galleryPanel.find(imagePath);
-            selectedImagePath = imagePath;
-            depthGenerated = false;
-            btnGenerateDepth.disabled = !!galleryEntry;
-            btnApplyWallpaper.disabled = true;
-            galleryPanel.setSelected(imagePath);
-
-            const fileName = galleryEntry ? `${galleryEntry.name} · 默认壁纸` : imagePath.split('\\').pop();
-            const dataUrl = window.electronAPI.readFileAsDataURL(imagePath);
-            if (dataUrl) depthPreview.showImage(dataUrl, fileName);
-
-            const depth = await window.electronAPI.getDepthCache(imagePath);
-            // 等深度图期间又选了别的图片，这次的结果就不用了
-            if (selectedImagePath !== imagePath) return !!depth;
-            depthPreview.setDepth(depth);
-            if (depth) {
-                depthGenerated = true;
-                btnApplyWallpaper.disabled = false;
-                if (!quiet) {
-                    setStatus(galleryEntry
-                        ? '默认壁纸已经带好深度图，点击"应用壁纸"就能用'
-                        : '检测到深度图缓存，点击"应用壁纸"即可生效', 'success');
-                }
-            } else if (!quiet) {
-                setStatus('已选择 ' + fileName + ' — 请生成深度图', '');
-            }
-            return !!depth;
-        }
-
-        // 默认壁纸图库：点一张就选中它
-        const galleryPanel = initGalleryPanel({
-            api: window.electronAPI,
-            onSelect: (entry) => selectImagePath(entry.file),
-        });
-
-        btnSelectImage.addEventListener('click', async () => {
-            if (!isElectron) {
-                setStatus('此功能仅在 Electron 中可用', 'error');
-                return;
-            }
-            try {
-                const imagePath = await window.electronAPI.selectImage();
-                if (imagePath) await selectImagePath(imagePath);
-            } catch (err) {
-                console.error('选择图片失败:', err);
-                setStatus('选择图片失败: ' + err.message, 'error');
-            }
-        });
-
-        // ==================== 生成深度图 ====================
-
-        /**
-         * 为当前选中的图片生成深度图。
-         * @returns {Promise<boolean>} 是否生成成功
-         */
-        async function generateDepth() {
-            if (!isElectron || !selectedImagePath || isGenerating) return false;
-
-            isGenerating = true;
-            btnGenerateDepth.disabled = true;
-            btnApplyWallpaper.disabled = true;
-            btnSelectImage.disabled = true;
-            depthGenerated = false;
-
-            progressSection.classList.add('visible');
-            progressBar.classList.add('indeterminate');
-            progressBar.style.width = '';
-            progressText.textContent = '正在启动 Python...';
-
-            const blurRadius = depthBlurSlider ? parseInt(depthBlurSlider.value, 10) : 8;
-            setStatus(`正在生成深度图（极速引擎, 平滑: ${blurRadius}px）...`, '');
-
-            try {
-                const result = await window.electronAPI.generateDepthMap(selectedImagePath, 'small', blurRadius);
-                if (result.success) {
-                    depthGenerated = true;
-                    depthPreview.setDepth(result.depthDataUrl, { show: true });
-                    btnApplyWallpaper.disabled = false;
-                    progressBar.classList.remove('indeterminate');
-                    progressBar.style.width = '100%';
-                    progressText.textContent = '✅ 深度图生成完成！';
-                    setStatus('深度图生成成功！点击"应用壁纸"生效', 'success');
-                    return true;
-                }
-                progressText.textContent = '❌ 生成失败';
-                setStatus('深度图生成失败: ' + (result.error || '未知错误'), 'error');
-                return false;
-            } catch (err) {
-                console.error('生成深度图失败:', err);
-                progressText.textContent = '❌ 生成失败';
-                setStatus('深度图生成失败: ' + err.message, 'error');
-                return false;
-            } finally {
-                isGenerating = false;
-                btnGenerateDepth.disabled = false;
-                btnSelectImage.disabled = false;
-            }
-        }
-
-        btnGenerateDepth.addEventListener('click', () => generateDepth());
-
-        // ==================== 监听进度 ====================
-        if (isElectron) {
-            window.electronAPI.onDepthProgress((data) => {
-                progressText.textContent = data.message;
-
-                // 根据消息内容更新进度条样式
-                if (data.message.includes('[OK]') || data.message.includes('完成')) {
-                    progressBar.classList.remove('indeterminate');
-                    progressBar.style.width = '100%';
-                } else if (data.message.includes('下载') || data.message.includes('Download')) {
-                    progressText.textContent = '📥 ' + data.message;
-                } else if (data.message.includes('加载模型') || data.message.includes('loading')) {
-                    progressText.textContent = '🔧 ' + data.message;
-                } else if (data.message.includes('分析') || data.message.includes('推理')) {
-                    progressText.textContent = '🧠 ' + data.message;
-                    progressBar.classList.remove('indeterminate');
-                    progressBar.style.width = '50%';
-                } else if (data.message.includes('[Smooth]') || data.message.includes('平滑') || data.message.includes('smoothing')) {
-                    progressText.textContent = '✨ ' + data.message;
-                    progressBar.classList.remove('indeterminate');
-                    progressBar.style.width = '85%';
-                }
-            });
-        }
-
-        // ==================== 应用壁纸 ====================
-
-        /** 把当前选中的图片应用到桌面（需要已有深度图） */
-        async function applySelectedWallpaper() {
-            if (!isElectron || !selectedImagePath || !depthGenerated) return;
-            try {
-                await window.electronAPI.applyWallpaper(selectedImagePath);
-                setStatus('壁纸已应用！移动鼠标查看效果', 'success');
-            } catch (err) {
-                setStatus('应用壁纸失败: ' + err.message, 'error');
-            }
-        }
-
-        btnApplyWallpaper.addEventListener('click', () => applySelectedWallpaper());
-
-        // ==================== 托盘"更换壁纸"转过来的图片 ====================
-        // 托盘选的图片还没有深度图时，主进程会打开设置窗口并转到这里：
-        // 选中 → 生成深度图 → 生成成功后直接应用，进度显示在设置窗口里。
-        if (isElectron) {
-            window.electronAPI.onPrepareImage(async ({ imagePath }) => {
-                if (isGenerating) {
-                    setStatus('正在为另一张图片生成深度图，请完成后再更换', 'error');
-                    return;
-                }
-                try {
-                    const ready = (await selectImagePath(imagePath)) || (await generateDepth());
-                    if (ready) await applySelectedWallpaper();
-                } catch (err) {
-                    console.error('更换壁纸失败:', err);
-                    setStatus('更换壁纸失败: ' + err.message, 'error');
-                }
-            });
-        }
-
-        // ==================== 恢复推荐设置 ====================
-        if (btnResetDefault) {
-            btnResetDefault.addEventListener('click', () => {
-                const RECOMMENDED = {
-                    parallaxMultiplier: 20,
-                    smoothness: 0.08,
-                    focusDepth: 0.50,
-                    blurRadius: 8,
-                };
-
-                parallaxSlider.value = RECOMMENDED.parallaxMultiplier;
-                parallaxValue.textContent = RECOMMENDED.parallaxMultiplier;
-
-                smoothnessSlider.value = Math.round(RECOMMENDED.smoothness * 100);
-                smoothnessValue.textContent = RECOMMENDED.smoothness.toFixed(2);
-
-                if (focusSlider) {
-                    focusSlider.value = Math.round(RECOMMENDED.focusDepth * 100);
-                    focusValue.textContent = Number(RECOMMENDED.focusDepth).toFixed(2);
-                }
-
-                if (depthBlurSlider) {
-                    depthBlurSlider.value = RECOMMENDED.blurRadius;
-                    blurValueEl.textContent = RECOMMENDED.blurRadius + 'px';
-                }
-
-                if (isElectron) {
-                    configSaver.save(RECOMMENDED);
-                }
-
-                setStatus('已恢复推荐设置（强度: 20, 阻尼: 0.08, 对焦: 0.50）', 'success');
-            });
-        }
-
-        // ==================== 视差参数滑块 ====================
-        parallaxSlider.addEventListener('input', () => {
-            const val = parseInt(parallaxSlider.value, 10);
-            parallaxValue.textContent = val;
-            if (isElectron) {
-                configSaver.save({ parallaxMultiplier: val });
-            }
-        });
-
-        smoothnessSlider.addEventListener('input', () => {
-            const val = parseFloat(smoothnessSlider.value) / 100.0;
-            smoothnessValue.textContent = val.toFixed(2);
-            if (isElectron) {
-                configSaver.save({ smoothness: val });
-            }
-        });
-
-        // ==================== 壁纸自定义元素设置交互 ====================
-
-        // 1. 选项卡切换
-        const elementTabs = document.querySelectorAll('.element-tab-btn');
-        const tabContents = {
-            vinyl: document.getElementById('tab-vinyl'),
-            video: document.getElementById('tab-video'),
-            weather: document.getElementById('tab-weather'),
-            elements: document.getElementById('tab-elements'),
-        };
-
-        elementTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                elementTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                const targetKey = tab.dataset.tab;
-                Object.keys(tabContents).forEach(key => {
-                    if (tabContents[key]) {
-                        tabContents[key].style.display = (key === targetKey) ? 'block' : 'none';
-                    }
-                });
-            });
-        });
-
-        // 2. 黑胶唱片机控制
-        const vinylEnabled = document.getElementById('vinyl-enabled');
-        const vinylCurrentMusicName = document.getElementById('vinyl-current-music-name');
-        const btnImportAudio = document.getElementById('btn-import-audio');
-        const btnPlayPauseToggle = document.getElementById('btn-play-pause-toggle');
-        const vinylVolume = document.getElementById('vinyl-volume');
-        const vinylVolumeVal = document.getElementById('vinyl-volume-val');
-        const vinylPosition = document.getElementById('vinyl-position');
-        const vinylScale = document.getElementById('vinyl-scale');
-        const vinylScaleVal = document.getElementById('vinyl-scale-val');
-        const btnImportCover = document.getElementById('btn-import-cover');
-        const btnResetCover = document.getElementById('btn-reset-cover');
-
-        let isVinylPlaying = false;
-
-        if (vinylEnabled) {
-            vinylEnabled.addEventListener('change', () => {
-                if (isElectron) {
-                    configSaver.save({ vinyl: { enabled: vinylEnabled.checked } });
-                }
-                setStatus(vinylEnabled.checked ? '已开启黑胶唱片机' : '已关闭黑胶唱片机', '');
-            });
-        }
-
-        if (btnImportAudio) {
-            btnImportAudio.addEventListener('click', async () => {
-                if (!isElectron) return;
-                try {
-                    const audioRes = await window.electronAPI.selectAudio();
-                    if (audioRes && audioRes.path) {
-                        isVinylPlaying = true;
-                        vinylCurrentMusicName.textContent = audioRes.name;
-                        btnPlayPauseToggle.textContent = '⏸️ 暂停播放';
-                        configSaver.save({
-                            vinyl: {
-                                enabled: true,
-                                audioPath: audioRes.path,
-                                audioName: audioRes.name,
-                                playing: true,
-                            }
-                        });
-                        if (vinylEnabled) vinylEnabled.checked = true;
-                        setStatus(`已导入音乐: ${audioRes.name} 并开始播放`, 'success');
-                    }
-                } catch (err) {
-                    setStatus('导入音频失败: ' + err.message, 'error');
-                }
-            });
-        }
-
-        if (btnPlayPauseToggle) {
-            btnPlayPauseToggle.addEventListener('click', () => {
-                if (!isElectron) return;
-                isVinylPlaying = !isVinylPlaying;
-                btnPlayPauseToggle.textContent = isVinylPlaying ? '⏸️ 暂停播放' : '▶️ 开始播放';
-                configSaver.save({ vinyl: { playing: isVinylPlaying } });
-                setStatus(isVinylPlaying ? '唱片机已开始播放' : '唱片机已暂停', '');
-            });
-        }
-
-        if (vinylVolume) {
-            vinylVolume.addEventListener('input', () => {
-                const vol = parseInt(vinylVolume.value, 10);
-                vinylVolumeVal.textContent = vol + '%';
-                if (isElectron) {
-                    configSaver.save({ vinyl: { volume: vol / 100.0 } });
-                }
-            });
-        }
-
-        if (vinylPosition) {
-            vinylPosition.addEventListener('change', () => {
-                if (isElectron) {
-                    configSaver.save({ vinyl: { position: vinylPosition.value } });
-                }
-            });
-        }
-
-        if (vinylScale) {
-            vinylScale.addEventListener('input', () => {
-                const s = parseInt(vinylScale.value, 10);
-                vinylScaleVal.textContent = s + '%';
-                if (isElectron) {
-                    configSaver.save({ vinyl: { scale: s / 100.0 } });
-                }
-            });
-        }
-
-        if (btnImportCover) {
-            btnImportCover.addEventListener('click', async () => {
-                if (!isElectron) return;
-                try {
-                    const coverPath = await window.electronAPI.selectCover();
-                    if (coverPath) {
-                        configSaver.save({ vinyl: { coverPath: coverPath } });
-                        setStatus('已更换唱片中心封面', 'success');
-                    }
-                } catch (err) {
-                    setStatus('更换封面失败: ' + err.message, 'error');
-                }
-            });
-        }
-
-        if (btnResetCover) {
-            btnResetCover.addEventListener('click', () => {
-                if (!isElectron) return;
-                configSaver.save({ vinyl: { coverPath: '' } });
-                setStatus('已重置为默认唱片封面', '');
-            });
-        }
-
-        // 3. 天气粒子特效控制
-        const weatherButtons = document.querySelectorAll('.weather-btn');
-        const weatherDensity = document.getElementById('weather-density');
-        const weatherSpeed = document.getElementById('weather-speed');
-        const weatherSpeedVal = document.getElementById('weather-speed-val');
-        const weatherParallaxToggle = document.getElementById('weather-parallax-toggle');
-
-        weatherButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                weatherButtons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const weatherType = btn.dataset.weather;
-                if (isElectron) {
-                    configSaver.save({ weather: { type: weatherType } });
-                }
-                const names = { none: '无特效', rain: '绵绵细雨', snow: '浪漫冬雪', sakura: '唯美落樱', leaves: '秋日枫叶', sunlight: '暖目光斑' };
-                setStatus(`已应用天气特效: ${names[weatherType] || weatherType}`, 'success');
-            });
-        });
-
-        if (weatherDensity) {
-            weatherDensity.addEventListener('change', () => {
-                if (isElectron) {
-                    configSaver.save({ weather: { density: weatherDensity.value } });
-                }
-            });
-        }
-
-        if (weatherSpeed) {
-            weatherSpeed.addEventListener('input', () => {
-                const spd = parseInt(weatherSpeed.value, 10) / 10.0;
-                weatherSpeedVal.textContent = spd.toFixed(1) + 'x';
-                if (isElectron) {
-                    configSaver.save({ weather: { speed: spd } });
-                }
-            });
-        }
-
-        if (weatherParallaxToggle) {
-            weatherParallaxToggle.addEventListener('change', () => {
-                if (isElectron) {
-                    configSaver.save({ weather: { parallax: weatherParallaxToggle.checked } });
-                }
-            });
-        }
-
-        // 4. 视频特效覆盖层控制
-        const videoOverlayEnabled = document.getElementById('video-overlay-enabled');
-        const videoPresetsGrid = document.getElementById('video-presets-grid');
-        const videoCustomName = document.getElementById('video-custom-name');
-        const btnImportVideo = document.getElementById('btn-import-video');
-        const btnSelectCustomPreset = document.getElementById('btn-select-custom-preset');
-        const videoBlendMode = document.getElementById('video-blend-mode');
-        const videoOpacity = document.getElementById('video-opacity');
-        const videoOpacityVal = document.getElementById('video-opacity-val');
-        const videoSpeed = document.getElementById('video-speed');
-        const videoSpeedVal = document.getElementById('video-speed-val');
-
-        let overlayPresets = [];
-        let currentOverlayPresetId = 'snow2';
-        let customVideoPath = '';
-        let customVideoName = '';
-
-        async function initVideoPresets() {
-            if (!isElectron) return;
-            try {
-                overlayPresets = await window.electronAPI.getOverlayPresets();
-                renderVideoPresetCards();
-            } catch (err) {
-                console.error('加载视频特效预设失败:', err);
-            }
-        }
-
-        function renderVideoPresetCards() {
-            if (!videoPresetsGrid) return;
-            videoPresetsGrid.innerHTML = '';
-            overlayPresets.forEach(preset => {
-                const card = document.createElement('div');
-                card.className = `video-card ${preset.id === currentOverlayPresetId ? 'active' : ''}`;
-                card.dataset.id = preset.id;
-
-                const isChroma = (preset.mode === 'chroma');
-                const badgeClass = isChroma ? 'badge-chroma' : 'badge-screen';
-                const badgeText = isChroma ? '绿幕' : '滤色';
-                const thumbUrl = encodeURI('file:///' + preset.thumb.replace(/\\/g, '/'));
-
-                card.innerHTML = `
-                    <div class="video-card-thumb-wrap">
-                        <img src="${thumbUrl}" alt="${preset.title}" loading="lazy">
-                        <span class="video-card-badge ${badgeClass}">${badgeText}</span>
-                    </div>
-                    <div class="video-card-body">
-                        <div class="video-card-title">${preset.title}</div>
-                        <div class="video-card-desc">${preset.desc}</div>
-                    </div>
-                `;
-
-                card.addEventListener('click', () => {
-                    currentOverlayPresetId = preset.id;
-                    updateVideoCardSelection();
-                    if (videoOverlayEnabled && !videoOverlayEnabled.checked) {
-                        videoOverlayEnabled.checked = true;
-                    }
-                    if (isElectron) {
-                        configSaver.save({
-                            videoOverlay: {
-                                enabled: true,
-                                presetId: preset.id,
-                            }
-                        });
-                    }
-                    setStatus(`已选择视频特效: ${preset.title} (${preset.modeName})`, 'success');
-                });
-
-                videoPresetsGrid.appendChild(card);
-            });
-        }
-
-        function updateVideoCardSelection() {
-            const cards = videoPresetsGrid ? videoPresetsGrid.querySelectorAll('.video-card') : [];
-            cards.forEach(c => {
-                c.classList.toggle('active', c.dataset.id === currentOverlayPresetId);
-            });
-            if (btnSelectCustomPreset) {
-                btnSelectCustomPreset.classList.toggle('primary', currentOverlayPresetId === 'custom');
-            }
-        }
-
-        if (videoOverlayEnabled) {
-            videoOverlayEnabled.addEventListener('change', () => {
-                const isEnabled = videoOverlayEnabled.checked;
-                if (isElectron) {
-                    configSaver.save({
-                        videoOverlay: { enabled: isEnabled }
-                    });
-                }
-                setStatus(isEnabled ? '已开启视频特效覆盖层' : '已关闭视频特效覆盖层', '');
-            });
-        }
-
-        if (btnImportVideo) {
-            btnImportVideo.addEventListener('click', async () => {
-                if (!isElectron) return;
-                try {
-                    const res = await window.electronAPI.selectOverlayVideo();
-                    if (res && res.path) {
-                        customVideoPath = res.path;
-                        customVideoName = res.name;
-                        videoCustomName.textContent = res.name;
-                        if (btnSelectCustomPreset) btnSelectCustomPreset.disabled = false;
-                        currentOverlayPresetId = 'custom';
-                        updateVideoCardSelection();
-                        if (videoOverlayEnabled) videoOverlayEnabled.checked = true;
-
-                        configSaver.save({
-                            videoOverlay: {
-                                enabled: true,
-                                presetId: 'custom',
-                                customPath: customVideoPath,
-                                customName: customVideoName,
-                            }
-                        });
-                        setStatus(`已导入并应用视频特效: ${res.name}`, 'success');
-                    }
-                } catch (err) {
-                    setStatus('导入视频失败: ' + err.message, 'error');
-                }
-            });
-        }
-
-        if (btnSelectCustomPreset) {
-            btnSelectCustomPreset.addEventListener('click', () => {
-                if (!customVideoPath) return;
-                currentOverlayPresetId = 'custom';
-                updateVideoCardSelection();
-                if (videoOverlayEnabled) videoOverlayEnabled.checked = true;
-                if (isElectron) {
-                    configSaver.save({
-                        videoOverlay: {
-                            enabled: true,
-                            presetId: 'custom',
-                            customPath: customVideoPath,
-                            customName: customVideoName,
-                        }
-                    });
-                }
-                setStatus(`已切换为自定义视频: ${customVideoName}`, 'success');
-            });
-        }
-
-        if (videoBlendMode) {
-            videoBlendMode.addEventListener('change', () => {
-                if (isElectron) {
-                    configSaver.save({
-                        videoOverlay: { blendMode: videoBlendMode.value }
-                    });
-                }
-                const modeLabels = { auto: '自动识别', screen: '滤色混合', chroma: '绿幕抠图' };
-                setStatus(`已切换混合模式: ${modeLabels[videoBlendMode.value]}`, 'success');
-            });
-        }
-
-        if (videoOpacity) {
-            videoOpacity.addEventListener('input', () => {
-                const val = parseInt(videoOpacity.value, 10);
-                videoOpacityVal.textContent = val + '%';
-                if (isElectron) {
-                    configSaver.save({
-                        videoOverlay: { opacity: val / 100.0 }
-                    });
-                }
-            });
-        }
-
-        if (videoSpeed) {
-            videoSpeed.addEventListener('input', () => {
-                const val = parseInt(videoSpeed.value, 10) / 10.0;
-                videoSpeedVal.textContent = val.toFixed(1) + 'x';
-                if (isElectron) {
-                    configSaver.save({
-                        videoOverlay: { speed: val }
-                    });
-                }
-            });
-        }
-
-        // ==================== 开机自启 ====================
-        autoLaunchToggle.addEventListener('change', async () => {
-            if (!isElectron) return;
-            const enabled = autoLaunchToggle.checked;
-            const result = await window.electronAPI.toggleAutoLaunch(enabled);
-            setStatus(result ? '已开启开机自启' : '已关闭开机自启', '');
-        });
-
-        // ==================== 深度图存储路径与目录操作 ====================
-        async function refreshDepthCacheDir() {
-            if (!isElectron || !depthDirPath) return;
-            try {
-                const dir = await window.electronAPI.getDepthCacheDir();
-                if (dir) {
-                    depthDirPath.textContent = dir;
-                    depthDirPath.title = dir + '\n(点击直接在文件资源管理器中打开)';
-                }
-            } catch (err) {
-                console.error('获取深度图存放路径失败:', err);
-            }
-        }
-
-        if (btnOpenDepthDir) {
-            btnOpenDepthDir.addEventListener('click', async () => {
-                if (!isElectron) return;
-                try {
-                    await window.electronAPI.openDepthCacheDir();
-                    setStatus('已在文件资源管理器中打开深度图文件夹', 'success');
-                } catch (err) {
-                    setStatus('打开文件夹失败: ' + err.message, 'error');
-                }
-            });
-        }
-
-        if (depthDirPath) {
-            depthDirPath.addEventListener('click', async () => {
-                if (!isElectron) return;
-                try {
-                    await window.electronAPI.openDepthCacheDir();
-                    setStatus('已在文件资源管理器中打开深度图文件夹', 'success');
-                } catch (err) {
-                    setStatus('打开文件夹失败: ' + err.message, 'error');
-                }
-            });
-        }
-
-        if (btnChangeDepthDir) {
-            btnChangeDepthDir.addEventListener('click', async () => {
-                if (!isElectron) return;
-                try {
-                    const res = await window.electronAPI.selectDepthCacheDir();
-                    if (!res) return; // 用户取消
-
-                    if (res.success) {
-                        await refreshDepthCacheDir();
-                        const movedTip = res.movedCount > 0 ? `（已自动迁移 ${res.movedCount} 个已有深度图）` : '';
-                        setStatus(`深度图存放位置已更改为: ${res.path} ${movedTip}`, 'success');
-                    } else {
-                        setStatus(`更改位置失败: ${res.error || '未知错误'}`, 'error');
-                    }
-                } catch (err) {
-                    setStatus(`更改位置失败: ${err.message}`, 'error');
-                }
-            });
-        }
-
-        // ==================== 清除缓存 ====================
-        document.getElementById('btn-clear-cache').addEventListener('click', async () => {
-            if (!confirm('确定要清除所有深度图缓存吗？\n\n下次更换壁纸需要重新生成深度图。')) return;
-
-            if (isElectron) {
-                await window.electronAPI.clearAllCache();
-                depthGenerated = false;
-                btnApplyWallpaper.disabled = true;
-                setStatus('深度图缓存已清除', '');
-            } else {
-                setStatus('缓存已清除', '');
-            }
-        });
-
-        // ==================== 加载配置 ====================
-        async function loadConfig() {
-            if (!isElectron) return;
-
-            // 加载深度图存储目录
-            await refreshDepthCacheDir();
-
-            try {
-                const config = await window.electronAPI.getConfig();
-                if (config) {
-                    if (config.parallaxMultiplier !== undefined) {
-                        parallaxSlider.value = config.parallaxMultiplier;
-                        parallaxValue.textContent = config.parallaxMultiplier;
-                    }
-                    if (config.smoothness !== undefined) {
-                        smoothnessSlider.value = Math.round(config.smoothness * 100);
-                        smoothnessValue.textContent = config.smoothness.toFixed(2);
-                    }
-                    if (config.focusDepth !== undefined && focusSlider) {
-                        focusSlider.value = Math.round(config.focusDepth * 100);
-                        focusValue.textContent = Number(config.focusDepth).toFixed(2);
-                    }
-                    if (config.blurRadius !== undefined && depthBlurSlider) {
-                        depthBlurSlider.value = config.blurRadius;
-                        blurValueEl.textContent = config.blurRadius === 0 ? '关闭' : config.blurRadius + 'px';
-                    }
-
-                    // 恢复黑胶唱片机配置
-                    if (config.vinyl) {
-                        if (vinylEnabled) vinylEnabled.checked = !!config.vinyl.enabled;
-                        if (vinylCurrentMusicName) {
-                            vinylCurrentMusicName.textContent = config.vinyl.audioName || (config.vinyl.audioPath ? config.vinyl.audioPath.split('\\').pop() : '未导入');
-                        }
-                        isVinylPlaying = !!config.vinyl.playing;
-                        if (btnPlayPauseToggle) {
-                            btnPlayPauseToggle.textContent = isVinylPlaying ? '⏸️ 暂停播放' : '▶️ 播放 / 暂停';
-                        }
-                        if (vinylVolume) {
-                            const vol = Math.round((config.vinyl.volume !== undefined ? config.vinyl.volume : 0.6) * 100);
-                            vinylVolume.value = vol;
-                            if (vinylVolumeVal) vinylVolumeVal.textContent = vol + '%';
-                        }
-                        if (vinylPosition && config.vinyl.position) {
-                            vinylPosition.value = config.vinyl.position;
-                        }
-                        if (vinylScale) {
-                            const sc = Math.round((config.vinyl.scale !== undefined ? config.vinyl.scale : 1.0) * 100);
-                            vinylScale.value = sc;
-                            if (vinylScaleVal) vinylScaleVal.textContent = sc + '%';
-                        }
-                    }
-
-                    // 恢复天气粒子配置
-                    if (config.weather) {
-                        const targetType = config.weather.type || 'none';
-                        weatherButtons.forEach(btn => {
-                            btn.classList.toggle('active', btn.dataset.weather === targetType);
-                        });
-                        if (weatherDensity && config.weather.density) {
-                            weatherDensity.value = config.weather.density;
-                        }
-                        if (weatherSpeed) {
-                            const spd = Math.round((config.weather.speed !== undefined ? config.weather.speed : 1.0) * 10);
-                            weatherSpeed.value = spd;
-                            if (weatherSpeedVal) weatherSpeedVal.textContent = (spd / 10).toFixed(1) + 'x';
-                        }
-                        if (weatherParallaxToggle) {
-                            weatherParallaxToggle.checked = config.weather.parallax !== false;
-                        }
-                    }
-
-                    // 恢复视频特效覆盖层配置
-                    if (config.videoOverlay) {
-                        if (videoOverlayEnabled) {
-                            videoOverlayEnabled.checked = !!config.videoOverlay.enabled;
-                        }
-                        if (config.videoOverlay.presetId) {
-                            currentOverlayPresetId = config.videoOverlay.presetId;
-                        }
-                        if (config.videoOverlay.customPath) {
-                            customVideoPath = config.videoOverlay.customPath;
-                            customVideoName = config.videoOverlay.customName || config.videoOverlay.customPath.split('\\').pop();
-                            if (videoCustomName) videoCustomName.textContent = customVideoName;
-                            if (btnSelectCustomPreset) btnSelectCustomPreset.disabled = false;
-                        }
-                        if (videoBlendMode && config.videoOverlay.blendMode) {
-                            videoBlendMode.value = config.videoOverlay.blendMode;
-                        }
-                        if (videoOpacity && config.videoOverlay.opacity !== undefined) {
-                            const op = Math.round(config.videoOverlay.opacity * 100);
-                            videoOpacity.value = op;
-                            if (videoOpacityVal) videoOpacityVal.textContent = op + '%';
-                        }
-                        if (videoSpeed && config.videoOverlay.speed !== undefined) {
-                            const spd = Math.round(config.videoOverlay.speed * 10);
-                            videoSpeed.value = spd;
-                            if (videoSpeedVal) videoSpeedVal.textContent = (spd / 10).toFixed(1) + 'x';
-                        }
-                    }
-
-                    // 初始化并渲染视频特效预设卡片
-                    await initVideoPresets();
-                    updateVideoCardSelection();
-
-                    // 恢复当前壁纸（和手动选中走同一套逻辑，只是不改状态栏）
-                    if (config.currentImage && window.electronAPI.fileExists(config.currentImage)) {
-                        await galleryPanel.ready;
-                        await selectImagePath(config.currentImage, { quiet: true });
-                    }
-                }
-
-                const autoLaunch = await window.electronAPI.getAutoLaunch();
-                autoLaunchToggle.checked = autoLaunch;
-            } catch (err) {
-                console.error('加载配置失败:', err);
-            }
-        }
-
-        function setStatus(msg, cls) {
-            statusText.textContent = msg;
-            statusText.className = 'status ' + (cls || '');
-        }
-
-        // 启动
-        initElementsTab({ api: window.electronAPI, setStatus });
-        loadConfig();
-    </script>
-
+    <script src="settings/effects-page.js"></script>
+    <script src="settings/music-page.js"></script>
+    <script src="settings/system-page.js"></script>
+    <script src="settings/main.js"></script>
 </body>
 </html>

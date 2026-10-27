@@ -44,6 +44,9 @@ function syncDebugPanel() {
     if (smoothnessValueEl) smoothnessValueEl.textContent = CONFIG.smoothness.toFixed(2);
     if (focusSlider) focusSlider.value = Math.round(CONFIG.focusDepth * 100);
     if (focusValueEl) focusValueEl.textContent = Number(CONFIG.focusDepth).toFixed(2);
+    for (const slider of [parallaxSlider, smoothnessSlider, focusSlider]) {
+        if (slider) UIControls.paintRange(slider);
+    }
     if (debugPanel) debugPanel.style.display = CONFIG.hideDebugPanel ? 'none' : '';
 }
 
@@ -163,8 +166,8 @@ function bindEvents() {
     }
     if (debugToggle && debugPanel) {
         debugToggle.addEventListener('click', () => {
+            // 箭头图标的方向由 .collapsed 控制（style.css）
             debugPanel.classList.toggle('collapsed');
-            debugToggle.textContent = debugPanel.classList.contains('collapsed') ? '+' : '−';
         });
     }
 }

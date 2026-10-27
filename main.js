@@ -294,12 +294,17 @@ function createSettingsWindow() {
     }
 
     settingsWindow = new BrowserWindow({
-        width: 540,
-        height: 800,
+        width: 960,
+        height: 660,
+        minWidth: 820,
+        minHeight: 560,
         resizable: true,
-        frame: true,
         title: '互动3D壁纸 - 设置',
         autoHideMenuBar: true,
+        // 深色标题栏：页面自己画标题栏，系统的最小化 / 最大化 / 关闭按钮叠在右上角
+        titleBarStyle: 'hidden',
+        titleBarOverlay: { color: '#0b0f15', symbolColor: '#97a3b4', height: 36 },
+        backgroundColor: '#10161e',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
