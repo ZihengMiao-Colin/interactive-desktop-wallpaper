@@ -248,9 +248,15 @@ function registerIpcListeners() {
         if (!info.silent) UI.showToast('壁纸已恢复', 1500);
     });
 
-    // 点击桌面：触发"点击播放"的元素
+    // 点击桌面：点中唱片机就播放 / 暂停（唱片机在最上层，点中了就不再传给元素），否则触发"点击播放"的元素
     window.electronAPI.onDesktopClick(({ x, y }) => {
         if (renderPaused) return;
+        if (vinylManager.hitTest(x, y)) {
+            const playing = vinylManager.clickToggle();
+            // 存进配置再由广播回来执行，设置页的播放按钮也会跟着变
+            if (playing !== null) window.electronAPI.saveConfig({ vinyl: { playing } });
+            return;
+        }
         if (elementsLayer.handleClick(x, y)) wake();
     });
 

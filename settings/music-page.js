@@ -71,6 +71,14 @@ function initMusicPage({ api, saver, setStatus }) {
         setStatus(isPlaying ? '开始播放' : '已暂停');
     });
 
+    // 在桌面上点唱片机也会改播放状态：跟着配置广播更新播放按钮（其他控件不动，免得和正在拖的滑块打架）
+    api.onLoadConfig((config) => {
+        const playing = !!(config && config.vinyl && config.vinyl.playing);
+        if (playing === isPlaying) return;
+        isPlaying = playing;
+        renderPlayer();
+    });
+
     bindRange(volume, volumeVal, (v) => v + '%', (v) => saver.save({ vinyl: { volume: v / 100 } }));
     bindRange(scale, scaleVal, (v) => v + '%', (v) => saver.save({ vinyl: { scale: v / 100 } }));
     const position = segmented(document.getElementById('vinyl-position'), (value) => saver.save({ vinyl: { position: value } }));

@@ -65,18 +65,10 @@
 
     <!-- ==================== 黑胶唱片机动态组件 ==================== -->
     <div id="vinyl-widget" class="vinyl-widget pos-bottom-right" style="display: none;">
-        <!-- 唱臂结构 -->
-        <div class="vinyl-tonearm" id="vinyl-tonearm">
-            <div class="tonearm-pivot"></div>
-            <div class="tonearm-rod"></div>
-            <div class="tonearm-head"></div>
-        </div>
-
-        <!-- 唱盘底座与黑胶 -->
+        <!-- 唱盘底座与黑胶（唱臂放在唱盘里定位，不受下面歌名长短影响） -->
         <div class="vinyl-deck">
             <div class="vinyl-platter">
                 <div class="vinyl-record" id="vinyl-record">
-                    <div class="vinyl-reflection"></div>
                     <!-- 唱片中心标签贴纸 -->
                     <div class="vinyl-center-label" id="vinyl-center-label">
                         <img id="vinyl-cover-img" src="" alt="Album Cover" style="display: none;">
@@ -86,6 +78,15 @@
                         <div class="vinyl-spindle"></div>
                     </div>
                 </div>
+                <!-- 高光不跟着唱片转（真实唱片转动时反光位置不动） -->
+                <div class="vinyl-reflection"></div>
+            </div>
+
+            <!-- 唱臂结构 -->
+            <div class="vinyl-tonearm" id="vinyl-tonearm">
+                <div class="tonearm-pivot"></div>
+                <div class="tonearm-rod"></div>
+                <div class="tonearm-head"></div>
             </div>
         </div>
 
@@ -156,6 +157,7 @@
     <script src="shared/placement-math.js"></script>
     <script src="shared/frame-pacing.js"></script>
     <script src="shared/config-sync.js"></script>
+    <script src="shared/vinyl-player.js"></script>
     <script src="renderer/shaders.js"></script>
     <script src="renderer/ui.js"></script>
     <script src="renderer/host.js"></script>

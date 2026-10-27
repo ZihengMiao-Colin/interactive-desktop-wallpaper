@@ -46,6 +46,7 @@ const { AppStore } = require('./src/store');
 const { registerElementsIpc } = require('./src/elements/ipc');
 const { PlacementController } = require('./src/elements/placement-controller');
 const { upsertInstance, hasClickTriggers } = require('./shared/elements-model');
+const { isClickable: isVinylClickable } = require('./shared/vinyl-player');
 const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
@@ -336,12 +337,12 @@ function broadcastConfig() {
 
 // ==================== 桌面点击 ====================
 
-/** 按配置开关桌面点击检测：有显示中的"点击播放"元素才开 */
+/** 按配置开关桌面点击检测：有显示中的"点击播放"元素，或者唱片机里有音乐（点它播放 / 暂停）才开 */
 function syncDesktopClickWatcher(config) {
     if (!desktopClickWatcher) {
         desktopClickWatcher = new DesktopClickWatcher({ onClick: forwardDesktopClick });
     }
-    desktopClickWatcher.setEnabled(hasClickTriggers(config.customElements));
+    desktopClickWatcher.setEnabled(hasClickTriggers(config.customElements) || isVinylClickable(config.vinyl));
 }
 
 /** 桌面被单击：把鼠标位置（相对主显示器）发给壁纸窗口；壁纸暂停或正在摆放元素时忽略 */
