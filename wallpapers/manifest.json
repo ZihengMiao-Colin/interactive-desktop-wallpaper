@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "wallpapers": [
+    {
+      "id": "lake-forest",
+      "name": "湖光山色",
+      "file": "lake-forest.jpg",
+      "depth": "depth/lake-forest.png",
+      "thumb": "thumbs/lake-forest.jpg",
+      "credit": "eberhardgross / Pexels",
+      "origin": "pexels-eberhardgross-1064162.jpg"
+    },
+    {
+      "id": "mountain-reflection",
+      "name": "山湖倒影",
+      "file": "mountain-reflection.jpg",
+      "depth": "depth/mountain-reflection.png",
+      "thumb": "thumbs/mountain-reflection.jpg",
+      "credit": "jplenio / Pexels",
+      "origin": "pexels-jplenio-3131634.jpg"
+    },
+    {
+      "id": "glacier-lake",
+      "name": "冰川湖",
+      "file": "glacier-lake.jpg",
+      "depth": "depth/glacier-lake.png",
+      "thumb": "thumbs/glacier-lake.jpg",
+      "credit": "souvenirpixels / Pexels",
+      "origin": "pexels-souvenirpixels-417074.jpg"
+    },
+    {
+      "id": "snowy-peaks-lake",
+      "name": "雪山镜湖",
+      "file": "snowy-peaks-lake.jpg",
+      "depth": "depth/snowy-peaks-lake.png",
+      "thumb": "thumbs/snowy-peaks-lake.jpg",
+      "credit": "Pixabay / Pexels",
+      "origin": "pexels-pixabay-459225.jpg"
+    },
+    {
+      "id": "arch-bridge",
+      "name": "石桥倒影",
+      "file": "arch-bridge.jpg",
+      "depth": "depth/arch-bridge.png",
+      "thumb": "thumbs/arch-bridge.jpg",
+      "credit": "mdx014 / Pexels",
+      "origin": "pexels-mdx014-814499.jpg"
+    },
+    {
+      "id": "sunset-path",
+      "name": "晚霞小路",
+      "file": "sunset-path.jpg",
+      "depth": "depth/sunset-path.png",
+      "thumb": "thumbs/sunset-path.jpg",
+      "credit": "jplenio / Pexels",
+      "origin": "pexels-jplenio-1146708.jpg"
+    },
+    {
+      "id": "pastel-mountains",
+      "name": "霞光群山",
+      "file": "pastel-mountains.jpg",
+      "depth": "depth/pastel-mountains.png",
+      "thumb": "thumbs/pastel-mountains.jpg",
+      "credit": "simon73 / Pexels",
+      "origin": "pexels-simon73-1323550.jpg"
+    },
+    {
+      "id": "distant-mountains",
+      "name": "远山",
+      "file": "distant-mountains.jpg",
+      "depth": "depth/distant-mountains.png",
+      "thumb": "thumbs/distant-mountains.jpg",
+      "credit": "ahmetyuksek / Pexels",
+      "origin": "pexels-ahmetyuksek-34712155.jpg"
+    },
+    {
+      "id": "coast-sunset",
+      "name": "海岸夕照",
+      "file": "coast-sunset.jpg",
+      "depth": "depth/coast-sunset.png",
+      "thumb": "thumbs/coast-sunset.jpg",
+      "credit": "kanenori / Pixabay",
+      "origin": "kanenori-sunset-7133867_1920.jpg"
+    },
+    {
+      "id": "snow-forest",
+      "name": "雪林",
+      "file": "snow-forest.jpg",
+      "depth": "depth/snow-forest.png",
+      "thumb": "thumbs/snow-forest.jpg",
+      "credit": "nickype / Pixabay",
+      "origin": "nickype-snow-7646952_1920.jpg"
+    },
+    {
+      "id": "milky-way-pier",
+      "name": "星河栈桥",
+      "file": "milky-way-pier.jpg",
+      "depth": "depth/milky-way-pier.png",
+      "thumb": "thumbs/milky-way-pier.jpg",
+      "credit": "chiemseherin / Pixabay",
+      "origin": "chiemseherin-milky-way-8149815_1920.jpg"
+    },
+    {
+      "id": "milky-way",
+      "name": "银河",
+      "file": "milky-way.jpg",
+      "depth": "depth/milky-way.png",
+      "thumb": "thumbs/milky-way.jpg",
+      "credit": "felix-mittermeier / Pixabay",
+      "origin": "felix-mittermeier-milky-way-2695569_1920.jpg"
+    },
+    {
+      "id": "cat",
+      "name": "小猫",
+      "file": "cat.jpg",
+      "depth": "depth/cat.png",
+      "thumb": "thumbs/cat.jpg",
+      "credit": "nennieinszweidrei / Pixabay",
+      "origin": "nennieinszweidrei-cat-7094808_1920.jpg"
+    },
+    {
+      "id": "white-horse",
+      "name": "白马",
+      "file": "white-horse.jpg",
+      "depth": "depth/white-horse.png",
+      "thumb": "thumbs/white-horse.jpg",
+      "credit": "ykaiavu / Pixabay",
+      "origin": "ykaiavu-horse-7993644_1920.jpg"
+    },
+    {
+      "id": "macaw",
+      "name": "蓝金刚鹦鹉",
+      "file": "macaw.jpg",
+      "depth": "depth/macaw.png",
+      "thumb": "thumbs/macaw.jpg",
+      "credit": "dan-reyes / Pixabay",
+      "origin": "dan-reyes-arara-9752196_1920.jpg"
+    },
+    {
+      "id": "eye",
+      "name": "眼眸",
+      "file": "eye.jpg",
+      "depth": "depth/eye.png",
+      "thumb": "thumbs/eye.jpg",
+      "credit": "bniique / Pixabay",
+      "origin": "bniique-eye-5248678_1920.jpg"
+    },
+    {
+      "id": "wire-fence",
+      "name": "铁网光斑",
+      "file": "wire-fence.jpg",
+      "depth": "depth/wire-fence.png",
+      "thumb": "thumbs/wire-fence.jpg",
+      "credit": "oliveiratp / Pixabay",
+      "origin": "oliveiratp-grid-7892225.jpg"
+    }
+  ]
+}

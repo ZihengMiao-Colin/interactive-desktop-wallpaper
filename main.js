@@ -47,6 +47,7 @@ const { PlacementController } = require('./src/elements/placement-controller');
 const { upsertInstance } = require('./shared/elements-model');
 const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
+const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
 
 // ==================== 全局状态 ====================
 
@@ -70,6 +71,9 @@ let isRenderingActive = true;
 
 /** 自定义元素摆放模式会话 */
 let placement = null;
+
+/** 默认壁纸图库（项目 wallpapers/ 目录），启动时读取 */
+let gallery = [];
 
 /**
  * 主动要求壁纸窗口重绘一次。
@@ -407,6 +411,8 @@ function applyWallpaper(imagePath) {
     if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return false;
     store.saveConfig({ currentImage: imagePath });
     wallpaperWindow.webContents.send('image:new', imagePath);
+    // 设置窗口的默认壁纸面板要知道"当前"换成了哪张
+    broadcastConfig();
     console.log('[Main] Apply wallpaper:', imagePath);
     return true;
 }
@@ -419,7 +425,7 @@ async function changeWallpaperFromTray() {
     const imagePath = await showImageDialog();
     if (!imagePath) return;
 
-    if (store.hasDepthCache(imagePath)) {
+    if (hasDepthMap(imagePath)) {
         applyWallpaper(imagePath);
         return;
     }
@@ -428,6 +434,25 @@ async function changeWallpaperFromTray() {
     const send = () => win.webContents.send('settings:prepareImage', { imagePath });
     if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send);
     else send();
+}
+
+// ==================== 深度图来源 ====================
+
+/** 默认壁纸用自带的深度图，其他图片用深度图缓存 */
+function getDepthDataUrl(imagePath) {
+    const entry = findGalleryEntry(gallery, imagePath);
+    if (!entry) return store.getDepthCache(imagePath);
+    try {
+        return 'data:image/png;base64,' + fs.readFileSync(entry.depth).toString('base64');
+    } catch (err) {
+        console.error('[Main] 读取默认壁纸深度图失败:', err.message);
+        return null;
+    }
+}
+
+/** 这张图是否已有深度图（默认壁纸总是有） */
+function hasDepthMap(imagePath) {
+    return !!findGalleryEntry(gallery, imagePath) || store.hasDepthCache(imagePath);
 }
 
 // ==================== IPC 处理器注册 ====================
@@ -578,10 +603,11 @@ function registerIpcHandlers() {
         return store.saveDepthCache(imagePath, depthDataUrl);
     });
 
-    // ---- 读取缓存的深度图 ----
-    ipcMain.handle('cache:getDepthMap', async (_event, imagePath) => {
-        return store.getDepthCache(imagePath);
-    });
+    // ---- 读取深度图（默认壁纸用自带的，其他图片读缓存） ----
+    ipcMain.handle('cache:getDepthMap', (_event, imagePath) => getDepthDataUrl(imagePath));
+
+    // ---- 默认壁纸图库 ----
+    ipcMain.handle('gallery:list', () => gallery);
 
     // ---- 深度图存放文件夹管理 ----
     ipcMain.handle('depth:getCacheDir', async () => {
@@ -879,6 +905,15 @@ app.whenReady().then(() => {
             return width && height ? width / height : 1;
         },
     });
+
+    // 默认壁纸图库；旧版本直接用 default wallpaper/ 里的原图当壁纸，原图不在了就换成图库里的同一张
+    gallery = loadGallery(path.join(__dirname, 'wallpapers'));
+    const currentImage = store.getConfig().currentImage;
+    const migratedImage = migrateLegacyImagePath(currentImage, gallery);
+    if (migratedImage !== currentImage) {
+        store.saveConfig({ currentImage: migratedImage });
+        console.log('[Main] 当前壁纸已换成图库里的同一张:', migratedImage);
+    }
 
     // 清理上次没删掉的素材副本（移除素材时视频可能正被占用）
     const orphans = cleanupOrphanFiles(store.getElementsDir(), store.getConfig().customElements.library);

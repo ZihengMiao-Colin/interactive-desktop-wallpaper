@@ -78,7 +78,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveDepthCache: (imagePath, depthDataUrl) =>
         ipcRenderer.invoke('cache:saveDepthMap', { imagePath, depthDataUrl }),
 
-    /** 读取缓存的深度图 */
+    /** 默认壁纸图库：[{ id, name, file, depth, thumb, credit }] */
+    getGallery: () => ipcRenderer.invoke('gallery:list'),
+
+    /** 读取深度图（默认壁纸用自带的，其他图片读缓存） */
     getDepthCache: (imagePath) =>
         ipcRenderer.invoke('cache:getDepthMap', imagePath),
 

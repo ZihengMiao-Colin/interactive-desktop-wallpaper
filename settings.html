@@ -486,6 +486,79 @@
             text-overflow: ellipsis;
         }
 
+        /* ---- 默认壁纸图库 ---- */
+        .gallery-panel { margin-bottom: 12px; }
+        .gallery-panel[hidden] { display: none; }
+        .gallery-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            padding: 9px 12px;
+            text-align: left;
+            background: rgba(0, 0, 0, 0.28);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .gallery-arrow {
+            color: #7ecfff;
+            transition: transform 0.2s;
+        }
+        .gallery-panel.open .gallery-arrow { transform: rotate(90deg); }
+        .gallery-hint {
+            margin-left: auto;
+            font-size: 11px;
+            color: #888;
+        }
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            max-height: 236px;
+            overflow-y: auto;
+            padding: 10px 4px 0 0;
+        }
+        .gallery-grid[hidden] { display: none; }
+        .gallery-card {
+            position: relative;
+            margin: 0;
+            padding: 0;
+            border: 2px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            overflow: hidden;
+            background: #111;
+            text-align: left;
+        }
+        .gallery-card:hover { border-color: rgba(126, 207, 255, 0.5); }
+        .gallery-card.selected {
+            border-color: #7ecfff;
+            box-shadow: 0 0 10px rgba(126, 207, 255, 0.35);
+        }
+        .gallery-card img {
+            display: block;
+            width: 100%;
+            aspect-ratio: 16 / 10;
+            object-fit: cover;
+        }
+        .gallery-card-name {
+            font-size: 11px;
+            padding: 3px 6px;
+            color: #ccc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .gallery-card.selected .gallery-card-name { color: #7ecfff; }
+        .gallery-current-badge {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: #2f9e5b;
+            color: #fff;
+        }
+
         /* ---- 自定义元素 ---- */
         .el-group-title {
             font-size: 12px;
@@ -645,6 +718,16 @@
             <span class="preview-placeholder" id="preview-placeholder">尚未选择壁纸</span>
             <img id="preview-image" style="display:none;" alt="预览">
             <div class="preview-info" id="preview-info"></div>
+        </div>
+
+        <!-- 默认壁纸图库（可折叠，默认收起） -->
+        <div class="gallery-panel" id="gallery-panel" hidden>
+            <button type="button" class="gallery-toggle" id="gallery-toggle" aria-expanded="false">
+                <span class="gallery-arrow">▸</span>
+                <span>默认壁纸（<span id="gallery-count">0</span>）</span>
+                <span class="gallery-hint" id="gallery-hint">点击展开</span>
+            </button>
+            <div class="gallery-grid" id="gallery-grid" hidden></div>
         </div>
 
         <!-- 边缘平滑度 (抗撕裂) -->
@@ -889,6 +972,7 @@
     <div class="status" id="status-text">设置已加载</div>
 
     <script src="shared/config-sync.js"></script>
+    <script src="settings/gallery-panel.js"></script>
     <script src="settings/thumbnail.js"></script>
     <script src="settings/elements-tab.js"></script>
     <script>
@@ -950,7 +1034,7 @@
                 if (isElectron) {
                     configSaver.save({ blurRadius: val });
                 }
-                if (selectedImagePath) {
+                if (selectedImagePath && !galleryPanel.find(selectedImagePath)) {
                     depthGenerated = false;
                     btnApplyWallpaper.disabled = true;
                     setStatus('平滑参数已变更，请重新点击"生成深度图"', '');
@@ -961,17 +1045,21 @@
         // ==================== 选择壁纸 ====================
 
         /**
-         * 选中一张图片：显示预览并检查深度图缓存（只选中，不应用到桌面）。
+         * 选中一张图片：显示预览并检查深度图（只选中，不应用到桌面）。
+         * 默认壁纸自带深度图，"生成深度图"按钮保持灰色。
          * @param {string} imagePath
-         * @returns {Promise<boolean>} 是否已有可用的深度图缓存
+         * @param {{quiet?: boolean}} [options] - quiet 为 true 时不改状态栏（打开设置窗口时恢复当前壁纸用）
+         * @returns {Promise<boolean>} 是否已有可用的深度图
          */
-        async function selectImagePath(imagePath) {
+        async function selectImagePath(imagePath, { quiet = false } = {}) {
+            const galleryEntry = galleryPanel.find(imagePath);
             selectedImagePath = imagePath;
             depthGenerated = false;
-            btnGenerateDepth.disabled = false;
+            btnGenerateDepth.disabled = !!galleryEntry;
             btnApplyWallpaper.disabled = true;
+            galleryPanel.setSelected(imagePath);
 
-            const fileName = imagePath.split('\\').pop();
+            const fileName = galleryEntry ? `${galleryEntry.name} · 默认壁纸` : imagePath.split('\\').pop();
             const dataUrl = window.electronAPI.readFileAsDataURL(imagePath);
             if (dataUrl) {
                 previewPlaceholder.style.display = 'none';
@@ -986,16 +1074,26 @@
                 img.src = dataUrl;
             }
 
-            const cached = await window.electronAPI.getDepthCache(imagePath);
-            if (cached) {
+            const depth = await window.electronAPI.getDepthCache(imagePath);
+            if (depth) {
                 depthGenerated = true;
                 btnApplyWallpaper.disabled = false;
-                setStatus('检测到深度图缓存，点击"应用壁纸"即可生效', 'success');
-            } else {
+                if (!quiet) {
+                    setStatus(galleryEntry
+                        ? '默认壁纸已经带好深度图，点击"应用壁纸"就能用'
+                        : '检测到深度图缓存，点击"应用壁纸"即可生效', 'success');
+                }
+            } else if (!quiet) {
                 setStatus('已选择 ' + fileName + ' — 请生成深度图', '');
             }
-            return !!cached;
+            return !!depth;
         }
+
+        // 默认壁纸图库：点一张就选中它
+        const galleryPanel = initGalleryPanel({
+            api: window.electronAPI,
+            onSelect: (entry) => selectImagePath(entry.file),
+        });
 
         btnSelectImage.addEventListener('click', async () => {
             if (!isElectron) {
@@ -1717,26 +1815,10 @@
                     await initVideoPresets();
                     updateVideoCardSelection();
 
-                    // 恢复当前图片
+                    // 恢复当前壁纸（和手动选中走同一套逻辑，只是不改状态栏）
                     if (config.currentImage && window.electronAPI.fileExists(config.currentImage)) {
-                        selectedImagePath = config.currentImage;
-                        const dataUrl = window.electronAPI.readFileAsDataURL(config.currentImage);
-                        if (dataUrl) {
-                            previewPlaceholder.style.display = 'none';
-                            previewImage.style.display = 'block';
-                            previewImage.src = dataUrl;
-                            previewInfo.classList.add('visible');
-                            const fileName = config.currentImage.split('\\').pop();
-                            previewInfo.textContent = fileName;
-                            btnGenerateDepth.disabled = false;
-
-                            // 检查缓存
-                            const cached = await window.electronAPI.getDepthCache(config.currentImage);
-                            if (cached) {
-                                depthGenerated = true;
-                                btnApplyWallpaper.disabled = false;
-                            }
-                        }
+                        await galleryPanel.ready;
+                        await selectImagePath(config.currentImage, { quiet: true });
                     }
                 }
 
