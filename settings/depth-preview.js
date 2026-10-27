@@ -74,7 +74,7 @@ function initDepthPreview() {
     const usingEl = document.getElementById('preview-using');
     const sizeEl = document.getElementById('preview-size');
 
-    const params = { parallaxMultiplier: 20, smoothness: 0.08, focusDepth: 0.5 };
+    const params = { parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5 };
     let imageUrl = '';
     let depthUrl = '';
     let mode = 'image';

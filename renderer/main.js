@@ -16,7 +16,7 @@ const isEditMode = Host.mode === 'edit';
 /** 视差参数（会被主进程下发的配置覆盖） */
 const CONFIG = {
     /** 视差强度系数 */
-    parallaxMultiplier: 20,
+    parallaxMultiplier: 10,
     /** 平滑度 0~1，越小越平滑 */
     smoothness: 0.08,
     /** 对焦深度 0~1：该深度的物体保持静止 */

@@ -8,7 +8,7 @@
 
 /** "恢复推荐值"：边缘平滑也一起恢复 */
 const RECOMMENDED_PARALLAX = {
-    parallaxMultiplier: 20,
+    parallaxMultiplier: 10,
     smoothness: 0.08,
     focusDepth: 0.50,
     blurRadius: 8,
@@ -61,7 +61,7 @@ function initParallaxPage({ saver, setStatus, preview, wallpaperPage }) {
         show(RECOMMENDED_PARALLAX);
         wallpaperPage.setBlur(RECOMMENDED_PARALLAX.blurRadius);
         change(RECOMMENDED_PARALLAX);
-        setStatus('已恢复推荐值：强度 20，跟手程度 0.08，对焦深度 0.50，边缘平滑 8px', 'success');
+        setStatus('已恢复推荐值：强度 10，跟手程度 0.08，对焦深度 0.50，边缘平滑 8px', 'success');
     });
 
     return {

@@ -297,7 +297,7 @@ class AppStore {
 
     _defaultConfig() {
         return {
-            parallaxMultiplier: 20,
+            parallaxMultiplier: 10,
             smoothness: 0.08,
             focusDepth: 0.50,
             blurRadius: 8,

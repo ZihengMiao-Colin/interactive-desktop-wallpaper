@@ -166,7 +166,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 
 ```js
 {
-  parallaxMultiplier: 20, smoothness: 0.08, focusDepth: 0.5, blurRadius: 8,
+  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 8,
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
   vinyl:        { enabled, position, scale, volume, playing, loop, audioPath, audioName, coverPath },
   weather:      { type, density, speed, parallax },
