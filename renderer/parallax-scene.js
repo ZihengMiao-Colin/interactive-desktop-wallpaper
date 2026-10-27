@@ -8,6 +8,9 @@
 
 'use strict';
 
+/** 渲染帧率上限 */
+const MAX_FPS = 60;
+
 /** 背景深度视差滤镜 */
 class DepthParallaxFilter extends PIXI.Filter {
     constructor(imageTexture, depthTexture) {
@@ -33,6 +36,8 @@ const Scene = (() => {
         autoDensity: true,
         resizeTo: window,
     });
+    // 壁纸不需要跟着高刷新率屏幕（比如 240Hz）满帧渲染，有动画时最多 60 帧
+    app.ticker.maxFPS = MAX_FPS;
     document.body.appendChild(app.view);
 
     /** 背景全屏精灵（本身是白色贴图，画面完全由滤镜采样得到） */
