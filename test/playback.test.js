@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { pickFrame, IntervalScheduler } = require('../shared/playback');
+const { pickFrame, IntervalScheduler, ClickTrigger } = require('../shared/playback');
 
 test('pickFrame 循环', () => {
     assert.equal(pickFrame([100, 100, 100], 0), 0);
@@ -83,4 +83,31 @@ test('调度器：暂停期间不给唤醒时间，恢复后唤醒时间顺延',
     assert.equal(s.nextEventMs, null);
     s.resume(12000);
     assert.equal(s.nextEventMs, 19000);
+});
+
+test('点击播放：平时不出帧，点一下播一次，播完回到待命', () => {
+    const c = new ClickTrigger({ hideWhenIdle: false });
+    assert.equal(c.playing, false);
+    assert.equal(c.needsFrames, false);
+    assert.equal(c.nextEventMs, null);
+    assert.equal(c.tick(0, false), null);
+
+    c.trigger();
+    assert.equal(c.needsFrames, true, '点了之后要出帧才能开始播放');
+    assert.equal(c.tick(10, false), 'start');
+    assert.equal(c.playing, true);
+    assert.equal(c.tick(20, false), null);
+    assert.equal(c.tick(30, true), 'end');
+    assert.equal(c.playing, false);
+    assert.equal(c.needsFrames, false);
+});
+
+test('点击播放：播放中再点一下从头播', () => {
+    const c = new ClickTrigger({ hideWhenIdle: true });
+    assert.equal(c.hideWhenIdle, true);
+    c.trigger();
+    c.tick(0, false);
+    c.trigger();
+    assert.equal(c.tick(10, false), 'start');
+    assert.equal(c.playing, true);
 });

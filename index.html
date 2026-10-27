@@ -108,17 +108,36 @@
 
     <!-- ==================== 自定义元素摆放模式（仅摆放窗口使用） ==================== -->
     <div id="placement-ui" hidden>
-        <div id="placement-hint">摆放模式 · 拖动移动，拖动角点缩放，Enter 确认，Esc 取消</div>
+        <div id="placement-hint">摆放模式 · 拖动移动，角点缩放，边点拉伸，上方圆点旋转（按住 Shift 每次 15°），Enter 确认，Esc 取消</div>
         <div id="placement-box">
-            <span class="handle" data-corner="nw"></span>
-            <span class="handle" data-corner="ne"></span>
-            <span class="handle" data-corner="sw"></span>
-            <span class="handle" data-corner="se"></span>
+            <svg class="warp-outline" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polygon id="placement-warp-outline" points="0,0 100,0 100,100 0,100"></polygon>
+            </svg>
+            <span class="handle scale" data-corner="nw"></span>
+            <span class="handle scale" data-corner="ne"></span>
+            <span class="handle scale" data-corner="sw"></span>
+            <span class="handle scale" data-corner="se"></span>
+            <span class="handle edge" data-edge="n"></span>
+            <span class="handle edge" data-edge="e"></span>
+            <span class="handle edge" data-edge="s"></span>
+            <span class="handle edge" data-edge="w"></span>
+            <span class="rotate-handle" data-rotate="1" title="拖动旋转，按住 Shift 每次 15°"></span>
+            <span class="handle warp" data-warp="0"></span>
+            <span class="handle warp" data-warp="1"></span>
+            <span class="handle warp" data-warp="2"></span>
+            <span class="handle warp" data-warp="3"></span>
         </div>
         <div id="placement-toolbar">
             <label for="placement-depth">深度</label>
             <input type="range" id="placement-depth" min="0" max="100" value="50" step="1">
             <span id="placement-depth-value">0.50</span>
+            <span class="placement-sep"></span>
+            <span id="placement-rotation" title="旋转角度">0°</span>
+            <button id="placement-flip-x" class="placement-btn" title="水平翻转">⇋ 翻转</button>
+            <button id="placement-flip-y" class="placement-btn" title="垂直翻转">⇅ 翻转</button>
+            <button id="placement-warp" class="placement-btn" title="单独拖动四个角，做出透视效果">◇ 自由变形</button>
+            <button id="placement-reset" class="placement-btn" title="清除旋转、拉伸、翻转和变形">↺ 复原</button>
+            <span class="placement-sep"></span>
             <button id="placement-confirm" class="placement-btn primary">✓ 确认</button>
             <button id="placement-cancel" class="placement-btn">✕ 取消</button>
         </div>

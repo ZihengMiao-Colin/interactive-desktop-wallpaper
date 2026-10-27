@@ -1,11 +1,16 @@
 /**
  * elements-layer.js — 自定义元素渲染层
  *
- * 每个实例是一个单位方形 PIXI.Mesh，挂元素着色器（视差位移、深度遮挡、绿幕抠像）。
- * 位置每帧按 transform + 视差位移重新计算；素材按实例 id 复用，素材文件变了才重新加载。
+ * 每个实例是框坐标里的一个四边形 PIXI.Mesh（自由变形时四个角各自偏移），
+ * 挂元素着色器（透视贴图、翻转、变色、视差位移、深度遮挡、绿幕抠像）。
+ * 位置、大小、旋转每帧按 transform + 视差位移重新计算；素材按实例 id 复用，素材文件变了才重新加载。
+ * 点击播放的元素由 handleClick 触发：点中元素播放一次，或者在点击的位置出现并播放一次。
  */
 
 'use strict';
+
+/** 框坐标里的四个角（左上、右上、右下、左下） */
+const ELEMENT_BOX_CORNERS = [[0, 0], [1, 0], [1, 1], [0, 1]];
 
 class ElementsLayer {
     /** @param {typeof Scene} scene */
@@ -15,13 +20,11 @@ class ElementsLayer {
         this.container.sortableChildren = true;
         scene.addLayer(this.container);
 
-        /** 单位方形，所有实例共用 */
-        this.geometry = new PIXI.Geometry()
-            .addAttribute('aVertexPosition', [0, 0, 1, 0, 1, 1, 0, 1], 2)
-            .addAttribute('aUvs', [0, 0, 1, 0, 1, 1, 0, 1], 2)
-            .addIndex([0, 1, 2, 0, 2, 3]);
+        /** 点击位置取深度用（深度图换了才重建） */
+        this.depthSampler = null;
+        this.depthSamplerImage = null;
 
-        /** @type {Map<string, {instance, asset, source, mesh, scheduler, aspect, playbackKey}>} */
+        /** @type {Map<string, {instance, asset, source, mesh, geometry, scheduler, aspect, playbackKey, warpKey, shown, clickAt, color}>} */
         this.entries = new Map();
         /** 正在加载素材的实例 id */
         this.loading = new Set();
@@ -73,7 +76,7 @@ class ElementsLayer {
         const screenH = window.innerHeight;
         const cover = this.scene.getCover();
         const depthTexture = this.scene.getDepthTexture();
-        const { rectFromTransform } = Shared.placement;
+        const { elementSize } = Shared.placement;
         const { elementScreenShift } = Shared.parallax;
 
         for (const entry of this.entries.values()) {
@@ -87,18 +90,33 @@ class ElementsLayer {
                     source.play();
                 } else if (action === 'hide') {
                     source.pause();
+                } else if (action === 'end') {
+                    // 点击播放播完：停回第一帧待命
+                    source.pause();
+                    source.restart();
                 }
             }
-            if (scheduler) show = show && scheduler.playing;
+            if (scheduler) show = show && (scheduler.playing || !scheduler.hideWhenIdle);
             mesh.visible = show;
             if (!show) continue;
 
             source.update(nowMs);
 
-            const rect = rectFromTransform(instance.transform, entry.aspect, screenW, screenH);
-            const [dx, dy] = elementScreenShift(mouseX, mouseY, instance.depth, focus, strength, cover);
-            mesh.position.set(rect.left + dx * screenW, rect.top + dy * screenH);
-            mesh.scale.set(rect.width, rect.height);
+            // "在点击位置出现"的元素用点击时记下的位置和深度
+            const transform = Shared.elements.transformOf(instance);
+            let depth = instance.depth;
+            if (entry.clickAt) {
+                transform.x = entry.clickAt.x;
+                transform.y = entry.clickAt.y;
+                depth = entry.clickAt.depth;
+            }
+            const size = elementSize(transform, entry.aspect, screenW);
+            const [dx, dy] = elementScreenShift(mouseX, mouseY, depth, focus, strength, cover);
+            entry.shown = { ...transform, x: transform.x + dx, y: transform.y + dy };
+            mesh.position.set(entry.shown.x * screenW, entry.shown.y * screenH);
+            mesh.scale.set(size.width, size.height);
+            mesh.rotation = (transform.rotation * Math.PI) / 180;
+            this._updateGeometry(entry, transform);
 
             const u = mesh.shader.uniforms;
             u.uDepth = depthTexture;
@@ -108,11 +126,44 @@ class ElementsLayer {
             u.uMouse = [mouseX, mouseY];
             u.uStrength = strength;
             u.uFocus = focus;
-            u.uElemDepth = instance.depth;
+            u.uElemDepth = depth;
             u.uOpacity = instance.opacity;
             u.uChromaEnabled = instance.chroma && instance.chroma.enabled ? 1 : 0;
             u.uChromaStrength = instance.chroma ? instance.chroma.strength : 0.5;
+            u.uFlip = [transform.flipX ? 1 : 0, transform.flipY ? 1 : 0];
+            const color = entry.color;
+            u.uHue = color.hue;
+            u.uSaturation = color.saturation;
+            u.uBrightness = color.brightness;
+            u.uTint = color.tint;
+            u.uTintAmount = color.tintAmount;
         }
+    }
+
+    /**
+     * 桌面被点击（屏幕像素坐标）：触发点击播放的元素。
+     * "在点击位置出现"的元素移到点击处播放；其余的要点中元素本身才播放。
+     * @returns {boolean} 是否触发了元素（需要叫醒渲染）
+     */
+    handleClick(px, py) {
+        if (this.paused) return false;
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+        let triggered = false;
+        for (const entry of this.entries.values()) {
+            const { instance, scheduler } = entry;
+            if (!instance.visible || !(scheduler instanceof Shared.playback.ClickTrigger)) continue;
+            if (scheduler.hideWhenIdle) {
+                const x = px / screenW;
+                const y = py / screenH;
+                entry.clickAt = { x, y, depth: instance.depthAuto ? this._depthAt(x, y) : instance.depth };
+            } else if (!entry.shown || !Shared.placement.pointInElement(entry.shown, entry.aspect, px, py, screenW, screenH)) {
+                continue;
+            }
+            scheduler.trigger();
+            triggered = true;
+        }
+        return triggered;
     }
 
     pause(nowMs) {
@@ -213,7 +264,13 @@ class ElementsLayer {
 
     _createEntry(instance, asset, source) {
         const shader = createElementShader(source.texture, this.scene.getDepthTexture());
-        const mesh = new PIXI.Mesh(this.geometry, shader);
+        // 每个实例自己一份几何体：自由变形时四个角的位置各不相同
+        const geometry = new PIXI.Geometry()
+            .addAttribute('aVertexPosition', new Float32Array(8), 2)
+            .addAttribute('aUvs', new Float32Array(12), 3)
+            .addIndex([0, 1, 2, 0, 2, 3]);
+        const mesh = new PIXI.Mesh(geometry, shader);
+        mesh.pivot.set(0.5, 0.5);   // 绕框中心旋转
         mesh.visible = false;   // 第一次 update 时再决定是否显示
         this.container.addChild(mesh);
         const entry = {
@@ -221,17 +278,47 @@ class ElementsLayer {
             asset,
             source,
             mesh,
+            geometry,
             scheduler: null,
             aspect: source.width / source.height || asset.aspect || 1,
             playbackKey: null,
+            warpKey: null,
+            shown: null,
+            clickAt: null,
+            color: null,
         };
         this.entries.set(instance.id, entry);
         this._configure(entry);
     }
 
-    /** 按实例的播放设置配置素材源；播放设置没变时不重置调度器 */
+    /** 四个角变了才重写顶点：位置是框坐标，贴图坐标带透视权重 */
+    _updateGeometry(entry, transform) {
+        const key = JSON.stringify(transform.warp);
+        if (key === entry.warpKey) return;
+        entry.warpKey = key;
+        const points = Shared.placement.quadCorners(transform);
+        const q = Shared.placement.projectiveWeights(points);
+        entry.geometry.getBuffer('aVertexPosition').update(new Float32Array(points.flat()));
+        entry.geometry.getBuffer('aUvs').update(new Float32Array(
+            ELEMENT_BOX_CORNERS.flatMap(([u, v], i) => [u * q[i], v * q[i], q[i]])));
+    }
+
+    /** 点击位置（屏幕归一化）处的壁纸深度 */
+    _depthAt(x, y) {
+        const image = this.scene.getDepthImage();
+        if (!image) return 0.5;
+        if (this.depthSamplerImage !== image) {
+            this.depthSampler = createDepthSampler(image);
+            this.depthSamplerImage = image;
+        }
+        const [u, v] = Shared.parallax.screenToImageUV(x, y, this.scene.getCover());
+        return this.depthSampler.sample(u, v);
+    }
+
+    /** 按实例的设置配置素材源和颜色；播放设置没变时不重置调度器 */
     _configure(entry) {
         const { instance, source } = entry;
+        entry.color = Shared.elements.colorUniforms(Shared.elements.effectsOf(instance));
         const playback = instance.playback || { mode: 'static' };
         const key = JSON.stringify([playback, instance.visible]);
         if (key === entry.playbackKey) return;
@@ -241,10 +328,16 @@ class ElementsLayer {
             entry.scheduler = null;
             return;
         }
+        entry.clickAt = null;
         if (playback.mode === 'interval') {
             source.setLoop(false);
             source.pause();
             entry.scheduler = new Shared.playback.IntervalScheduler(playback);
+        } else if (playback.mode === 'click') {
+            source.setLoop(false);
+            source.pause();
+            source.restart();
+            entry.scheduler = new Shared.playback.ClickTrigger({ hideWhenIdle: !!playback.followClick });
         } else {
             entry.scheduler = null;
             source.setLoop(true);
@@ -277,6 +370,7 @@ class ElementsLayer {
         if (!entry) return;
         this.container.removeChild(entry.mesh);
         entry.mesh.destroy();
+        entry.geometry.destroy();
         entry.source.destroy();
         this.entries.delete(id);
     }

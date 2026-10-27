@@ -41,10 +41,11 @@ const { spawn } = require('child_process');
 const { injectToWallpaperLayer, restoreFromWallpaperLayer } = require('./src/wallpaper-native');
 const { createTray, updateTrayMenu } = require('./src/tray-manager');
 const { FullscreenDetector } = require('./src/fullscreen-detector');
+const { DesktopClickWatcher } = require('./src/desktop-click-watcher');
 const { AppStore } = require('./src/store');
 const { registerElementsIpc } = require('./src/elements/ipc');
 const { PlacementController } = require('./src/elements/placement-controller');
-const { upsertInstance } = require('./shared/elements-model');
+const { upsertInstance, hasClickTriggers } = require('./shared/elements-model');
 const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
@@ -62,6 +63,9 @@ let tray = null;
 
 /** 全屏检测器 */
 let fullscreenDetector = null;
+
+/** 桌面点击检测（有"点击播放"的元素时才开启） */
+let desktopClickWatcher = null;
 
 /** 数据持久化 */
 let store = null;
@@ -322,6 +326,27 @@ function broadcastConfig() {
     for (const win of [wallpaperWindow, settingsWindow]) {
         if (win && !win.isDestroyed()) win.webContents.send('config:load', config);
     }
+    syncDesktopClickWatcher(config);
+}
+
+// ==================== 桌面点击 ====================
+
+/** 按配置开关桌面点击检测：有显示中的"点击播放"元素才开 */
+function syncDesktopClickWatcher(config) {
+    if (!desktopClickWatcher) {
+        desktopClickWatcher = new DesktopClickWatcher({ onClick: forwardDesktopClick });
+    }
+    desktopClickWatcher.setEnabled(hasClickTriggers(config.customElements));
+}
+
+/** 桌面被单击：把鼠标位置（相对主显示器）发给壁纸窗口；壁纸暂停或正在摆放元素时忽略 */
+function forwardDesktopClick() {
+    if (!isRenderingActive || (placement && placement.active)) return;
+    if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return;
+    const point = screen.getCursorScreenPoint();
+    const { x, y, width, height } = screen.getPrimaryDisplay().bounds;
+    if (point.x < x || point.x > x + width || point.y < y || point.y > y + height) return;
+    wallpaperWindow.webContents.send('desktop:click', { x: point.x - x, y: point.y - y });
 }
 
 // ==================== 自定义元素摆放窗口 ====================
@@ -859,9 +884,12 @@ function setupPowerMonitor() {
 function cleanupAndQuit() {
     console.log('[Main] Cleaning up...');
 
-    // 停止全屏检测
+    // 停止全屏检测和桌面点击检测
     if (fullscreenDetector) {
         fullscreenDetector.stop();
+    }
+    if (desktopClickWatcher) {
+        desktopClickWatcher.stop();
     }
 
     // 从 WorkerW 层恢复（可选，防止桌面图标异常）
@@ -943,8 +971,9 @@ app.whenReady().then(() => {
         },
     });
 
-    // 5. 启动全屏检测
+    // 5. 启动全屏检测；有"点击播放"的元素时启动桌面点击检测
     startFullscreenDetection();
+    syncDesktopClickWatcher(store.getConfig());
 
     // 6. 监听电源事件
     setupPowerMonitor();

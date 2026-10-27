@@ -52,6 +52,11 @@
             return this.state === 'playing';
         }
 
+        /** 两次播放之间隐藏 */
+        get hideWhenIdle() {
+            return true;
+        }
+
         /** 是否需要每帧 tick：还没开始第一次播放，或者正在播放 */
         get needsFrames() {
             return this.state !== 'waiting';
@@ -100,5 +105,57 @@
         }
     }
 
-    return { pickFrame, IntervalScheduler };
+    /**
+     * 点击播放：平时待命（停在第一帧或隐藏），点击桌面触发后播放一次，播完回到待命。
+     * 接口和 IntervalScheduler 一致，渲染层按同样的方式处理。
+     */
+    class ClickTrigger {
+        /** @param {{hideWhenIdle: boolean}} options - 待命时是否隐藏（"在点击位置出现"时隐藏） */
+        constructor({ hideWhenIdle }) {
+            this.hideWhenIdle = !!hideWhenIdle;
+            this.state = 'idle';
+            this.pending = false;
+        }
+
+        get playing() {
+            return this.state === 'playing';
+        }
+
+        /** 正在播放，或者刚被点击、下一帧要开始播放 */
+        get needsFrames() {
+            return this.pending || this.state === 'playing';
+        }
+
+        /** 点击播放不需要定时唤醒 */
+        get nextEventMs() {
+            return null;
+        }
+
+        /** 被点击：下一次 tick 从头开始播放（正在播时也从头播） */
+        trigger() {
+            this.pending = true;
+        }
+
+        /**
+         * @returns {'start'|'end'|null}
+         */
+        tick(nowMs, ended) {
+            if (this.pending) {
+                this.pending = false;
+                this.state = 'playing';
+                return 'start';
+            }
+            if (this.state === 'playing' && ended) {
+                this.state = 'idle';
+                return 'end';
+            }
+            return null;
+        }
+
+        pause() {}
+
+        resume() {}
+    }
+
+    return { pickFrame, IntervalScheduler, ClickTrigger };
 });

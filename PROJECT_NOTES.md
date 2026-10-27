@@ -62,17 +62,17 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 │   ├── elements/
 │   │   ├── sources.js       素材源：图片 / 动图（ImageDecoder）/ 视频 → Pixi 纹理
 │   │   ├── element-shader.js 元素着色器实例
-│   │   ├── elements-layer.js 元素渲染层：视差位移、深度遮挡、间隔播放、排序
+│   │   ├── elements-layer.js 元素渲染层：视差位移、深度遮挡、旋转 / 透视变形 / 变色、间隔播放、点击播放、排序
 │   │   └── depth-sampler.js CPU 读深度图（自动贴地）
-│   ├── edit-mode.js         摆放模式：拖动、角点缩放、深度滑块、Enter / Esc
+│   ├── edit-mode.js         摆放模式：拖动、角点缩放、边点拉伸、旋转手柄、自由变形、翻转、深度滑块、Enter / Esc
 │   └── main.js              入口：配置、鼠标、动画循环、IPC
 ├── shared/                  纯逻辑（UMD，Node 测试和渲染进程共用，挂在 window.Shared）
 │   ├── parallax-math.js     Cover 映射、视差位移、元素屏幕位移
 │   ├── elements-model.js    自定义元素数据结构与纯函数
-│   ├── playback.js          动图取帧、间隔播放调度
+│   ├── playback.js          动图取帧、间隔播放调度、点击播放状态机
 │   ├── frame-pacing.js      空闲停帧判断
 │   ├── config-sync.js       配置节流保存、只应用变化的配置段
-│   └── placement-math.js    摆放几何：矩形换算、拖动、角点缩放、深度取样
+│   └── placement-math.js    摆放几何：框坐标 ↔ 屏幕、拖动、缩放、拉伸、旋转、自由变形、透视权重、点击命中、深度取样
 ├── src/
 │   ├── elements/
 │   │   ├── library.js       素材库：识别格式、读 manifest、导入复制、缩略图、file URL
@@ -80,7 +80,9 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 │   │   ├── placement-controller.js 摆放会话（保证只有一个窗口，异常时按取消处理）
 │   │   └── migrate.js       旧"自定义贴纸"配置迁移
 │   ├── wallpaper-native.js  WorkerW 注入
-│   ├── fullscreen-detector.js 全屏检测（常驻 PowerShell）
+│   ├── ps-helper.js         常驻 PowerShell 助手（按行读输出、异常重启），下面两个共用
+│   ├── fullscreen-detector.js 全屏检测
+│   ├── desktop-click-watcher.js 桌面单击检测（有"点击播放"元素时才开）
 │   ├── store.js             config.json / 深度缓存 / custom_elements 目录
 │   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移
 │   └── tray-manager.js      托盘菜单
@@ -136,6 +138,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | `config:save` / `config:get` / `config:load` | R→M / M→R | 配置读写 + 广播（壁纸窗口和设置窗口） |
 | `wallpaper:apply` / `image:new` | R→M / M→R | 应用壁纸 |
 | `mouse:move` | M→R | 全局鼠标坐标 |
+| `desktop:click` | M→R | 桌面被单击（坐标相对主显示器），触发"点击播放"的元素；壁纸暂停或摆放中不发 |
 | `renderer:pause` / `renderer:resume` | M→R | 暂停 / 恢复；带 `{ silent: true }` 时不弹提示 |
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | 自定义元素 |
 | `placement:getDraft` / `commit` / `cancel` | R→M | 摆放窗口 |
@@ -154,9 +157,12 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
   videoOverlay: { enabled, presetId, customPath, customName, blendMode, opacity, speed },
   customElements: {
     library:   [{ id: 'user:<uuid>', name, type: 'image'|'animated'|'video', file, thumb, builtin: false, importedAt }],
-    instances: [{ id, assetId, visible, transform: { x, y, width, rotation }, depth, depthAuto, opacity,
-                  playback: { mode: 'static'|'loop'|'interval', intervalSec, jitterSec },
-                  chroma: { enabled, strength }, effects: {} }],
+    instances: [{ id, assetId, visible,
+                  transform: { x, y, width, rotation, stretch, flipX, flipY, warp },   // warp：自由变形时四个角的偏移，null 为不变形
+                  depth, depthAuto, opacity,
+                  playback: { mode: 'static'|'loop'|'interval'|'click', intervalSec, jitterSec, followClick },
+                  chroma: { enabled, strength },
+                  effects: { hue, saturation, brightness, tint, tintAmount } }],      // 旧实例缺的字段用 transformOf / effectsOf 补齐
   },
 }
 ```
@@ -176,7 +182,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | 全屏 / 锁屏暂停 | ✅ | 自定义元素的视频和间隔计时也会暂停 |
 | 托盘、开机自启 | ✅ | 托盘"更换壁纸"：有缓存直接应用，没有就在设置窗口生成后自动应用 |
 | 黑胶唱片机 / 视频特效 / 天气粒子 | ✅ | |
-| **自定义元素系统** | ✅ | 图片 / GIF / 动态 webp / apng / mp4 / webm；默认两个爆炸；摆放模式；深度遮挡；间隔播放；抠绿幕 |
+| **自定义元素系统** | ✅ | 图片 / GIF / 动态 webp / apng / mp4 / webm；默认两个爆炸；摆放模式（缩放、拉伸、旋转、翻转、自由变形）；深度遮挡；间隔播放；点击播放；抠绿幕；变色 |
 | 自定义贴纸 | ♻️ 已移除 | 被自定义元素取代，旧配置自动迁移 |
 | 默认壁纸图库（`default wallpaper/`） | ⬜ 未开始 | |
 | 打包后独立运行 | ⏸ 暂缓 | |
@@ -244,7 +250,13 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
    - 输出深度图最长边 1920（原来是原图尺寸），6000px 的大图整个流程约 1.2 秒。
    - 设置页预览区右上角"原图 | 深度图"切换；有深度图时才出现，刚生成完自动切到深度图。
    - 17 张默认壁纸的深度图已用新算法重算（`prepare_wallpapers.py --depth-only`）。用户自己图片的旧缓存仍有效，重新点"生成深度图"才会换成新算法。
-3. [ ] 自定义元素进阶：变色、旋转、变形（数据结构已预留 `transform.rotation`、`effects`）；点击桌面触发播放。
+3. [x] 自定义元素进阶。
+   - 变色（设置页"调整"里）：色相、饱和度、亮度、染色（颜色 + 强度，按亮度乘上染色颜色，白色元素也能染）、恢复原色。在元素着色器里做，放在抠像之后。
+   - 旋转（摆放模式框上方的圆点，按住 Shift 每次 15°）、单向拉伸（边中点，`transform.stretch` 是高度相对原始比例的倍数）、水平 / 垂直翻转。
+   - 自由变形：工具条"自由变形"后单独拖四个角，贴图按透视铺开（顶点带齐次权重 q，见 `projectiveWeights`）；拖成凹四边形时不接受。"复原"清掉旋转、拉伸、翻转和变形。
+   - 点击播放（播放方式第三项）：平时停在第一帧，点中元素时播放一次；打开"在点击位置出现"后平时隐藏，点桌面哪里就在那里播放一次（自动深度时取点击处的深度）。
+   - 桌面点击检测：常驻助手每 15ms 读左键状态，按下到松开 ≤500ms、移动 ≤6px 且松开处是桌面（根窗口类名 Progman / WorkerW）才算；只在有显示中的点击播放元素时开启。和全屏检测共用 `src/ps-helper.js`。
+   - 实测：Electron 里渲染、摆放手柄、设置页调色、主进程转发点击都验证过；真实鼠标点桌面这一步要人工试（自动测试不能去点用户的桌面）。
 - ~~设置页模型选择~~：不做，只用 small 模型（用户决定）。
 - ~~多显示器~~：不做（用户决定）。
 

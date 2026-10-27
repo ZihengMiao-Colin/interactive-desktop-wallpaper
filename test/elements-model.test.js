@@ -32,13 +32,53 @@ test('默认素材的播放配置优先', () => {
 
 test('createInstance 默认值', () => {
     const i = M.createInstance(imageAsset, 'i1');
-    assert.deepEqual(i.transform, { x: 0.5, y: 0.5, width: 0.25, rotation: 0 });
+    assert.deepEqual(i.transform, {
+        x: 0.5, y: 0.5, width: 0.25, rotation: 0, stretch: 1, flipX: false, flipY: false, warp: null,
+    });
     assert.equal(i.id, 'i1');
     assert.equal(i.assetId, 'user:img');
     assert.equal(i.opacity, 1);
     assert.equal(i.depthAuto, true);
     assert.equal(i.visible, true);
-    assert.deepEqual(i.effects, {});
+    assert.deepEqual(i.effects, M.DEFAULT_EFFECTS);
+});
+
+test('transformOf / effectsOf 给旧实例补齐新字段', () => {
+    const old = { transform: { x: 0.2, y: 0.3, width: 0.1, rotation: 0 }, effects: {} };
+    assert.deepEqual(M.transformOf(old), {
+        x: 0.2, y: 0.3, width: 0.1, rotation: 0, stretch: 1, flipX: false, flipY: false, warp: null,
+    });
+    assert.deepEqual(M.effectsOf(old), M.DEFAULT_EFFECTS);
+    assert.deepEqual(M.effectsOf({}), M.DEFAULT_EFFECTS);
+    assert.equal(M.effectsOf({ effects: { hue: 40 } }).hue, 40);
+});
+
+test('normalizeRotation 落在 (-180, 180]', () => {
+    assert.equal(M.normalizeRotation(45), 45);
+    assert.equal(M.normalizeRotation(190), -170);
+    assert.equal(M.normalizeRotation(-180), 180);
+    assert.equal(M.normalizeRotation(540), 180);
+    assert.equal(M.normalizeRotation(-725), -5);
+});
+
+test('colorUniforms：色相换成圈数，染色颜色解析成 0~1', () => {
+    const u = M.colorUniforms({ ...M.DEFAULT_EFFECTS, hue: 90, saturation: 1.5, brightness: 0.8, tint: '#ff8000', tintAmount: 0.4 });
+    assert.equal(u.hue, 0.25);
+    assert.equal(u.saturation, 1.5);
+    assert.equal(u.brightness, 0.8);
+    assert.deepEqual(u.tint, [1, 128 / 255, 0]);
+    assert.equal(u.tintAmount, 0.4);
+    assert.deepEqual(M.colorUniforms({ tint: 'oops' }).tint, [1, 1, 1], '颜色写错时按白色处理');
+    assert.equal(M.colorUniforms({}).saturation, 1, '缺字段用默认值');
+});
+
+test('patchInstance 夹紧拉伸、规整旋转角，effects 只合并给出的字段', () => {
+    const ce = { library: [], instances: [M.createInstance(imageAsset, 'i1')] };
+    const i = M.patchInstance(ce, 'i1', { transform: { stretch: 99, rotation: 270 }, effects: { hue: 30 } }).instances[0];
+    assert.equal(i.transform.stretch, M.LIMITS.maxStretch);
+    assert.equal(i.transform.rotation, -90);
+    assert.equal(i.effects.hue, 30);
+    assert.equal(i.effects.saturation, 1);
 });
 
 test('createInstance 使用素材自带默认宽度', () => {
@@ -130,4 +170,13 @@ test('legacyStickerToInstance 未启用或没有图片返回 null', () => {
     assert.equal(M.legacyStickerToInstance({ enabled: false, imagePath: 'a.png' }, 1920, 1080, 1), null);
     assert.equal(M.legacyStickerToInstance({ enabled: true, imagePath: '' }, 1920, 1080, 1), null);
     assert.equal(M.legacyStickerToInstance(undefined, 1920, 1080, 1), null);
+});
+
+test('hasClickTriggers：有显示中的点击播放元素才需要检测桌面点击', () => {
+    const click = { ...M.createInstance(videoAsset, 'c1'), playback: { mode: 'click', intervalSec: 10, jitterSec: 3 } };
+    const loop = M.createInstance(videoAsset, 'l1');
+    assert.equal(M.hasClickTriggers({ library: [], instances: [loop] }), false);
+    assert.equal(M.hasClickTriggers({ library: [], instances: [loop, click] }), true);
+    assert.equal(M.hasClickTriggers({ library: [], instances: [{ ...click, visible: false }] }), false);
+    assert.equal(M.hasClickTriggers(null), false);
 });

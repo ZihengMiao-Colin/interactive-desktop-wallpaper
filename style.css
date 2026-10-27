@@ -574,6 +574,7 @@ body > canvas {
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
     cursor: move;
     touch-action: none;
+    transform-origin: center;
 }
 
 #placement-box .handle {
@@ -589,6 +590,100 @@ body > canvas {
 #placement-box .handle[data-corner="ne"] { right: -7px; top: -7px; cursor: nesw-resize; }
 #placement-box .handle[data-corner="sw"] { left: -7px; bottom: -7px; cursor: nesw-resize; }
 #placement-box .handle[data-corner="se"] { right: -7px; bottom: -7px; cursor: nwse-resize; }
+
+/* 边中点：单向拉伸 */
+#placement-box .handle.edge { width: 10px; height: 10px; border-radius: 50%; }
+#placement-box .handle[data-edge="n"] { left: calc(50% - 6px); top: -7px; cursor: ns-resize; }
+#placement-box .handle[data-edge="s"] { left: calc(50% - 6px); bottom: -7px; cursor: ns-resize; }
+#placement-box .handle[data-edge="w"] { left: -7px; top: calc(50% - 6px); cursor: ew-resize; }
+#placement-box .handle[data-edge="e"] { right: -7px; top: calc(50% - 6px); cursor: ew-resize; }
+
+/* 旋转手柄：框上方的圆点，用一根竖线连到框 */
+#placement-box .rotate-handle {
+    position: absolute;
+    left: calc(50% - 8px);
+    top: -40px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #9ec5ff;
+    border: 1px solid #234;
+    cursor: grab;
+}
+
+#placement-box .rotate-handle::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 14px;
+    width: 2px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.8);
+    pointer-events: none;
+}
+
+/* 自由变形：四个角单独拖动，实线画出变形后的轮廓 */
+#placement-box .handle.warp {
+    width: 14px;
+    height: 14px;
+    margin: -8px 0 0 -8px;
+    border-radius: 50%;
+    background: #ffcf5a;
+    cursor: crosshair;
+}
+
+#placement-box .warp-outline {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+#placement-box .warp-outline polygon {
+    fill: none;
+    stroke: #ffcf5a;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+}
+
+#placement-box .handle.warp,
+#placement-box .warp-outline {
+    display: none;
+}
+
+#placement-box.warp-mode {
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+#placement-box.warp-mode .handle.scale,
+#placement-box.warp-mode .handle.edge,
+#placement-box.warp-mode .rotate-handle {
+    display: none;
+}
+
+#placement-box.warp-mode .handle.warp,
+#placement-box.warp-mode .warp-outline,
+#placement-box.warped .warp-outline {
+    display: block;
+}
+
+.placement-sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+#placement-rotation {
+    min-width: 40px;
+    color: #9ec5ff;
+    text-align: right;
+}
+
+.placement-btn.active {
+    background: #b8860b;
+}
 
 #placement-toolbar {
     position: absolute;

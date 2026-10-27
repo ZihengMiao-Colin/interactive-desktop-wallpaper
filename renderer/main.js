@@ -245,6 +245,12 @@ function registerIpcListeners() {
         if (!info.silent) UI.showToast('壁纸已恢复', 1500);
     });
 
+    // 点击桌面：触发"点击播放"的元素
+    window.electronAPI.onDesktopClick(({ x, y }) => {
+        if (renderPaused) return;
+        if (elementsLayer.handleClick(x, y)) wake();
+    });
+
     window.electronAPI.onNewImage(async (imagePath) => {
         UI.showLoading('正在加载新壁纸...');
         try {

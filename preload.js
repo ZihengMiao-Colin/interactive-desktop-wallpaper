@@ -174,6 +174,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => ipcRenderer.removeListener('config:load', handler);
     },
 
+    /** 桌面被单击（坐标相对主显示器），只发给壁纸窗口 */
+    onDesktopClick: (callback) => {
+        const handler = (_event, point) => callback(point);
+        ipcRenderer.on('desktop:click', handler);
+        return () => ipcRenderer.removeListener('desktop:click', handler);
+    },
+
     /**
      * 监听全局鼠标位置（主进程轮询 → 渲染进程）。
      * 回调参数: { x: number, y: number } — 相对于主显示器的坐标

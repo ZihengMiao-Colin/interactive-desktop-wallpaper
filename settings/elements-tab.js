@@ -2,7 +2,8 @@
  * elements-tab.js — 设置窗口的"自定义元素"页签
  *
  * 三块内容：添加按钮、素材库（默认元素 / 我添加的）、壁纸上的元素列表。
- * 点素材进入摆放模式；列表里可以调深度、不透明度、播放方式、抠像，以及重新摆放和删除。
+ * 点素材进入摆放模式；列表里可以调深度、不透明度、颜色、播放方式、抠像，以及重新摆放和删除。
+ * 位置、大小、旋转、翻转、变形都在摆放模式里直接在壁纸上调。
  */
 
 'use strict';
@@ -13,7 +14,12 @@ const ELEMENTS_SAVE_DEBOUNCE_MS = 150;
 const ELEMENTS_RENDER_HOLD_MS = 800;
 
 const TYPE_LABEL = { image: '图片', animated: 'GIF', video: '视频' };
-const MODE_LABEL = { static: '静止', loop: '循环', interval: '间隔播放' };
+const MODE_LABEL = { static: '静止', loop: '循环', interval: '间隔播放', click: '点击播放' };
+/** 点击播放两种待命方式的说明 */
+const CLICK_HINT = {
+    follow: '平时隐藏，点击桌面空白处就在那里播放一次',
+    element: '平时停在第一帧，点中它时播放一次',
+};
 
 /**
  * @param {{ api: object, setStatus: (msg: string, cls?: string) => void }} deps
@@ -90,7 +96,7 @@ function initElementsTab({ api, setStatus }) {
                 return;
             }
             const started = await api.elements.startPlacement({ assetId: asset.id });
-            setStatus(started ? `正在摆放「${asset.name}」：拖动移动，拖动角点缩放，Enter 确认` : '摆放窗口已经打开', started ? '' : 'error');
+            setStatus(started ? `正在摆放「${asset.name}」：拖动移动，角点缩放，上方圆点旋转，Enter 确认` : '摆放窗口已经打开', started ? '' : 'error');
         });
 
         if (!asset.builtin) {
@@ -148,42 +154,100 @@ function initElementsTab({ api, setStatus }) {
     function playbackSummary(instance, asset) {
         if (!asset) return '素材丢失';
         const mode = asset.type === 'image' ? 'static' : instance.playback.mode;
-        return mode === 'interval'
-            ? `间隔播放 · 每 ${instance.playback.intervalSec} 秒`
-            : MODE_LABEL[mode] || mode;
+        if (mode === 'interval') return `间隔播放 · 每 ${instance.playback.intervalSec} 秒`;
+        if (mode === 'click') return instance.playback.followClick ? '点击播放 · 在点击位置出现' : '点击播放 · 点中时播放';
+        return MODE_LABEL[mode] || mode;
+    }
+
+    /** 颜色：色相、饱和度、亮度、染色 */
+    function renderColorControls(instance) {
+        const id = instance.id;
+        const fx = Shared.elements.effectsOf(instance);
+        const group = el('div', 'el-color-group');
+        group.appendChild(el('div', 'el-group-title', '颜色'));
+        group.appendChild(sliderRow('色相', -180, 180, Math.round(fx.hue),
+            (v) => (v > 0 ? '+' : '') + v + '°', (v) => saveInstance(id, { effects: { hue: v } })));
+        group.appendChild(sliderRow('饱和度', 0, 200, Math.round(fx.saturation * 100),
+            (v) => v + '%', (v) => saveInstance(id, { effects: { saturation: v / 100 } })));
+        group.appendChild(sliderRow('亮度', 20, 200, Math.round(fx.brightness * 100),
+            (v) => v + '%', (v) => saveInstance(id, { effects: { brightness: v / 100 } })));
+
+        const tintRow = el('div', 'row');
+        tintRow.appendChild(el('label', '', '染色颜色'));
+        const tint = el('input', 'el-color-input');
+        tint.type = 'color';
+        tint.value = fx.tint;
+        tint.addEventListener('input', () => saveInstance(id, { effects: { tint: tint.value } }));
+        tintRow.appendChild(tint);
+        group.appendChild(tintRow);
+        group.appendChild(sliderRow('染色强度', 0, 100, Math.round(fx.tintAmount * 100),
+            (v) => v + '%', (v) => saveInstance(id, { effects: { tintAmount: v / 100 } })));
+
+        const actions = el('div', 'el-detail-actions');
+        const reset = el('button', 'el-mini-btn', '恢复原色');
+        reset.addEventListener('click', () => {
+            // 不走 hold：希望收到新配置后立刻重绘，滑块回到默认位置
+            clearTimeout(saveTimers.get(id));
+            holdUntil = 0;
+            api.elements.updateInstance(id, { effects: { ...Shared.elements.DEFAULT_EFFECTS } });
+        });
+        actions.appendChild(reset);
+        group.appendChild(actions);
+        return group;
     }
 
     function renderInstanceDetails(instance, asset) {
         const box = el('div', 'el-instance-details');
         const id = instance.id;
 
+        box.appendChild(el('div', 'el-detail-hint', '位置、大小、旋转、翻转和变形：点"重新摆放"直接在壁纸上调'));
         box.appendChild(sliderRow('深度', 0, 100, Math.round(instance.depth * 100),
             (v) => (v / 100).toFixed(2), (v) => saveInstance(id, { depth: v / 100 })));
         box.appendChild(sliderRow('不透明度', 10, 100, Math.round(instance.opacity * 100),
             (v) => v + '%', (v) => saveInstance(id, { opacity: v / 100 })));
+        box.appendChild(renderColorControls(instance));
 
         if (asset.type === 'image') return box;
 
         // 播放方式
+        box.appendChild(el('div', 'el-group-title', '播放'));
         const modeRow = el('div', 'row');
         modeRow.appendChild(el('label', '', '播放方式'));
         const select = el('select', 'custom-select');
-        for (const mode of ['loop', 'interval']) {
+        for (const mode of ['loop', 'interval', 'click']) {
             const option = el('option', '', MODE_LABEL[mode]);
             option.value = mode;
             select.appendChild(option);
         }
-        select.value = instance.playback.mode === 'interval' ? 'interval' : 'loop';
+        select.value = ['interval', 'click'].includes(instance.playback.mode) ? instance.playback.mode : 'loop';
         modeRow.appendChild(select);
         box.appendChild(modeRow);
 
         const intervalRow = sliderRow('播放间隔（播完后等待）', 1, 120, instance.playback.intervalSec,
             (v) => v + ' 秒', (v) => saveInstance(id, { playback: { intervalSec: v } }));
-        intervalRow.style.display = select.value === 'interval' ? '' : 'none';
         box.appendChild(intervalRow);
 
-        select.addEventListener('change', () => {
+        // 点击播放：在点击位置出现，或者点中元素时播放
+        const followRow = el('div', 'toggle-row');
+        followRow.appendChild(el('span', '', '在点击位置出现'));
+        const clickHint = el('div', 'el-detail-hint');
+        let follow = !!instance.playback.followClick;
+        followRow.appendChild(toggle(follow, (on) => {
+            follow = on;
+            clickHint.textContent = on ? CLICK_HINT.follow : CLICK_HINT.element;
+            saveInstance(id, { playback: { followClick: on } }, true);
+        }));
+        clickHint.textContent = follow ? CLICK_HINT.follow : CLICK_HINT.element;
+        box.append(followRow, clickHint);
+
+        const showModeRows = () => {
             intervalRow.style.display = select.value === 'interval' ? '' : 'none';
+            followRow.style.display = select.value === 'click' ? '' : 'none';
+            clickHint.style.display = select.value === 'click' ? '' : 'none';
+        };
+        showModeRows();
+        select.addEventListener('change', () => {
+            showModeRows();
             saveInstance(id, { playback: { mode: select.value } }, true);
         });
 

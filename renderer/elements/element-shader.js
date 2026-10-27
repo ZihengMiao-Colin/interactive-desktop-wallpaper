@@ -23,5 +23,11 @@ function createElementShader(texture, depthTexture) {
         uOpacity: 1,
         uChromaEnabled: 0,
         uChromaStrength: 0.5,
+        uFlip: new Float32Array([0, 0]),
+        uHue: 0,
+        uSaturation: 1,
+        uBrightness: 1,
+        uTint: new Float32Array([1, 1, 1]),
+        uTintAmount: 0,
     });
 }

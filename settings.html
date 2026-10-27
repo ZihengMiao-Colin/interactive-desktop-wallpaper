@@ -719,6 +719,31 @@
             color: #666;
             margin-top: 10px;
         }
+        .el-detail-hint {
+            font-size: 11px;
+            color: #777;
+            margin-bottom: 10px;
+        }
+        .el-group-title {
+            font-size: 12px;
+            color: #9ec5ff;
+            margin: 12px 0 8px;
+        }
+        .el-color-input {
+            width: 140px;
+            height: 22px;
+            padding: 0;
+            margin: 0;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            background: transparent;
+            cursor: pointer;
+        }
+        .el-detail-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 4px;
+        }
 
         .status {
             text-align: center;
@@ -965,7 +990,7 @@
             <div class="el-group-title">壁纸上的元素</div>
             <div class="el-instance-list" id="elements-instance-list"></div>
 
-            <div class="el-hint">点击素材进入摆放模式：拖动移动，拖动角点缩放，Enter 确认，Esc 取消。</div>
+            <div class="el-hint">点击素材进入摆放模式：拖动移动，角点缩放，边点拉伸，上方圆点旋转，"自由变形"单独拖四个角，Enter 确认，Esc 取消。</div>
         </div>
     </div>
 
@@ -1004,6 +1029,7 @@
     <script src="settings/gallery-panel.js"></script>
     <script src="settings/depth-preview.js"></script>
     <script src="settings/thumbnail.js"></script>
+    <script src="shared/elements-model.js"></script>
     <script src="settings/elements-tab.js"></script>
     <script>
         // ==================== 状态 ====================
