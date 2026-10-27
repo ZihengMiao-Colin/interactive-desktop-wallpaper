@@ -78,6 +78,7 @@
       "icon": "assets/icon.png"
     },
     "nsis": {
+      "artifactName": "Interactive3DWallpaper-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
