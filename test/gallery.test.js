@@ -68,6 +68,26 @@ test('migrateLegacyImagePath：旧文件还在、对不上原文件名、或路�
     assert.equal(migrateLegacyImagePath('', g, () => false), '');
 });
 
+test('migrateLegacyImagePath：另一份图库里的同一张换成当前图库的（开发目录 ↔ 安装目录）', () => {
+    const current = loadGallery(galleryDir([cat, lake]));
+    // 另一份图库还在：目录里有列了这张图的 manifest.json
+    const otherDir = galleryDir([cat]);
+    const other = path.join(otherDir, 'cat.jpg');
+    assert.equal(migrateLegacyImagePath(other, current), current[0].file);
+    // 另一份图库已经删了（比如开发目录挪走了）：按 wallpapers 目录名和文件名认
+    const gone = 'C:\\old-project\\wallpapers\\lake.jpg';
+    assert.equal(migrateLegacyImagePath(gone, current, () => false), current[1].file);
+});
+
+test('migrateLegacyImagePath：用户自己 wallpapers 文件夹里的同名图片不动', () => {
+    const current = loadGallery(galleryDir([cat]));
+    const userDir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wp-user-')), 'wallpapers');
+    fs.mkdirSync(userDir);
+    fs.writeFileSync(path.join(userDir, 'cat.jpg'), 'x');
+    assert.equal(migrateLegacyImagePath(path.join(userDir, 'cat.jpg'), current), path.join(userDir, 'cat.jpg'));
+    assert.equal(migrateLegacyImagePath(current[0].file, current), current[0].file);
+});
+
 test('项目自带的图库能读出 17 张壁纸，图片、深度图、缩略图都在', () => {
     const g = loadGallery(path.join(__dirname, '..', 'wallpapers'));
     assert.equal(g.length, 17);

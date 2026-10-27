@@ -21,6 +21,8 @@ const Host = (() => {
             getConfig: () => api.getConfig(),
             onConfig: (callback) => api.onLoadConfig(callback),
             getBuiltinAssets: () => api.elements.getBuiltin(),
+            /** 全屏视频特效预设（绝对路径：打包后素材在 resources/overlay，不在页面旁边） */
+            getOverlayPresets: () => api.getOverlayPresets(),
             fileUrl: (filePath) => api.toFileUrl(filePath),
             readBytes: async (filePath) => {
                 const bytes = api.readFileBuffer(filePath);
@@ -58,6 +60,8 @@ const Host = (() => {
                 return [];
             }
         },
+        /** 浏览器预览直接用页面旁边的 overlay/ 目录（VideoOverlayManager 里的默认表） */
+        getOverlayPresets: async () => null,
         fileUrl: (filePath) => filePath,
         readBytes: async (filePath) => {
             const r = await fetch(filePath);

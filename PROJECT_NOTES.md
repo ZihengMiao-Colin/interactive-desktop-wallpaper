@@ -1,11 +1,11 @@
 # 互动3D壁纸 — 项目现状 & 开发计划
 
-> 最近更新：2026-10-26（唱片机动画改进后）
+> 最近更新：2026-10-27（v1 发布前检查）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件。
 
-**当前范围（2026-10-25 确认）**
+**当前范围**
 - 只做**电脑端**。Android 版在 `C:\Users\24418\Desktop\2\Wallpaper3D phone`，暂不更新。
-- 目前是自己开发、自己用，**暂不考虑打包**。打包相关问题移到 §9 的"暂缓"部分。
+- 2026-10-27：现有功能定为 **v1** 并完成打包（取代 10-25 的"暂不考虑打包"）：`npm run build` 出 NSIS 安装包，安装版已实测。过程见 §9 阶段 6。
 - 特效视频素材（`overlay/`、`elements/`）进 git。
 
 ---
@@ -27,13 +27,15 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | 桌面框架 | Electron ^28.3.3（Chromium 120），electron-builder ^24.9.1 |
 | 渲染 | Pixi.js 7.4.2（npm 本地依赖，版本锁定），自定义 Filter / Mesh 着色器 |
 | 动图解码 | Chromium 自带的 WebCodecs `ImageDecoder`（没有引入 `@pixi/gif`） |
-| 深度模型 | Depth Anything V2 Small；`generate_depth_map.py` 先找本地 ONNX，找不到再走 HuggingFace。ONNX 输入固定 518×518（不能保持原图比例）；输出深度图最长边 1920 |
-| Python | 项目内 `venv/`（3.11.9），只装了 onnxruntime / numpy / pillow |
-| ONNX 模型 | 根目录（`.gitignore` 忽略）：`_ir9.onnx` 100MB（实际被选中）、`_int8.onnx` 28MB、2MB 的空壳 |
+| 深度模型 | Depth Anything V2 Small。应用里用 `onnxruntime-node`（1.31.1，版本锁定）在 utilityProcess 子进程里推理（`src/depth/`），前后处理从 `generate_depth_map.py` 移植，结果和 Python 版逐像素一致。ONNX 输入固定 518×518（不能保持原图比例）；输出深度图最长边 1920 |
+| Python | 项目内 `venv/`（3.11.9），只装了 onnxruntime / numpy / pillow。应用本身不再用 Python，只给 `tools/` 下的素材脚本和 Python 测试用 |
+| ONNX 模型 | 根目录（`.gitignore` 忽略）：`_ir9.onnx` 100MB（选最大的，实际用这个）、`_int8.onnx` 28MB、2MB 的空壳。打包时 `_ir9.onnx` 复制成 `resources/models/depth_anything_v2_small.onnx` |
+| 打包 | electron-builder，只出 NSIS 安装包（`npm run build` → `dist/互动3D壁纸 Setup 1.0.0.exe`，约 334MB；装好约 560MB）。素材和模型在 `resources/` 下（asar 外），onnxruntime 的 dll 解包到 `app.asar.unpacked` |
 | 测试 | Node 内置 `node --test`（`npm test`）；预处理脚本用 Python `unittest` |
 | 平台 | 仅 Windows，仅主显示器 |
 
 - 启动：`npm start`；`npm run dev` 会打开 DevTools。
+- 打包：`npm run build`。日志在数据目录的 `logs/main.log`（主进程和各窗口的控制台输出都在里面，打包后排查问题看这个）。
 - 测试：`npm test`；Python 用 `venv/Scripts/python.exe -m unittest tools/test_<名字>.py`（`test_generate_depth_map`、`test_prepare_wallpapers`、`test_prepare_builtin_element`）。
 - 浏览器预览（不用启动 Electron 就能看渲染效果）：`venv/Scripts/python.exe -m http.server 8765`，打开 `http://localhost:8765/index.html`；摆放模式加 `?mode=edit`。数据来自 `dev/dev-config.json`。
 
@@ -99,6 +101,11 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 │   ├── ps-helper.js         常驻 PowerShell 助手（按行读输出、异常重启），下面两个共用
 │   ├── fullscreen-detector.js 全屏检测
 │   ├── desktop-click-watcher.js 桌面单击检测（有"点击播放"元素时才开）
+│   ├── depth/
+│   │   ├── generator.js     深度图生成入口：找模型、开推理子进程、收结果
+│   │   ├── inference-process.js 推理子进程（utilityProcess）：缩放 → ONNX → 后处理 → PNG
+│   │   ├── processing.js    数值处理（Pillow 兼容的 bicubic、外扩、三次均值模糊、量化）
+│   │   └── png.js           8 位灰度 PNG 编码
 │   ├── store.js             config.json / 深度缓存 / custom_elements 目录
 │   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移
 │   └── tray-manager.js      托盘菜单
@@ -109,7 +116,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ├── tools/prepare_wallpapers.py       默认壁纸图库素材生成（缩图 / 缩略图 / 深度图；`--depth-only` 只重算深度图）
 ├── dev/                     浏览器预览用的假配置和示例 GIF
 ├── test/                    Node 单元测试
-├── generate_depth_map.py / export_onnx.py / 生成深度图.bat
+├── generate_depth_map.py / export_onnx.py / 生成深度图.bat   Python 版深度图（tools/prepare_wallpapers.py 在用；应用里已换成 src/depth/）
 ├── background.png / background2.png / depth_map.png   默认素材
 └── default wallpaper/       （未跟踪）默认壁纸的原图，图库素材由它生成，可以删除
 ```
@@ -124,7 +131,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 3. 渲染进程 `start()`：读配置 → 有上次的壁纸就用它和它的深度缓存（没有缓存时用占位深度图）→ `Scene.load` → 加载自定义元素 → 启动 ticker。
 
 ### 4.2 换壁纸（设置窗口）
-`选择壁纸` → `生成深度图`（spawn venv python）→ `应用壁纸`（保存 `currentImage`，发 `image:new`）→ 壁纸窗口 `Scene.load` 换纹理并释放旧纹理。
+`选择壁纸` → `生成深度图`（preload 用 Chromium 解码成 RGBA → 主进程开推理子进程 → 存进深度缓存）→ `应用壁纸`（保存 `currentImage`，发 `image:new`）→ 壁纸窗口 `Scene.load` 换纹理并释放旧纹理。
 
 ### 4.3 视差渲染
 - 背景：屏幕 UV 按 Cover 映射到图片 UV → 取深度 → `parallaxUV = mouse × (depth − focus) × strength`（软截断）→ 偏移采样。
@@ -149,7 +156,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | `settings:prepareImage` | M→R | 托盘选了一张没有深度图的图片：设置窗口生成深度图后自动应用 |
 | `overlay:getPresets` | R→M | 全屏视频特效列表 |
 | `gallery:list` | R→M | 默认壁纸图库列表 |
-| `depth:generate` / `depth:progress` | R→M / M→R | 生成深度图 / 进度 |
+| `depth:generate` / `depth:progress` | R→M / M→R | 生成深度图（带 `{ imagePath, blurRadius, width, height, rgba }`）/ 进度 |
 | `cache:*`、`depth:*CacheDir` | R→M | 深度图缓存与目录（`cache:getDepthMap` 对默认壁纸返回自带的深度图） |
 | `config:save` / `config:get` / `config:load` | R→M / M→R | 配置读写 + 广播（壁纸窗口和设置窗口） |
 | `wallpaper:apply` / `image:new` | R→M / M→R | 应用壁纸 |
@@ -193,7 +200,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 |---|---|---|
 | 深度视差渲染 | ✅ | 背景着色器改为 highp，公式与元素共用 |
 | WorkerW 注入 | ✅ | |
-| 深度图生成（ONNX） | ✅（仅开发环境） | 依赖项目内 `venv` + 根目录 onnx 文件 |
+| 深度图生成（ONNX） | ✅ | onnxruntime-node，开发版和安装版都能用 |
 | 深度图缓存 / 迁移目录 | ✅ | |
 | 全屏 / 锁屏暂停 | ✅ | 自定义元素的视频和间隔计时也会暂停 |
 | 托盘、开机自启 | ✅ | 托盘"更换壁纸"：有缓存直接应用，没有就在设置窗口生成后自动应用 |
@@ -202,7 +209,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | 自定义贴纸 | ♻️ 已移除 | 被自定义元素取代，旧配置自动迁移 |
 | 默认壁纸图库（`wallpapers/`） | ✅ | |
 | 设置窗口 / 壁纸页界面 | ✅ 2026-10-26 改版 | 左侧导航分六页、统一控件和 Lucide 图标、实时视差预览；摆放模式、Toast、调试面板同一套样式 |
-| 打包后独立运行 | ⏸ 暂缓 | |
+| 打包后独立运行 | ✅ v1 | NSIS 安装包，见 §9 阶段 6 |
 | 多显示器 | ❌ 不支持 | |
 
 ---
@@ -210,7 +217,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ## 8. 已知问题 / 风险
 
 ### 🔴 P0
-1. ⏸（暂缓到打包时）打包产物无法生成深度图、无法播放内置素材：`build.files` 不含 Python 脚本、模型、`overlay/`、`elements/`；`main.js` 用 `__dirname` 找 `venv`。另外 `build.files` 也没有 `ui/`、`settings/`、`shared/`、`wallpapers/`，打包时要一起加。
+1. ~~打包产物无法生成深度图、无法播放内置素材~~ ✅ 2026-10-27 解决（§9 阶段 6）
 2. ~~Pixi.js 走 CDN~~ ✅ 改为 npm 本地依赖
 3. ~~"选择"等于"应用"~~ ✅ 选择只返回路径，只有"应用壁纸"会换壁纸并保存 `currentImage`
 4. ~~托盘"更换壁纸"流程不完整~~ ✅ 有缓存直接应用；没有缓存在设置窗口生成后自动应用
@@ -221,9 +228,9 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 7. ~~一直满帧渲染~~ ✅ 空闲停帧：鼠标静止、视差收敛、没有天气粒子和播放中的视频 / 动图时停掉 ticker（实测静止 3 秒 0 帧）；有动画时帧率上限 60（这台机器屏幕约 240Hz，实测下雪时 2 秒 481 帧 → 118 帧）
 8. ~~拖滑块时每次 input 都写盘并广播~~ ✅ 设置页和调试面板节流保存（首次立即发送，之后每 100ms 最多一次，实测 30 次拖动 → 5 次广播）；壁纸只重新应用变了的配置段
 9. 注入失败的兜底模式 `moveTop()` 会把全屏窗口提到所有程序上面。
-10. 单实例锁写在 `whenReady` 之后。
+10. ~~单实例锁写在 `whenReady` 之后~~ ✅ 拿不到锁就不注册启动流程
 11. ~~深度缓存只按文件大小判断~~ ✅ 改为大小 + 修改时间（旧索引没有修改时间的条目仍只比大小）
-12. 设置页生成深度图写死 `'small'` —— 按用户决定只用 small 模型，保持现状。
+12. 只用 small 模型（用户决定）。`generateDepthMap` 已去掉 `modelSize` 参数。
 
 ### 🟡 P2
 13. ~~死代码~~ ✅ 拆分 `app.js` 时已清理
@@ -233,6 +240,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 17. ~~mediump 精度~~ ✅ 改为 highp
 18. 视频素材都进了 git：`overlay/` 139MB（`old1.mp4` 53.7MB 推到 GitHub 会有警告）。素材继续增多的话考虑 Git LFS。
 19. `生成深度图.bat`、`requirements.txt` 仍按 torch 路线写。
+22. 深度图后处理现在有两份实现：应用里的 `src/depth/processing.js` 和 `generate_depth_map.py`（`tools/prepare_wallpapers.py` 生成默认壁纸深度图时用）。改算法要两边一起改，`test/depth-processing.test.js` 里有 Pillow 生成的对照数据。
 20. 自定义元素：摆放模式只处理主显示器；动图最多解码 600 帧；元素多了以后没有数量上限提示。
 21. 天气粒子画在单独的 Canvas 2D 图层上，盖在整张壁纸上面，不会被近处的物体挡住（想要"雪落在树后面"得把天气挪进 Pixi 场景做深度遮挡）。光斑的光源固定在左上角，可能和壁纸里实际的光线方向不一致。
 
@@ -317,9 +325,42 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。
 
-### ⏸ 暂缓 — 打包
-- 深度推理改用 `onnxruntime-node`，去掉 Python。
-- 素材和模型放进 `extraResources`，路径用 `app.isPackaged ? process.resourcesPath : __dirname`。
+### ✅ 阶段 6 — v1 打包（2026-10-27 完成）
+发布前检查：`npm test` 121 个全过，三组 Python 测试全过；用全新数据目录启动（模拟新用户）、打开设置窗口切完六个页面、正常退出，都没有报错，也没有残留 PowerShell 进程。功能上可以定为 v1，但当时的打包配置打不出能用的程序，于是做了下面这些。
+
+打包阻断项：
+- [x] `build.files` 补齐 `ui/`、`settings/`、`shared/`；只出 NSIS 安装包（portable 每次启动解压到临时目录，开机自启路径会变）。onnxruntime-node 只带 win32/x64，去掉用不到的 DirectML.dll / dxcompiler.dll（只用 CPU，实测去掉照常推理），省 36MB。
+- [x] 深度图改用 `onnxruntime-node`，去掉 Python（`src/depth/`）：
+  - 预处理和后处理从 `generate_depth_map.py` 移植，缩放照搬 Pillow 的 bicubic 算法。图片由设置窗口的 preload 用 Chromium 解码（不做色彩管理，和 Pillow 读到的一样；按 EXIF 方向摆正，和壁纸显示一致，原来 Python 版不管 EXIF）。
+  - 实测 3 张图（1920 图、7952×5304 大图、PNG）开发版和安装版的结果和 Python 版**逐像素一致**，耗时 0.7~2.5 秒（大图多花在把像素传给主进程上）。webp、路径带 `#` 也测过。
+  - 推理放在 Electron 的 `utilityProcess` 子进程里，不放 worker 线程：原生代码出问题时只会让子进程退出。实际遇到过：`onnxruntime.dll` 缺失时，加载器会找到 Windows 11 自带的 `C:\Windows\System32\onnxruntime.dll`（1.17），推理时原生中止，在 worker 线程里会把整个壁纸程序带崩。现在实测藏掉 dll 只会提示"生成失败"，壁纸照常运行。
+- [x] 素材（`overlay/`、`elements/` 里运行时用到的、`wallpapers/`）和模型放进 `extraResources`，主进程用 `ASSET_DIR` / `MODEL_DIR`（打包后是 `process.resourcesPath`）。`renderer/video-overlay.js` 原来写死了 `overlay/xxx.mp4` 相对路径，打包后指到 asar 里，改成从主进程取预设（`Host.getOverlayPresets`）。
+- [x] 配置里的绝对路径：`migrateLegacyImagePath` 会把"另一份图库里的同一张"换成当前图库的（那份图库还在时看它的 `manifest.json`，删了就按 `wallpapers` 目录名和文件名认），开发版和安装版来回切都能对上。用户自己 `wallpapers` 文件夹里的同名图片不受影响。
+
+发布前顺手修：
+- [x] 单实例锁：拿不到锁就不注册启动流程（实测第二个实例 0.4 秒退出，不建窗口、不注入桌面）。
+- [x] 全屏应用退出、唤醒、解锁时统一走 `resumeWallpaper()`：全屏应用还开着、或正在摆放元素时不恢复渲染。
+- [x] 开机自启：开发时带上项目目录（原来开机会打开 Electron 的默认页），查询和设置用同一组参数。
+- [x] 日志：`electron-log` 写到数据目录的 `logs/main.log`，包括各窗口的控制台输出。删掉没用的 `electron-store`。
+- [x] 新用户第一次启动默认用图库第一张（湖光山色），不再是 1366×768 的 `background.png`。
+- [x] 自定义视频的 file URL 改用 `Host.fileUrl`（路径带 `#` 也能打开）。
+- [x] `author` 改为 ZihengMiao；`dist/` 旧构建已清掉。
+
+安装版实测（复制一份真实配置到单独的数据目录，用 `--user-data-dir` 启动，不动真实配置）：
+- 静默安装 166 个文件，装在 `%LOCALAPPDATA%\Programs\interactive-desktop-wallpaper`，桌面和开始菜单都有快捷方式，"应用和功能"里能看到。覆盖安装（升级）也正常。
+- 当前壁纸路径从开发目录换成安装目录的同一张；注入桌面成功；生成深度图和 Python 版逐像素一致；视频特效从 `resources/overlay` 播放并能循环；默认元素（爆炸）从 `resources/elements` 加载播放；设置页 21 张来自 `resources` 的缩略图都加载成功；防多开、正常退出都没问题。
+- 没测：开机自启开关（会写注册表 Run 项）、托盘图标的显示和菜单（要人工看）、真实鼠标点桌面。
+
+打包环境的坑（换电脑打包时会再遇到）：
+- electron-builder 解压 `winCodeSign` 时要建 macOS 的符号链接，普通权限会失败。解决：手动把缓存里的 7z 解压到 `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\winCodeSign-2.6.0`，跳过 `darwin` 目录（或者打开 Windows 开发者模式）。
+- 在受限的 shell 里下载的 nsis / nsis-resources 改名失败（"cannot move the file to a different disk drive"），手动把临时目录改成 `nsis-3.0.4.1`、`nsis-resources-3.4.1`。
+- 在 Git Bash 里给安装程序传 `/D=路径` 时反斜杠会被吃掉，会装到一个奇怪的相对路径；用 PowerShell 的 `Start-Process` 传参。
+
+分发给别人前要确认（不影响自用）：
+- 默认壁纸来自 Pexels / Pixabay，公开分发前核对它们对"壁纸类应用直接附带原图"的限制；`overlay/`、`elements/` 视频没有记录来源。
+- 没有代码签名，别人运行会看到 SmartScreen 提示。
+- Electron 28 已停止安全更新。只加载本地页面，风险低，v1 可以不动。
+- 唱片机封面 `coverPath` 指向未跟踪的 `default wallpaper/` 里的一张图，删这个目录前先换封面。
 
 ---
 
@@ -328,7 +369,7 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 | 问题 | 结论 |
 |---|---|
 | `elements/` 爆炸视频用途 | 做成用户可以单独加到壁纸上的自定义元素 |
-| 自用还是分发 | 目前自己开发，暂不考虑打包 |
+| 自用还是分发 | 目前自己开发；2026-10-27 起现有功能定为 v1 并打包（深度图改 onnxruntime-node、fp32 模型、只出 NSIS 安装包） |
 | Android 版 | 在 `C:\Users\24418\Desktop\2\Wallpaper3D phone`，暂不更新 |
 | 视频素材进 git | 进 |
 | 视频元素默认播放方式 | 一次性素材间隔播放（播完等 10±3 秒），其余循环 |

@@ -66,17 +66,41 @@ function findGalleryEntry(gallery, imagePath) {
     return gallery.find((e) => samePath(e.file, imagePath)) || null;
 }
 
+/** 图片所在目录是不是一份图库：有 manifest.json，并且列了这张图 */
+function listedInGalleryManifest(imagePath) {
+    try {
+        const manifest = JSON.parse(fs.readFileSync(path.join(path.dirname(imagePath), 'manifest.json'), 'utf-8'));
+        const name = path.basename(imagePath).toLowerCase();
+        return (manifest.wallpapers || []).some((w) => String(w.file).toLowerCase() === name);
+    } catch (_) {
+        return false;
+    }
+}
+
 /**
- * 旧版本直接用 `default wallpaper/` 里的原图当壁纸；那个文件不在了的话，
- * 按原文件名换成图库里处理过的同一张图。
+ * 配置里记着的壁纸路径如果指向别处的同一张默认壁纸，换成当前图库里的：
+ *   - 另一份图库里的图：开发目录和安装目录各有一份图库、共用同一份配置。
+ *     那份图库还在时看它的 manifest.json；已经删了就按 wallpapers 目录名和文件名认。
+ *   - 旧版本直接用 `default wallpaper/` 里的原图当壁纸，那个文件不在了的话按原文件名认。
  * @param {string} imagePath - 配置里记着的壁纸路径
  * @param {GalleryEntry[]} gallery
  * @param {(p: string) => boolean} [exists]
  * @returns {string} 新路径；不需要迁移时原样返回
  */
 function migrateLegacyImagePath(imagePath, gallery, exists = fs.existsSync) {
-    if (!imagePath || exists(imagePath)) return imagePath;
+    if (!imagePath || findGalleryEntry(gallery, imagePath)) return imagePath;
     const base = path.basename(imagePath).toLowerCase();
+    const found = exists(imagePath);
+
+    const fromOtherGallery = found
+        ? listedInGalleryManifest(imagePath)
+        : path.basename(path.dirname(imagePath)).toLowerCase() === 'wallpapers';
+    if (fromOtherGallery) {
+        const entry = gallery.find((e) => path.basename(e.file).toLowerCase() === base);
+        if (entry) return entry.file;
+    }
+
+    if (found) return imagePath;
     const entry = gallery.find((e) => e.origin && e.origin.toLowerCase() === base);
     return entry ? entry.file : imagePath;
 }

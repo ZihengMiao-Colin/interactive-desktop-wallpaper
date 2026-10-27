@@ -170,11 +170,11 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
         btnApply.disabled = true;
         gallery.setBusy(true);
         depthGenerated = false;
-        showProgress('正在启动 Python…');
+        showProgress('正在读取图片…');
 
         const blurRadius = parseInt(blurSlider.value, 10);
         try {
-            const result = await api.generateDepthMap(selectedImagePath, 'small', blurRadius);
+            const result = await api.generateDepthMap(selectedImagePath, blurRadius);
             endProgress();
             if (result.success) {
                 depthGenerated = true;
@@ -203,7 +203,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
 
     btnGenerate.addEventListener('click', () => generateDepth());
 
-    // Python 脚本的进度输出：按关键字推进度条
+    // 主进程发来的进度：按关键字推进度条
     api.onDepthProgress((data) => {
         if (!isGenerating) return;
         const msg = data.message;

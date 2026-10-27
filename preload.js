@@ -18,6 +18,30 @@ const fs = require('fs');
 const { toFileUrl } = require('./src/elements/library');
 
 /**
+ * 读取图片并解码成 RGBA 像素，给主进程生成深度图用。
+ * 用 Chromium 的解码器：jpg / png / webp / bmp 都支持，并按 EXIF 方向摆正（和壁纸上显示的一致）。
+ * @param {string} filePath
+ * @returns {Promise<{width: number, height: number, rgba: Uint8ClampedArray}>}
+ */
+async function decodeImagePixels(filePath) {
+    let bitmap;
+    try {
+        // 不做色彩管理：和原来 Python（Pillow）读到的像素一样
+        bitmap = await createImageBitmap(new Blob([fs.readFileSync(filePath)]), { colorSpaceConversion: 'none' });
+    } catch (err) {
+        throw new Error('无法读取图片：' + err.message);
+    }
+    try {
+        const { width, height } = bitmap;
+        const ctx = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(bitmap, 0, 0);
+        return { width, height, rgba: ctx.getImageData(0, 0, width, height).data };
+    } finally {
+        bitmap.close();
+    }
+}
+
+/**
  * 暴露到渲染进程 window.electronAPI 的安全 API。
  */
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -52,14 +76,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // ==================== 深度图生成 ====================
 
     /**
-     * 调用 Python 脚本生成深度图。
+     * 生成深度图：这里解码图片，主进程用 ONNX 模型推理并存进缓存。
      * @param {string} imagePath - 原始图片路径
-     * @param {string} modelSize - 模型大小: "small" / "base" / "large"
      * @param {number} [blurRadius] - 边缘平滑高斯模糊半径（像素），0为不平滑，默认 8
      * @returns {Promise<{success: boolean, depthDataUrl?: string, error?: string}>}
      */
-    generateDepthMap: (imagePath, modelSize, blurRadius) =>
-        ipcRenderer.invoke('depth:generate', { imagePath, modelSize, blurRadius }),
+    generateDepthMap: async (imagePath, blurRadius) => {
+        const pixels = await decodeImagePixels(imagePath);
+        return ipcRenderer.invoke('depth:generate', { imagePath, blurRadius, ...pixels });
+    },
 
     /**
      * 监听深度图生成进度。

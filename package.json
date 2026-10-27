@@ -3,18 +3,17 @@
   "version": "1.0.0",
   "description": "互动 3D 桌面壁纸 — 基于 Pixi.js + Electron 的伪 3D 深度视差壁纸",
   "main": "main.js",
-  "author": "Wallpaper App",
+  "author": "ZihengMiao",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder",
-    "build:win": "electron-builder --win portable",
+    "build": "electron-builder --win nsis",
     "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
     "electron-log": "^5.0.1",
-    "electron-store": "^8.1.0",
+    "onnxruntime-node": "1.31.1",
     "pixi.js": "7.4.2"
   },
   "devDependencies": {
@@ -30,25 +29,51 @@
     "files": [
       "main.js",
       "preload.js",
-      "src/**/*",
       "index.html",
       "settings.html",
       "style.css",
+      "src/**/*",
       "renderer/**/*",
+      "settings/**/*",
+      "shared/**/*",
+      "ui/**/*",
       "assets/**/*",
       "background.png",
-      "depth_map.png"
+      "depth_map.png",
+      "!node_modules/onnxruntime-node/bin/napi-v*/{darwin,linux}/**",
+      "!node_modules/onnxruntime-node/bin/napi-v*/win32/arm64/**",
+      "!node_modules/onnxruntime-node/bin/napi-v*/win32/x64/{DirectML,dxcompiler}.dll",
+      "!node_modules/onnxruntime-node/script/**"
+    ],
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/bin/**"
     ],
     "extraResources": [
       {
-        "from": "assets/",
-        "to": "assets/"
+        "from": "overlay",
+        "to": "overlay"
+      },
+      {
+        "from": "elements",
+        "to": "elements",
+        "filter": [
+          "manifest.json",
+          "*_cut.mp4",
+          "*_thumb.jpg"
+        ]
+      },
+      {
+        "from": "wallpapers",
+        "to": "wallpapers"
+      },
+      {
+        "from": "depth_anything_v2_small_ir9.onnx",
+        "to": "models/depth_anything_v2_small.onnx"
       }
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "icon": "assets/icon.png"
     },

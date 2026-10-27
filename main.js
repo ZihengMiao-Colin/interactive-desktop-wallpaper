@@ -10,13 +10,13 @@
  *   4. 通过 IPC 与渲染进程通信（图片上传、参数配置、深度图缓存）
  *   5. 管理开机自启
  *
- * 启动流程：
- *   app.whenReady()
- *     → 初始化 electron-store（数据持久化）
+ * 启动流程（拿到单实例锁之后）：
+ *   app.whenReady() → startApp()
+ *     → 初始化 AppStore（config.json 和深度图缓存）
+ *     → 注册 IPC 处理器
  *     → 创建壁纸窗口 → 注入 WorkerW 层
  *     → 创建系统托盘
  *     → 启动全屏检测轮询
- *     → 注册 IPC 处理器
  * ============================================================================
  */
 
@@ -35,7 +35,12 @@ const {
 
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+
+// ---- 日志：主进程和各窗口的控制台输出都写进 userData/logs/main.log（打包后没有控制台可看） ----
+const log = require('electron-log/main');
+log.initialize({ preload: false, spyRendererConsole: true });
+log.errorHandler.startCatching();
+Object.assign(console, log.functions);
 
 // ---- 自定义模块 ----
 const { injectToWallpaperLayer, restoreFromWallpaperLayer } = require('./src/wallpaper-native');
@@ -50,6 +55,18 @@ const { isClickable: isVinylClickable } = require('./shared/vinyl-player');
 const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
+const { findDepthModel, generateDepthPng } = require('./src/depth/generator');
+
+// ==================== 资源位置 ====================
+
+/**
+ * 自带素材（overlay/、elements/、wallpapers/）所在目录：
+ * 打包后在安装目录的 resources/ 下（asar 外面，视频才能正常拖进度、循环），开发时就是项目目录。
+ */
+const ASSET_DIR = app.isPackaged ? process.resourcesPath : __dirname;
+
+/** 深度模型所在目录：打包后是 resources/models/，开发时是项目根目录（*.onnx 不进 git） */
+const MODEL_DIR = app.isPackaged ? path.join(process.resourcesPath, 'models') : __dirname;
 
 // ==================== 全局状态 ====================
 
@@ -552,7 +569,7 @@ function registerIpcHandlers() {
 
     // ---- 获取内置视频特效列表 ----
     ipcMain.handle('overlay:getPresets', async () => {
-        const overlayDir = path.join(__dirname, 'overlay');
+        const overlayDir = path.join(ASSET_DIR, 'overlay');
         return [
             {
                 id: 'rain1',
@@ -703,102 +720,39 @@ function registerIpcHandlers() {
 
     // ---- 开机自启切换 ----
     ipcMain.handle('app:toggleAutoLaunch', async (_event, enabled) => {
-        app.setLoginItemSettings({
-            openAtLogin: enabled,
-            path: process.execPath,
-        });
+        setAutoLaunch(enabled);
         store.saveConfig({ autoLaunch: enabled });
-        return app.getLoginItemSettings().openAtLogin;
+        return getAutoLaunch();
     });
 
-    ipcMain.handle('app:getAutoLaunch', async () => {
-        return app.getLoginItemSettings().openAtLogin;
-    });
+    ipcMain.handle('app:getAutoLaunch', async () => getAutoLaunch());
 
-    // ---- 生成深度图（调用 Python 脚本） ----
-    ipcMain.handle('depth:generate', async (event, { imagePath, modelSize, blurRadius }) => {
-        const scriptPath = path.join(__dirname, 'generate_depth_map.py');
-        const cacheKey = store._hashPath(imagePath);
-        const outputPath = path.join(store._cacheDir, `${cacheKey}.png`);
+    // ---- 生成深度图（onnxruntime-node，在单独的子进程里跑；像素由设置窗口的 preload 解码好传过来） ----
+    ipcMain.handle('depth:generate', async (event, { imagePath, blurRadius, width, height, rgba }) => {
+        const blur = Number.isFinite(Number(blurRadius)) ? Number(blurRadius) : 8;
+        const progress = (message) => {
+            console.log('[Depth]', message);
+            if (!event.sender.isDestroyed()) event.sender.send('depth:progress', { message });
+        };
 
-        const blurVal = (blurRadius !== undefined && blurRadius !== null) ? Number(blurRadius) : 8.0;
-        console.log(`[Main] Starting depth generation: ${imagePath} (model: ${modelSize || 'small'}, blur: ${blurVal})`);
+        const modelPath = findDepthModel(MODEL_DIR);
+        if (!modelPath) {
+            const error = `找不到深度模型 depth_anything_v2_small*.onnx（${MODEL_DIR}）`;
+            console.error('[Main]', error);
+            return { success: false, error };
+        }
+        console.log(`[Main] 生成深度图: ${imagePath}（${width}×${height}，平滑 ${blur}，模型 ${path.basename(modelPath)}）`);
 
-        return new Promise((resolve) => {
-            const args = ['-X', 'utf8', scriptPath, imagePath, '-o', outputPath];
-            if (modelSize) {
-                args.push('-m', modelSize);
-            }
-            args.push('--blur', String(blurVal));
-
-            // 优先使用项目虚拟环境里的 Python（包含所有依赖），找不到则回退到系统 python
-            const venvPython = path.join(__dirname, 'venv', 'Scripts', 'python.exe');
-            const pythonExe = fs.existsSync(venvPython) ? venvPython : 'python';
-            console.log(`[Main] Using Python: ${pythonExe}`);
-
-            const proc = spawn(pythonExe, args, {
-                stdio: ['ignore', 'pipe', 'pipe'],
-                env: {
-                    ...process.env,
-                    PYTHONUTF8: '1',
-                    PYTHONIOENCODING: 'utf-8',
-                },
-            });
-
-            let stderr = '';
-
-            proc.stdout.on('data', (data) => {
-                const text = data.toString('utf-8');
-                const lines = text.split('\n').filter(l => l.trim());
-                for (const line of lines) {
-                    console.log('[Python]', line);
-                    event.sender.send('depth:progress', { message: line.trim() });
-                }
-            });
-
-            proc.stderr.on('data', (data) => {
-                const text = data.toString('utf-8');
-                stderr += text;
-                console.error('[Python:stderr]', text);
-            });
-
-            proc.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error('[Main] Python exit code:', code);
-                    resolve({ success: false, error: stderr || 'Depth map generation failed' });
-                    return;
-                }
-
-                try {
-                    if (!fs.existsSync(outputPath)) {
-                        resolve({ success: false, error: `Depth file not generated: ${outputPath}` });
-                        return;
-                    }
-
-                    const depthData = fs.readFileSync(outputPath);
-                    const base64 = depthData.toString('base64');
-                    const depthDataUrl = `data:image/png;base64,${base64}`;
-
-                    // 保存到缓存
-                    store.saveDepthCache(imagePath, depthDataUrl);
-
-                    console.log('[Main] Depth map generated and cached');
-
-                    resolve({ success: true, depthDataUrl, depthPath: outputPath });
-                } catch (err) {
-                    console.error('[Main] Failed to read depth map:', err.message);
-                    resolve({ success: false, error: err.message });
-                }
-            });
-
-            proc.on('error', (err) => {
-                console.error('[Main] Failed to start Python:', err.message);
-                resolve({
-                    success: false,
-                    error: `Failed to start Python: ${err.message}\nPlease ensure Python is installed and in PATH`,
-                });
-            });
-        });
+        try {
+            const png = await generateDepthPng({ rgba, width, height, modelPath, blurRadius: blur, onProgress: progress });
+            const depthDataUrl = 'data:image/png;base64,' + png.toString('base64');
+            store.saveDepthCache(imagePath, depthDataUrl);
+            progress(`[OK] 深度图已生成（${Math.round(png.length / 1024)} KB）`);
+            return { success: true, depthDataUrl };
+        } catch (err) {
+            console.error('[Main] 深度图生成失败:', err);
+            return { success: false, error: err.message };
+        }
     });
 
     // ---- 应用壁纸（从设置窗口触发） ----
@@ -821,11 +775,46 @@ function registerIpcHandlers() {
         ipcMain,
         dialog,
         store,
-        elementsDir: path.join(__dirname, 'elements'),
+        elementsDir: path.join(ASSET_DIR, 'elements'),
         getDialogParent: () => settingsWindow || wallpaperWindow,
         broadcastConfig,
         placement,
     });
+}
+
+// ==================== 开机自启 ====================
+
+/**
+ * 开机自启的启动命令。打包后就是安装目录里的 exe；
+ * 开发时 process.execPath 是 electron.exe，要带上项目目录，否则开机打开的是 Electron 的默认页。
+ * 查询时必须传同样的 path / args 才能找到这一条。
+ */
+function loginItemOptions() {
+    return app.isPackaged
+        ? { path: process.execPath }
+        : { path: process.execPath, args: [app.getAppPath()] };
+}
+
+function getAutoLaunch() {
+    return app.getLoginItemSettings(loginItemOptions()).openAtLogin;
+}
+
+function setAutoLaunch(enabled) {
+    app.setLoginItemSettings({ openAtLogin: enabled, ...loginItemOptions() });
+}
+
+// ==================== 暂停 / 恢复 ====================
+
+/**
+ * 系统事件（全屏应用退出、唤醒、解锁）之后恢复壁纸渲染。
+ * 全屏应用还开着时不恢复（全屏检测只在状态变化时通知，恢复了就不会再暂停）；
+ * 正在摆放元素时也不恢复，摆放结束时 PlacementController 会负责恢复。
+ */
+function resumeWallpaper() {
+    if (!isRenderingActive || (placement && placement.active)) return;
+    if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
+        wallpaperWindow.webContents.send('renderer:resume');
+    }
 }
 
 // ==================== 全屏检测 ====================
@@ -844,9 +833,7 @@ function startFullscreenDetection() {
         onFullscreenEnd: () => {
             console.log('[Main] Fullscreen app exited, resuming render');
             isRenderingActive = true;
-            if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-                wallpaperWindow.webContents.send('renderer:resume');
-            }
+            resumeWallpaper();
         },
     });
 
@@ -863,12 +850,8 @@ function setupPowerMonitor() {
         }
     });
 
-    // 系统唤醒/解锁 → 恢复渲染
-    powerMonitor.on('resume', () => {
-        if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-            wallpaperWindow.webContents.send('renderer:resume');
-        }
-    });
+    // 系统唤醒 → 恢复渲染（全屏应用还开着时不恢复）
+    powerMonitor.on('resume', resumeWallpaper);
 
     // 锁屏
     powerMonitor.on('lock-screen', () => {
@@ -878,11 +861,7 @@ function setupPowerMonitor() {
     });
 
     // 解锁
-    powerMonitor.on('unlock-screen', () => {
-        if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-            wallpaperWindow.webContents.send('renderer:resume');
-        }
-    });
+    powerMonitor.on('unlock-screen', resumeWallpaper);
 }
 
 // ==================== 清理和退出 ====================
@@ -923,7 +902,7 @@ function cleanupAndQuit() {
 // 允许壁纸后台播放音频，免除手势交互限制
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
-app.whenReady().then(() => {
+function startApp() {
     console.log('[Main] App starting...');
 
     // 1. 初始化数据存储
@@ -940,13 +919,19 @@ app.whenReady().then(() => {
         },
     });
 
-    // 默认壁纸图库；旧版本直接用 default wallpaper/ 里的原图当壁纸，原图不在了就换成图库里的同一张
-    gallery = loadGallery(path.join(__dirname, 'wallpapers'));
+    // 默认壁纸图库。配置里记的是绝对路径：开发目录和安装目录各有一份图库、共用同一份配置，
+    // 另一份图库里的图、以及旧版本 default wallpaper/ 里的原图，都换成当前图库里的同一张
+    gallery = loadGallery(path.join(ASSET_DIR, 'wallpapers'));
     const currentImage = store.getConfig().currentImage;
     const migratedImage = migrateLegacyImagePath(currentImage, gallery);
     if (migratedImage !== currentImage) {
         store.saveConfig({ currentImage: migratedImage });
         console.log('[Main] 当前壁纸已换成图库里的同一张:', migratedImage);
+    }
+    // 第一次运行还没选过壁纸：用图库第一张（自带深度图）
+    if (!store.getConfig().currentImage && gallery.length) {
+        store.saveConfig({ currentImage: gallery[0].file });
+        console.log('[Main] 第一次运行，默认壁纸:', gallery[0].name);
     }
 
     // 清理上次没删掉的素材副本（移除素材时视频可能正被占用）
@@ -971,10 +956,8 @@ app.whenReady().then(() => {
             await shell.openPath(dir);
         },
         onQuit: () => cleanupAndQuit(),
-        getAutoLaunch: () => app.getLoginItemSettings().openAtLogin,
-        setAutoLaunch: (enabled) => {
-            app.setLoginItemSettings({ openAtLogin: enabled, path: process.execPath });
-        },
+        getAutoLaunch,
+        setAutoLaunch,
     });
 
     // 5. 启动全屏检测；有"点击播放"的元素时启动桌面点击检测
@@ -985,27 +968,21 @@ app.whenReady().then(() => {
     setupPowerMonitor();
 
     console.log('[Main] App startup complete');
-});
+}
 
 // 所有窗口关闭时不退出（壁纸在托盘中常驻）
 app.on('window-all-closed', () => {
     // 不退出，由托盘控制
 });
 
-// macOS: 从 Dock 激活时重新创建窗口
-app.on('activate', () => {
-    if (!wallpaperWindow || wallpaperWindow.isDestroyed()) {
-        createWallpaperWindow();
-    }
-});
-
-// 防止应用多开
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-    app.quit();
-} else {
+// 防止应用多开。拿不到锁说明已经有一个在运行：直接退出，不注册启动流程——
+// app.quit() 之后 ready 事件照样会来，启动流程写在外面的话第二个实例会先建窗口、注入桌面、建托盘再退出
+if (app.requestSingleInstanceLock()) {
     app.on('second-instance', () => {
         // 第二个实例启动时，打开设置窗口
         createSettingsWindow();
     });
+    app.whenReady().then(startApp);
+} else {
+    app.quit();
 }

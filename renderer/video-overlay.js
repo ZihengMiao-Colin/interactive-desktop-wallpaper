@@ -28,6 +28,8 @@ class VideoOverlayManager {
             speed: 1.0,
         };
 
+        // 浏览器预览用的默认表（相对页面）；Electron 里换成主进程给的绝对路径，
+        // 打包后视频在 resources/overlay，不在 app.asar 里的页面旁边
         this.presets = {
             'rain1': { mode: 'screen', path: 'overlay/rain1.mp4' },
             'rain2': { mode: 'screen', path: 'overlay/rain2.mp4' },
@@ -38,9 +40,23 @@ class VideoOverlayManager {
             'old2':  { mode: 'screen', path: 'overlay/old2.mp4' },
             'old3':  { mode: 'screen', path: 'overlay/old3.mp4' },
         };
+        this.presetsReady = false;
+        this._loadPresets();
 
         this._initWebGL();
         window.addEventListener('resize', () => this._onResize());
+    }
+
+    /** 向主进程要预设列表；拿到之前不设置视频源，避免先去请求一个不存在的路径 */
+    async _loadPresets() {
+        try {
+            const list = await Host.getOverlayPresets();
+            for (const p of list || []) this.presets[p.id] = { mode: p.mode, path: p.path };
+        } catch (err) {
+            console.warn('[VideoOverlay] 读取预设列表失败，使用默认路径:', err);
+        }
+        this.presetsReady = true;
+        if (this.config.enabled) this._applySource();
     }
 
     _initWebGL() {
@@ -216,7 +232,7 @@ class VideoOverlayManager {
     }
 
     _applySource() {
-        if (!this.video) return;
+        if (!this.video || !this.presetsReady) return;
 
         const info = this._resolveCurrentVideo();
         if (!info || !info.path) {
@@ -226,8 +242,9 @@ class VideoOverlayManager {
 
         let videoUrl = info.path;
         if (!videoUrl.startsWith('http') && !videoUrl.startsWith('data:') && !videoUrl.startsWith('file://')) {
+            // Windows 绝对路径：交给 Host.fileUrl 转义（encodeURI 不转义 #、%，路径里有它们就打不开）
             if (/^[a-zA-Z]:[\\\/]/.test(videoUrl)) {
-                videoUrl = encodeURI('file:///' + videoUrl.replace(/\\/g, '/'));
+                videoUrl = Host.fileUrl(videoUrl);
             }
         } else if (videoUrl.startsWith('file://')) {
             videoUrl = encodeURI(videoUrl);

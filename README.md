@@ -14,7 +14,7 @@ Windows 桌面上的伪 3D 视差动态壁纸：选一张图片，AI 自动生�
 
 ## 运行
 
-需要 Windows、Node.js 和项目内的 Python 虚拟环境 `venv/`（装有 onnxruntime / numpy / pillow），以及放在项目根目录的 Depth Anything V2 ONNX 模型（`depth_anything_v2_small*.onnx`，不进仓库，可以用 `export_onnx.py` 导出）。
+需要 Windows、Node.js，以及放在项目根目录的 Depth Anything V2 Small ONNX 模型（`depth_anything_v2_small*.onnx`，不进仓库，可以用 `export_onnx.py` 导出；有多个时用最大的那个）。深度图由 `onnxruntime-node` 生成，应用本身不需要 Python。
 
 ```bash
 npm install
@@ -26,12 +26,23 @@ npm start
 
 - `npm run dev`：同时打开 DevTools。
 - 托盘图标左键或右键菜单 → "打开设置"：选择壁纸、生成深度图、调整参数、管理自定义元素。
+- 日志在 `%APPDATA%/interactive-desktop-wallpaper/logs/main.log`。
+
+## 打包
+
+```bash
+npm run build
+```
+
+生成 `dist/互动3D壁纸 Setup 1.0.0.exe`（NSIS 安装包）。打包要求项目根目录有 `depth_anything_v2_small_ir9.onnx`，它会被复制进安装包。第一次打包遇到 `winCodeSign` 解压报"Cannot create symbolic link"的处理办法见 [PROJECT_NOTES.md](PROJECT_NOTES.md) §9 阶段 6。
 
 ## 开发
 
 ```bash
 npm test
 ```
+
+素材预处理脚本（`tools/`）和 Python 版深度图（`generate_depth_map.py`）用项目内的 `venv/`（装有 onnxruntime / numpy / pillow）：
 
 ```bash
 venv/Scripts/python.exe -m unittest tools/test_prepare_builtin_element.py
@@ -55,13 +66,13 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 
 | 路径 | 内容 |
 |---|---|
-| `main.js`、`preload.js`、`src/` | Electron 主进程、IPC、WorkerW 注入、全屏检测、配置存储、自定义元素素材库与摆放窗口 |
+| `main.js`、`preload.js`、`src/` | Electron 主进程、IPC、WorkerW 注入、全屏检测、配置存储、深度图生成（`src/depth/`）、自定义元素素材库与摆放窗口 |
 | `index.html`、`renderer/` | 壁纸页面（也是摆放窗口）：Pixi 场景、着色器、自定义元素渲染层、摆放模式 |
 | `settings.html`、`settings/` | 设置窗口 |
 | `shared/` | 主进程、渲染进程和测试共用的纯逻辑 |
 | `elements/` | 默认元素素材与 `manifest.json` |
 | `overlay/` | 全屏视频特效素材 |
-| `generate_depth_map.py` | 深度图生成（优先本地 ONNX） |
+| `generate_depth_map.py` | Python 版深度图生成（`tools/prepare_wallpapers.py` 用；应用里用的是 `src/depth/`，结果一致） |
 | `test/`、`tools/`、`dev/` | 测试、素材预处理脚本、浏览器预览数据 |
 
 更详细的架构说明、已知问题和开发计划见 [PROJECT_NOTES.md](PROJECT_NOTES.md)。
