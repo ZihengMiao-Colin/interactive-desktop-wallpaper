@@ -1,7 +1,9 @@
 # 互动3D壁纸 — 项目现状 & 开发计划
 
+**简体中文** | [English](PROJECT_NOTES.en.md)
+
 > 最近更新：2026-10-27（v1.0.0 发布到 GitHub Releases）
-> 用途：后续开发的"地图"。改动代码后请顺手更新本文件。
+> 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
 - 只做**电脑端**。Android 版在 `C:\Users\24418\Desktop\2\Wallpaper3D phone`，暂不更新。
@@ -12,7 +14,7 @@
 
 ## 1. 一句话概括
 
-Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth Anything V2，ONNX）生成灰度深度图 → 渲染进程用 Pixi.js 自定义 2.5D 视差着色器全屏绘制 → 主进程轮询全局鼠标位置，画面随鼠标产生伪 3D 视差。窗口通过 PowerShell + C# 注入到 Windows 桌面 WorkerW 层，显示在桌面图标下方。
+Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX，`onnxruntime-node` 推理）生成灰度深度图 → 渲染进程用 Pixi.js 自定义 2.5D 视差着色器全屏绘制 → 主进程轮询全局鼠标位置，画面随鼠标产生伪 3D 视差。窗口通过 PowerShell + C# 注入到 Windows 桌面 WorkerW 层，显示在桌面图标下方。
 
 在此之上可以叠加：
 - **自定义元素**：用户导入的图片 / GIF / 视频（含绿幕），以及自带的默认元素（两个爆炸）。元素在 Pixi 场景里渲染，和背景一样随鼠标视差，并被更近的背景物体遮挡。
@@ -360,14 +362,14 @@ Electron 桌面应用：用户选一张图片 → 调用本地 Python（Depth An
 - 地址：https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.0.0 。tag `v1.0.0` 指向 `c0b2be4`，附件 `Interactive3DWallpaper-Setup-1.0.0.exe`（和本地测试过的安装包 SHA-256 一致）。
 - 原来的文件名 `互动3D壁纸 Setup 1.0.0.exe` 带中文和空格，GitHub 会把这些字符替换掉，v1.0.0 是手动复制改名后上传的。之后在 `nsis.artifactName` 里把文件名设成 `Interactive3DWallpaper-Setup-${version}.${ext}`，打包直接出英文名。装好后的程序名仍是 `productName`（互动3D壁纸）。
 - 只传 exe。`latest.yml`、`.blockmap` 是给自动更新用的，应用没有自动更新，不传。
-- 发布说明（中文）写了功能、安装方法、SmartScreen 提示的处理（"更多信息"→"仍要运行"）和系统要求。系统要求是 Windows 10 / 11 x64，因为 Electron 28 不支持 Win7/8，onnxruntime 也只带了 x64。
+- 发布说明（中文在前、英文在后）写了功能、安装方法、SmartScreen 提示的处理（"更多信息"→"仍要运行"）和系统要求。系统要求是 Windows 10 / 11 x64，因为 Electron 28 不支持 Win7/8，onnxruntime 也只带了 x64。
 - `gh` 用 ZihengMiao-Colin 账号登录（`gh auth login`，凭据存在系统钥匙串里）。
 
 以后发版的步骤：
 1. 改 `package.json` 的 `version`，跑 `npm test`，然后 `npm run build`。
 2. 确认安装包是最新代码：`node node_modules/@electron/asar/bin/asar.js extract dist/win-unpacked/resources/app.asar <临时目录>`，解出来和源码逐个比对（`diff --strip-trailing-cr`）。打包后又改过代码就重新打。
 3. 提交并推送。
-4. 先建草稿：`gh release create v<版本> dist/Interactive3DWallpaper-Setup-<版本>.exe --draft --target <提交的完整 SHA> --title "互动3D壁纸 v<版本>" --notes-file <说明文件>`。草稿只有自己看得到。用 `gh release view v<版本> --json assets` 核对附件的大小和 SHA-256，发布说明给用户确认。
+4. 先建草稿：`gh release create v<版本> dist/Interactive3DWallpaper-Setup-<版本>.exe --draft --target <提交的完整 SHA> --title "互动3D壁纸 v<版本>" --notes-file <说明文件>`。草稿只有自己看得到。用 `gh release view v<版本> --json assets` 核对附件的大小和 SHA-256，发布说明（中英两份）给用户确认。
 5. 正式公开：`gh release edit v<版本> --draft=false --latest`。草稿阶段 tag 还不存在，公开时 GitHub 才创建；之后 `git fetch --tags` 同步到本地。
 
 公开分发相关（v1.0.0 已公开，下面几条仍然成立）：
