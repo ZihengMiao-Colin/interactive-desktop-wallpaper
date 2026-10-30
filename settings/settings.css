@@ -337,6 +337,56 @@ button, input, select { font: inherit; color: inherit; }
 }
 .smooth input { width: 110px; }
 .smooth .value { min-width: 34px; }
+.smooth label { cursor: default; }
+/* 边缘平滑旁边的问号：鼠标移上去 / 键盘选中时立刻弹出用法说明。
+   默认往上弹（盖在预览上），上面放不下时加 .below 往下弹（Controls.initHelpTips） */
+.help {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-left: -6px;
+    border-radius: 50%;
+    color: var(--text-3);
+    cursor: help;
+    outline: none;
+}
+.help svg.i { width: 15px; height: 15px; }
+.help:hover,
+.help:focus-visible { color: var(--accent); background: var(--accent-soft); }
+.help-pop {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    z-index: 20;
+    display: grid;
+    gap: 6px;
+    width: 300px;
+    padding: 12px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--raised);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: normal;
+    cursor: default;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, 4px);
+    transition: opacity 0.12s, transform 0.12s, visibility 0.12s;
+    pointer-events: none;
+}
+.help.below .help-pop { top: calc(100% + 10px); bottom: auto; transform: translate(-50%, -4px); }
+.help-pop b { color: var(--text); font-weight: 600; }
+.help-pop > b { font-size: 12.5px; }
+.help-pop .li { padding-left: 12px; text-indent: -12px; }
+.help-pop .li::before { content: "·"; display: inline-block; width: 12px; text-indent: 0; text-align: center; color: var(--accent); }
+.help-pop .note { padding-top: 6px; border-top: 1px solid var(--line); color: var(--text-3); }
+.help:hover .help-pop,
+.help:focus .help-pop { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
 .depth-actions {
     display: flex;
     flex-shrink: 0;
@@ -728,6 +778,77 @@ input[type=range].hue::-webkit-slider-runnable-track {
 }
 .player-text small { color: var(--text-3); }
 .player-actions { display: flex; align-items: center; gap: 10px; }
+.player-actions .btn:disabled { opacity: 0.35; cursor: default; }
+.play-btn:disabled { opacity: 0.4; cursor: default; }
+.group + .list { margin-top: 12px; }
+/* 播放顺序：图标 + 文字 */
+#vinyl-play-mode button { display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; }
+#vinyl-play-mode svg.i { width: 14px; height: 14px; }
+
+/* 歌单：当前这首用强调色，正在放时序号换成跳动的小波形；拖动排序时插入位置画一条线 */
+.playlist {
+    display: grid;
+    gap: 2px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 6px;
+    border-radius: var(--r-lg);
+    background: var(--surface);
+}
+.playlist-empty { padding: 18px 12px; color: var(--text-3); font-size: 12.5px; text-align: center; }
+.track {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 4px 6px 4px 2px;
+    border-radius: var(--r-md);
+    cursor: pointer;
+}
+.track:hover { background: rgba(255, 255, 255, 0.04); }
+.track.on { background: var(--accent-soft); }
+.track.on .tx b { color: var(--accent); }
+.track.dragging { opacity: 0.4; }
+.track .grip { display: grid; place-items: center; width: 18px; color: var(--text-3); cursor: grab; opacity: 0; }
+.track .grip svg.i { width: 14px; height: 14px; }
+.track:hover .grip { opacity: 1; }
+.track .no {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 2px;
+    width: 24px;
+    height: 14px;
+    color: var(--text-3);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 14px;
+}
+.track .no i { width: 3px; height: 4px; border-radius: 2px; background: var(--accent); animation: track-eq 0.8s ease-in-out infinite alternate; }
+.track .no i:nth-child(2) { animation-duration: 0.6s; animation-delay: 0.2s; }
+.track .no i:nth-child(3) { animation-duration: 0.9s; animation-delay: 0.4s; }
+@keyframes track-eq { from { height: 3px; } to { height: 14px; } }
+.track .tx { flex: 1; min-width: 0; padding-left: 4px; }
+.track .tx b, .track .tx small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.track .tx b { font-size: 13px; font-weight: 500; }
+.track .tx small { color: var(--danger); font-size: 11.5px; }
+.track.missing .tx b { color: var(--text-3); }
+.track .del { opacity: 0; }
+.track:hover .del,
+.track .del:focus-visible { opacity: 1; }
+.track.drop-before::before,
+.track.drop-after::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+}
+.track.drop-before::before { top: -2px; }
+.track.drop-after::after { bottom: -2px; }
 .play-btn {
     display: grid;
     place-items: center;

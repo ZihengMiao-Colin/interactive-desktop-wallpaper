@@ -69,7 +69,12 @@ const Host = (() => {
             return new Uint8Array(await r.arrayBuffer());
         },
         placement: {
-            getDraft: async () => (await loadDevConfig()).draft || null,
+            // ?mode=edit&draft=vinyl 预览摆放唱片机
+            getDraft: async () => {
+                const c = await loadDevConfig();
+                if (params.get('draft') === 'vinyl') return { kind: 'vinyl', vinyl: c.vinyl || {} };
+                return c.draft || null;
+            },
             commit: async (instance) => {
                 console.info('[DevHost] commit', instance);
                 window.__lastPlacement = { action: 'commit', instance };

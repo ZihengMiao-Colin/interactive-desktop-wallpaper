@@ -13,7 +13,7 @@ The Android version is at [interactive-phone-wallpaper](https://github.com/Zihen
   - Click an element to enter placement mode: drag to move, drag a corner to resize, adjust depth; Enter to confirm, Esc to cancel.
   - Elements move with the mouse together with background at the same depth and are hidden behind closer objects; new elements "stick to the ground" for their depth by default.
   - Green-screen keying, loop / interval playback, opacity, show / hide; multiple elements at once.
-- **Other decorations**: vinyl record player (plays local music), full-screen video effects (rain, snow, old film), weather particles.
+- **Other decorations**: vinyl record player (a playlist of local music with list loop / repeat one / shuffle / play in order; drag it anywhere), full-screen video effects (rain, snow, old film), weather particles.
 - **Desktop integration**: injected into the WorkerW layer below the desktop icons; pauses automatically for full-screen apps, lock screen and sleep; tray menu, launch at startup.
 
 ## Running
@@ -29,7 +29,7 @@ npm start
 ```
 
 - `npm run dev`: also opens DevTools.
-- Left-click the tray icon, or right-click → "打开设置" (Open settings): choose a wallpaper, generate depth maps, tweak parameters, manage custom elements.
+- The settings window opens on launch: choose a wallpaper, generate depth maps, tweak parameters, manage custom elements. After you close it the app stays in the tray; launch the app again or click the tray icon (right-click → "打开设置", Open settings) to bring it back. When started at login it only shows the wallpaper, without the settings window.
 - Logs are in `%APPDATA%/interactive-desktop-wallpaper/logs/main.log`.
 
 ## Packaging

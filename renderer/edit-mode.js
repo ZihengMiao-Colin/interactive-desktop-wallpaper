@@ -5,6 +5,7 @@
  * 拖框移动、拖角点等比缩放、拖边中点单向拉伸、拖上方圆点旋转（Shift 吸附 15°）；
  * 工具条调深度、翻转、切换自由变形（单独拖四个角）、复原；Enter 确认，Esc 取消。
  * 新元素默认"自动贴地"：深度跟随元素底边中点处的壁纸深度，手动拖过深度滑块后改为固定值。
+ * 草稿是唱片机（kind: 'vinyl'）时交给 renderer/vinyl-edit-mode.js。
  */
 
 'use strict';
@@ -15,9 +16,26 @@ const TOOLBAR_GAP = 10;
 const ROTATE_SNAP_DEG = 15;
 
 /**
- * @param {{ scene: typeof Scene, layer: ElementsLayer, host: typeof Host }} deps
+ * 工具条默认放在选框下方，放不下就放到上方（多空 40px 给旋转圆点）。
+ * @param {HTMLElement} toolbar
+ * @param {{ left: number, top: number, right: number, bottom: number }} b - 选框外接矩形（屏幕像素）
  */
-async function startEditMode({ scene, layer, host }) {
+function placeToolbar(toolbar, b) {
+    const sw = window.innerWidth;
+    const sh = window.innerHeight;
+    const barH = toolbar.offsetHeight;
+    const barW = toolbar.offsetWidth;
+    const below = b.bottom + TOOLBAR_GAP;
+    const top = below + barH > sh ? b.top - TOOLBAR_GAP - barH - 40 : below;
+    const left = Math.min(sw - barW - 8, Math.max(8, (b.left + b.right) / 2 - barW / 2));
+    toolbar.style.top = `${Math.min(sh - barH - 8, Math.max(8, top))}px`;
+    toolbar.style.left = `${left}px`;
+}
+
+/**
+ * @param {{ scene: typeof Scene, layer: ElementsLayer, host: typeof Host, vinyl: VinylPlayerManager }} deps
+ */
+async function startEditMode({ scene, layer, host, vinyl }) {
     const ui = document.getElementById('placement-ui');
     const box = document.getElementById('placement-box');
     const outline = document.getElementById('placement-warp-outline');
@@ -39,6 +57,10 @@ async function startEditMode({ scene, layer, host }) {
     if (!draft) {
         console.warn('[EditMode] 没有待摆放的元素，退出摆放模式');
         await host.placement.cancel();
+        return;
+    }
+    if (draft.kind === 'vinyl') {
+        startVinylEditMode({ vinyl, host, draft });
         return;
     }
 
@@ -93,15 +115,7 @@ async function startEditMode({ scene, layer, host }) {
             h.style.top = `${corners[i][1] * 100}%`;
         });
 
-        // 工具条默认放在元素下方，放不下就放到上方
-        const b = P.boundingRect(t, aspect(), sw, sh);
-        const barH = toolbar.offsetHeight;
-        const barW = toolbar.offsetWidth;
-        const below = b.bottom + TOOLBAR_GAP;
-        const top = below + barH > sh ? b.top - TOOLBAR_GAP - barH - 40 : below;
-        const left = Math.min(sw - barW - 8, Math.max(8, (b.left + b.right) / 2 - barW / 2));
-        toolbar.style.top = `${Math.min(sh - barH - 8, Math.max(8, top))}px`;
-        toolbar.style.left = `${left}px`;
+        placeToolbar(toolbar, P.boundingRect(t, aspect(), sw, sh));
 
         depthSlider.value = Math.round(instance.depth * 100);
         UIControls.paintRange(depthSlider);

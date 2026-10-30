@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-10-29（README 加上安卓版仓库链接）
+> 最近更新：2026-10-30（用户反馈的一批优化：启动直接打开设置窗口、唱片机拖动摆放、暂停时唱臂回停靠位、歌单等，见 §9 阶段 7）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -59,14 +59,14 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── settings.css         设置窗口布局
 │   ├── main.js              入口：组装外壳和各页面，读一次配置分给各页面
 │   ├── shell.js             导航切页、右下角提示条（setStatus）、"正在使用"卡片、导航角标
-│   ├── controls.js          各页面共用的小工具：建节点、滑块、分段按钮、开关、按钮
+│   ├── controls.js          各页面共用的小工具：建节点、滑块、分段按钮、开关、按钮、问号说明（往上 / 往下弹）
 │   ├── depth-preview.js     实时视差预览（WebGL，和壁纸同一个公式）+ 原图 / 深度图切换
 │   ├── wallpaper-page.js    "壁纸"页：选图、生成深度图（进度在操作栏）、应用、托盘转来的图片
-│   ├── gallery-panel.js     "壁纸"页下方的默认壁纸图库（平铺，末尾"从电脑选择"）
+│   ├── gallery-panel.js     "壁纸"页下方的默认壁纸图库（平铺，第一格"从电脑选择"）
 │   ├── parallax-page.js     "视差"页：强度、跟手程度、对焦深度、恢复推荐值
 │   ├── elements-tab.js      "元素"页：素材库 + 左右两栏（元素列表 / 调整面板）
 │   ├── effects-page.js      "特效"页：天气 + 视频特效
-│   ├── music-page.js        "唱片机"页
+│   ├── music-page.js        "唱片机"页：播放控制、歌单（添加 / 删除 / 拖动排序 / 点一首播放）、播放顺序、外观
 │   ├── system-page.js       "设置"页：开机自启、深度图缓存
 │   └── thumbnail.js         导入素材时生成缩略图
 ├── renderer/                壁纸页脚本（普通全局脚本，按 index.html 里的顺序加载）
@@ -76,7 +76,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── parallax-scene.js    Scene：Pixi 应用、背景视差滤镜、壁纸 / 深度图纹理
 │   ├── weather.js           天气管理器：画布、按配置切换特效、每帧算风和视差
 │   ├── weather/             五种天气：kit.js（离屏贴图、贴图矩阵、粒子基类）+ rain / snow / sakura / leaves / sunlight
-│   ├── vinyl.js             唱片机：唱臂抬起 / 摆入 / 放下、唱片加减速（Web Animations）、音乐淡入淡出
+│   ├── vinyl.js             唱片机：唱臂抬起 / 摆入 / 放下、唱片加减速（Web Animations）、音乐淡入淡出、位置和大小
 │   ├── video-overlay.js     全屏视频特效
 │   ├── elements/
 │   │   ├── sources.js       素材源：图片 / 动图（ImageDecoder）/ 视频 → Pixi 纹理
@@ -84,6 +84,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   │   ├── elements-layer.js 元素渲染层：视差位移、深度遮挡、旋转 / 透视变形 / 变色、间隔播放、点击播放、排序
 │   │   └── depth-sampler.js CPU 读深度图（自动贴地）
 │   ├── edit-mode.js         摆放模式：拖动、角点缩放、边点拉伸、旋转手柄、自由变形、翻转、深度滑块、Enter / Esc
+│   ├── vinyl-edit-mode.js   摆放唱片机（同一个摆放窗口）：拖动、角点缩放、复原
 │   └── main.js              入口：配置、鼠标、动画循环、IPC
 ├── shared/                  纯逻辑（UMD，Node 测试和渲染进程共用，挂在 window.Shared）
 │   ├── parallax-math.js     Cover 映射、视差位移、元素屏幕位移
@@ -91,7 +92,8 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── playback.js          动图取帧、间隔播放调度、点击播放状态机
 │   ├── frame-pacing.js      空闲停帧判断
 │   ├── config-sync.js       配置节流保存、只应用变化的配置段
-│   ├── vinyl-player.js      唱片机纯逻辑：唱片匀加减速、唱臂随进度的角度、桌面点击判断
+│   ├── vinyl-player.js      唱片机纯逻辑：唱片匀加减速、唱臂随进度的角度、桌面点击判断、位置和大小（normalizeLayout / clampCenter）
+│   ├── playlist.js          歌单纯逻辑：旧配置迁移、增删、排序、上一首 / 下一首、播完接哪首
 │   └── placement-math.js    摆放几何：框坐标 ↔ 屏幕、拖动、缩放、拉伸、旋转、自由变形、透视权重、点击命中、深度取样
 ├── src/
 │   ├── elements/
@@ -128,7 +130,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ## 4. 核心流程
 
 ### 4.1 启动
-1. `app.whenReady` → `new AppStore()` → **迁移旧贴纸配置** → 注册 IPC → 创建壁纸窗口 → 托盘 → 全屏检测 → 电源监听。
+1. `app.whenReady` → `new AppStore()` → **迁移旧贴纸配置** → 注册 IPC → 创建壁纸窗口 → 托盘 → 全屏检测 → 电源监听 → 打开设置窗口（开机自启带 `--autostart`，不打开）。
 2. 壁纸窗口 `ready-to-show`：发 `config:load`，开始 30fps 鼠标轮询，异步注入 WorkerW。
 3. 渲染进程 `start()`：读配置 → 有上次的壁纸就用它和它的深度缓存（没有缓存时用占位深度图）→ `Scene.load` → 加载自定义元素 → 启动 ticker。
 
@@ -154,7 +156,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 
 | 通道 | 方向 | 作用 |
 |---|---|---|
-| `dialog:selectImage` / `selectAudio` / `selectCover` / `selectOverlayVideo` | R→M | 文件对话框，只返回路径 |
+| `dialog:selectImage` / `selectAudioFiles`（可多选）/ `selectCover` / `selectOverlayVideo` | R→M | 文件对话框，只返回路径 |
 | `settings:prepareImage` | M→R | 托盘选了一张没有深度图的图片：设置窗口生成深度图后自动应用 |
 | `overlay:getPresets` | R→M | 全屏视频特效列表 |
 | `gallery:list` | R→M | 默认壁纸图库列表 |
@@ -166,7 +168,8 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | `desktop:click` | M→R | 桌面被单击（坐标相对主显示器）：点中唱片机就播放 / 暂停，否则触发"点击播放"的元素；壁纸暂停或摆放中不发 |
 | `renderer:pause` / `renderer:resume` | M→R | 暂停 / 恢复；带 `{ silent: true }` 时不弹提示 |
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | 自定义元素 |
-| `placement:getDraft` / `commit` / `cancel` | R→M | 摆放窗口 |
+| `placement:getDraft` / `commit` / `cancel` | R→M | 摆放窗口（草稿是元素 `{ instance, asset }` 或唱片机 `{ kind: 'vinyl', vinyl }`） |
+| `vinyl:startPlacement` | R→M | 打开摆放窗口拖动唱片机 |
 | `renderer:ready`、`app:*` | R→M | 就绪通知、应用控制 |
 
 ---
@@ -175,9 +178,12 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 
 ```js
 {
-  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 8,
+  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 8,   // 视差强度 5 ~ 30（旧配置超过 30 读出 30）
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
-  vinyl:        { enabled, position, scale, volume, playing, loop, audioPath, audioName, coverPath },
+  vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
+                  playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
+                // 旧版本的 audioPath / audioName / loop 读配置时换成一首歌的歌单（shared/playlist.js 的 normalizeVinyl）
+                // position：四个角或 'custom'（x / y 是唱盘中心在屏幕上的比例位置）；scale 0.5 ~ 2
   weather:      { type, density, speed, parallax },
   videoOverlay: { enabled, presetId, customPath, customName, blendMode, opacity, speed },
   customElements: {
@@ -308,7 +314,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
    - 实测（Electron，1708×1068 @1.5）：五种天气"适中"和"浓密"都跑满 60 帧上限，天气每帧 0.1~0.55ms。浏览器里和旧版对比，枫叶、樱花、光斑更省；雨和雪粒子数翻倍，每帧多几百微秒。
 6. [x] 唱片机动画（2026-10-26，用户要求：点播放时唱臂先移到唱片上再开始转；停止时停转，唱臂可以留在唱片上）。
    - 播放：抬起唱针 → 唱臂摆到唱片上（1.1 秒）→ 放下唱针 → 唱片匀加速到 33⅓ 转（1.3 秒），音乐同时淡入。唱片在唱针落下之前不转。
-   - 暂停：音乐淡出（0.3 秒），唱片匀减速停下，唱臂留在唱片上；再播放时不抬臂，直接加速。唱臂离进度位置超过 3° 才重新抬臂对位（换歌时）。
+   - 暂停：音乐淡出（0.3 秒），唱片匀减速停下，唱臂留在唱片上；再播放时不抬臂，直接加速。唱臂离进度位置超过 3° 才重新抬臂对位（换歌时）。（2026-10-30 改成暂停时唱臂回停靠位，见阶段 7）
    - 播放中唱臂随进度从最外圈（4°）移到最内圈（26°）；单曲循环回到开头时抬臂回到外圈；不循环时播完自动回到停靠位（-32°）。唱臂摆到一半被暂停会立刻掉头回停靠位。
    - 唱片旋转改用 Web Animations（合成器线程上跑，不需要壁纸每帧重绘）：每段加减速从当前角度、当前速度接着算，中途改主意也不会顿一下（`shared/vinyl-player.js`，有单元测试）。唱臂用 CSS transition。
    - 唱臂挪进唱盘里定位（原来相对整个组件，歌名长时唱臂会往右偏、够不到唱片）；高光挪到唱片外面不跟着转（真实唱片转动时反光不动）；加了很淡的沟槽纹。
@@ -323,6 +329,29 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
      - 限制：桌面图标压在唱片机上时，点那个图标也会切换播放（判断不了点的是不是图标）。
 - ~~设置页模型选择~~：不做，只用 small 模型（用户决定）。
 - ~~多显示器~~：不做（用户决定）。
+
+### 阶段 7 — 用户反馈的优化（2026-10-30）
+用户一次提了 7 条，说不用一起做完、顺序由助手定。
+1. [x] **启动直接打开设置窗口**：原来启动后只有托盘图标（Windows 11 默认把新托盘图标收进折叠区），用户找不到入口。现在自己打开程序时会弹设置窗口（任务栏上也有图标，开发时窗口图标用 `assets/icon.png`）；开机自启的命令带 `--autostart`，只显示壁纸。旧版本登记的开机自启没有这个参数，启动时 `migrateAutoLaunch` 会换成新命令（注册表里是同一项）。设置窗口最小化时再打开程序会还原它。
+   - 实测（Electron，单独的数据目录）：正常启动有设置窗口和壁纸窗口；带 `--autostart` 只有壁纸窗口。没实测：真实的开机自启（会写注册表 Run 项）。
+2. [x] **"从电脑选择"放到图库第一格**（原来在最后，不往下翻看不到）。
+3. [x] **边缘平滑旁边加问号**：鼠标移上去（或 Tab 选中）立刻弹出说明——深度图是什么、太小 / 太大分别会怎样、建议值、改完要重新生成。默认往上弹盖在预览上，上面放不下才往下弹（`Controls.initHelpTips`）。去掉了原来 label 上的长 `title`。
+4. [x] **视差强度最大 30**（原来 100）：设置页和调试面板的滑块；`AppStore.getConfig` 把旧配置里超过 30 的值读成 30。
+5. [x] **唱片机拖动摆放**（"像元素的编辑功能一样"）：唱片机页"位置"一行加"拖动摆放…"，打开和摆放元素同一个摆放窗口（`PlacementController` 的草稿带 `kind: 'vinyl'`），只留角点和"大小 / 复原 / 取消 / 确认"。
+   - 拖动移动；拖角点以唱盘中心为原点缩放（0.5 ~ 2，设置页"大小"滑块也放宽到 50% ~ 200%）；拖不出屏幕（`clampCenter`）；选框把伸出去的唱臂也框进去；"复原"回到右下角、100%。确认后存 `position: 'custom'`、`x`、`y`、`scale`，并顺手打开唱片机。
+   - 位置记成唱盘中心在屏幕上的比例，换分辨率后还在差不多的地方；歌名变长、屏幕变了都会重新挪回屏幕里。自定义位置用 `left/top = 0` + transform 定位（用 left 定位时靠近右边可用宽度变窄，歌名胶囊会被挤扁）。
+   - 设置页点四个角之一就回到角上；四个角的位置现在以那个角为原点缩放（原来以中心缩放，放大后会伸出屏幕）。设置页跟着配置广播同步开关、位置和大小（正在拖的大小滑块不同步）。
+   - 摆放窗口里的唱片机只显示样子，不读音乐文件；摆放期间桌面上的音乐照常播放。
+   - 实测：浏览器预览（`index.html?mode=edit&draft=vinyl`）拖动、角点缩放、拖到屏幕角、复原、确认；Electron 里从设置页打开摆放窗口、提交后壁纸上的位置 / 点击判断 / 设置页同步、四个角放大到 200% 离边 36px。元素摆放模式回归正常。
+6. [x] **暂停时唱臂回停靠位**（改了 10-26 定的"唱臂留在唱片上"）：暂停 = 音乐淡出 + 抬臂回停靠位 + 唱片惯性停下；再播放时唱臂重新摆到当前进度对应的那一圈再放下。实测（Electron，静音测试音频）：播放 1 秒后暂停，唱臂回到 -32°；再播放摆回 7.9°（8 秒的歌放到 1.4 秒）后开始转。
+7. [x] **歌单**（用户确认"播放模式和手动排序两个都要"）。
+   - 配置：`vinyl.playlist: [{ path, name }]`（同一个文件只出现一次，path 兼作 id）、`current`（当前歌的 path）、`playMode`：列表循环 `list` / 单曲循环 `one` / 随机播放 `shuffle` / 顺序播放 `once`（放完最后一首停下）。旧配置的 `audioPath` 在 `AppStore.getConfig` 里换成一首歌的歌单，`loop: false` 换成顺序播放，下次保存时旧字段就从磁盘上去掉了。歌单字段不写在默认值里（有没有 `playlist` 用来判断是不是旧配置）。纯逻辑在 `shared/playlist.js`，有单元测试。
+   - 设置页：播放器加上一首 / 下一首（暂停中切歌只换歌，不开始放）；"歌单"分组：添加歌曲（文件对话框可多选，已经在歌单里的跳过；歌单原来是空的就显示唱片机并开始放）、点一首直接放、悬停出现的删除按钮、拖动排序（插入位置画一条线）、找不到的文件标红；"播放顺序"一行四个选项带说明。设置页跟着配置广播刷新歌单（壁纸换歌时高亮跟着走），拖动中不重画。
+   - 壁纸：一首播完按播放模式换下一首——存 `current` 进配置，广播回来后唱臂抬起回到外圈再放下（唱片不停）；顺序播放放完最后一首时唱臂回停靠位，`playing` 改成 false，`current` 回到第一首。单曲循环、或者只有一首歌且不是顺序播放时用 `<audio loop>`。读不出来的文件（被删、挪走）或放不了的格式：提示"放不了「歌名」，跳到下一首"，连着失败的数量够整张歌单就停下。
+   - 去掉了"导入音乐…"按钮和 IPC `dialog:selectAudio`，换成 `dialog:selectAudioFiles`（返回路径数组）。桌面点击检测改成"歌单里有歌"才开。
+   - 实测（Electron，单独的数据目录，3 秒静音测试音频）：旧配置迁移；列表循环 短歌二 → 跳过不存在的文件 → 短歌三 → 回到第一首；顺序播放放完最后一首停下、唱臂回停靠位、当前歌回到第一首；单曲循环；随机播放不会连着两次同一首；上一首 / 下一首循环；删除、拖动排序后配置里的顺序对；播放中删光歌单，壁纸停下显示"请添加歌曲"；窗口缩到 820×560 没有横向滚动条。没实测：文件对话框里多选（要人工点）、真实鼠标拖动排序（用合成的拖放事件测的）。
+
+8. [x] 去掉唱片中心的白色轴孔（`.vinyl-spindle`）：它盖在封面图正中间。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。

@@ -1,5 +1,5 @@
 /**
- * vinyl-player.js — 唱片机的纯逻辑：唱片匀加速 / 匀减速、唱臂随播放进度移动、桌面点击
+ * vinyl-player.js — 唱片机的纯逻辑：唱片匀加速 / 匀减速、唱臂随播放进度移动、桌面点击、位置和大小
  *
  * 唱片旋转交给 Web Animations 在合成器线程上跑，这里算出一段加减速对应的
  * 时长、转过的角度和缓动曲线，保证和前后两段衔接时速度连续（不会突然一顿）。
@@ -48,9 +48,43 @@
         return start + (end - start) * clamp01(progress);
     }
 
-    /** 唱片机显示中且导入了音乐，点桌面上的它才有意义（播放 / 暂停） */
+    /** 唱片机显示中且歌单里有歌，点桌面上的它才有意义（播放 / 暂停）；配置已经过 Shared.playlist.normalizeVinyl */
     function isClickable(vinyl) {
-        return !!(vinyl && vinyl.enabled && vinyl.audioPath);
+        return !!(vinyl && vinyl.enabled && Array.isArray(vinyl.playlist) && vinyl.playlist.length > 0);
+    }
+
+    /** 唱片机停靠的四个角；'custom' 是在摆放窗口里拖到的任意位置 */
+    const CORNERS = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
+    const SCALE_MIN = 0.5;
+    const SCALE_MAX = 2;
+
+    /**
+     * 唱片机的位置和大小。四个角之一，或者 custom：x / y 是唱盘中心在屏幕上的比例位置（0 ~ 1）。
+     * custom 缺坐标、方位写错时回到右下角；大小限制在 0.5 ~ 2。
+     * @returns {{ position: string, scale: number, x?: number, y?: number }}
+     */
+    function normalizeLayout(layout) {
+        const l = layout || {};
+        const s = Number(l.scale);
+        const scale = Number.isFinite(s) && s > 0 ? Math.min(SCALE_MAX, Math.max(SCALE_MIN, s)) : 1;
+        if (l.position === 'custom' && Number.isFinite(l.x) && Number.isFinite(l.y)) {
+            return { position: 'custom', x: clamp01(l.x), y: clamp01(l.y), scale };
+        }
+        return { position: CORNERS.includes(l.position) ? l.position : 'bottom-right', scale };
+    }
+
+    /**
+     * 把唱盘中心 (x, y)（屏幕比例）挪到让整个唱片机都露在屏幕里的范围内。
+     * @param {{ left: number, right: number, top: number, bottom: number }} extent - 唱盘中心到唱片机四边的距离（像素）
+     * @returns {{ x: number, y: number }} 唱片机比屏幕还大的方向上居中
+     */
+    function clampCenter(x, y, extent, width, height) {
+        const fit = (v, before, after, size) => {
+            const min = before / size;
+            const max = 1 - after / size;
+            return min > max ? (min + max) / 2 : Math.min(max, Math.max(min, v));
+        };
+        return { x: fit(x, extent.left, extent.right, width), y: fit(y, extent.top, extent.bottom, height) };
     }
 
     /**
@@ -63,5 +97,8 @@
         return !!card && x >= card.left && x <= card.right && y >= card.top && y <= card.bottom;
     }
 
-    return { spinRamp, velocityAt, progressOf, armAngle, isClickable, hitTest };
+    return {
+        spinRamp, velocityAt, progressOf, armAngle, isClickable, hitTest,
+        CORNERS, SCALE_MIN, SCALE_MAX, normalizeLayout, clampCenter,
+    };
 });

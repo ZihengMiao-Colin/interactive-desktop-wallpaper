@@ -239,6 +239,8 @@ body > canvas {
 .vinyl-widget.pos-bottom-left  { left: 36px; bottom: 36px; }
 .vinyl-widget.pos-top-right    { right: 36px; top: 36px; }
 .vinyl-widget.pos-top-left     { left: 36px; top: 36px; }
+/* 摆放窗口里拖到的位置：实际位置由 renderer/vinyl.js 用 transform 定 */
+.vinyl-widget.pos-custom       { left: 0; top: 0; }
 
 /* 唱机底座与盘面容器 */
 .vinyl-deck {
@@ -336,17 +338,6 @@ body > canvas {
 .vinyl-music-icon {
     font-size: 20px;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-}
-
-/* 中心轴孔金属柱 */
-.vinyl-spindle {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #e2e8f0;
-    box-shadow: 0 0 2px #000, inset 0 0 2px #555;
-    z-index: 2;
 }
 
 /* 拟真机械唱臂（相对唱盘定位；角度和过渡由 renderer/vinyl.js 设置） */
@@ -675,6 +666,22 @@ body > canvas {
 }
 
 #placement-rotation { padding: 0 4px; }
+
+/* 摆放唱片机：只留角点和"大小 / 复原 / 取消 / 确认" */
+#placement-ui:not(.vinyl-mode) .vinyl-only,
+#placement-ui.vinyl-mode .element-only,
+#placement-ui.vinyl-mode #placement-box .handle.edge,
+#placement-ui.vinyl-mode #placement-box .rotate-handle {
+    display: none;
+}
+
+#placement-scale {
+    min-width: 40px;
+    padding: 0 6px 0 8px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
 
 .placement-sep {
     width: 1px;

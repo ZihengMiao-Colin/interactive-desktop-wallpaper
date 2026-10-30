@@ -38,7 +38,7 @@
         <div id="debug-panel-body">
             <div class="debug-row">
                 <label for="parallax-strength">视差强度 <span id="parallax-value">10</span></label>
-                <input type="range" id="parallax-strength" min="5" max="100" value="10" step="1">
+                <input type="range" id="parallax-strength" min="5" max="30" value="10" step="1">
             </div>
             <div class="debug-row">
                 <label for="smoothness">跟手程度 <span id="smoothness-value">0.08</span></label>
@@ -75,7 +75,6 @@
                         <div class="vinyl-default-cover" id="vinyl-default-cover">
                             <span class="vinyl-music-icon">🎵</span>
                         </div>
-                        <div class="vinyl-spindle"></div>
                     </div>
                 </div>
                 <!-- 高光不跟着唱片转（真实唱片转动时反光位置不动） -->
@@ -102,11 +101,12 @@
         </div>
     </div>
 
-    <!-- ==================== 自定义元素摆放模式（仅摆放窗口使用） ==================== -->
+    <!-- ==================== 摆放模式：自定义元素 / 唱片机（仅摆放窗口使用） ==================== -->
+    <!-- 摆放唱片机时 #placement-ui 加上 vinyl-mode：藏起 element-only，显示 vinyl-only -->
     <div id="placement-ui" hidden>
         <div id="placement-hint" class="glass">
             <b id="placement-title">摆放元素</b>
-            <span>拖动移动，角点缩放，边点拉伸，圆点旋转（<kbd>Shift</kbd> 每次 15°）</span>
+            <span id="placement-tips">拖动移动，角点缩放，边点拉伸，圆点旋转（<kbd>Shift</kbd> 每次 15°）</span>
             <span><kbd>Enter</kbd> 确认 <kbd>Esc</kbd> 取消</span>
         </div>
         <div id="placement-box">
@@ -128,17 +128,18 @@
             <span class="handle warp" data-warp="3"></span>
         </div>
         <div id="placement-toolbar" class="glass">
-            <div class="placement-group">
+            <div class="placement-group element-only">
                 <label for="placement-depth">深度</label>
                 <input type="range" class="depth" id="placement-depth" min="0" max="100" value="50" step="1">
                 <span id="placement-depth-value">0.50</span>
                 <span id="placement-depth-auto" class="chip accent" title="跟着元素底边处的壁纸深度走，拖动深度滑块后改为固定值">自动</span>
             </div>
-            <span class="placement-sep"></span>
-            <span id="placement-rotation" title="旋转角度">0°</span>
-            <button id="placement-flip-x" class="placement-btn" title="水平翻转" aria-label="水平翻转"><svg class="i"><use href="#i-flip-horizontal-2"/></svg></button>
-            <button id="placement-flip-y" class="placement-btn" title="垂直翻转" aria-label="垂直翻转"><svg class="i"><use href="#i-flip-vertical-2"/></svg></button>
-            <button id="placement-warp" class="placement-btn" title="单独拖动四个角，做出透视效果"><svg class="i"><use href="#i-square-dashed"/></svg>自由变形</button>
+            <span class="placement-sep element-only"></span>
+            <span id="placement-scale" class="vinyl-only" title="大小">100%</span>
+            <span id="placement-rotation" class="element-only" title="旋转角度">0°</span>
+            <button id="placement-flip-x" class="placement-btn element-only" title="水平翻转" aria-label="水平翻转"><svg class="i"><use href="#i-flip-horizontal-2"/></svg></button>
+            <button id="placement-flip-y" class="placement-btn element-only" title="垂直翻转" aria-label="垂直翻转"><svg class="i"><use href="#i-flip-vertical-2"/></svg></button>
+            <button id="placement-warp" class="placement-btn element-only" title="单独拖动四个角，做出透视效果"><svg class="i"><use href="#i-square-dashed"/></svg>自由变形</button>
             <button id="placement-reset" class="placement-btn" title="清除旋转、拉伸、翻转和变形"><svg class="i"><use href="#i-rotate-ccw"/></svg>复原</button>
             <span class="placement-sep"></span>
             <button id="placement-cancel" class="placement-btn">取消</button>
@@ -158,6 +159,7 @@
     <script src="shared/frame-pacing.js"></script>
     <script src="shared/config-sync.js"></script>
     <script src="shared/vinyl-player.js"></script>
+    <script src="shared/playlist.js"></script>
     <script src="renderer/shaders.js"></script>
     <script src="renderer/ui.js"></script>
     <script src="renderer/host.js"></script>
@@ -176,6 +178,7 @@
     <script src="renderer/elements/elements-layer.js"></script>
     <script src="renderer/elements/depth-sampler.js"></script>
     <script src="renderer/edit-mode.js"></script>
+    <script src="renderer/vinyl-edit-mode.js"></script>
     <script src="renderer/main.js"></script>
 </body>
 </html>

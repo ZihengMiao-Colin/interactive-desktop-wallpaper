@@ -81,5 +81,23 @@ const Controls = (() => {
         return b;
     }
 
-    return { el, setRange, bindRange, segmented, switchEl, button };
+    /**
+     * 问号说明（.help > .help-pop）：默认往上弹，上面放不下（比如页面往下滚过了）就往下弹。
+     * 显示和隐藏由 CSS 的 :hover / :focus 负责，这里只在显示前挑方向。
+     */
+    function initHelpTips(root = document) {
+        for (const help of root.querySelectorAll('.help')) {
+            const pop = help.querySelector('.help-pop');
+            if (!pop) continue;
+            const choose = () => {
+                const scroller = help.closest('.content') || document.documentElement;
+                const roomAbove = help.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+                help.classList.toggle('below', roomAbove < pop.offsetHeight + 16);
+            };
+            help.addEventListener('mouseenter', choose);
+            help.addEventListener('focus', choose);
+        }
+    }
+
+    return { el, setRange, bindRange, segmented, switchEl, button, initHelpTips };
 })();

@@ -46,8 +46,16 @@ const Icons = (() => {
         "<symbol id=\"i-circle-check\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m9 12 2 2 4-4\" /></symbol>",
         "<symbol id=\"i-circle-alert\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" /><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\" /><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\" /></symbol>",
         "<symbol id=\"i-info\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 16v-4\" /><path d=\"M12 8h.01\" /></symbol>",
+        "<symbol id=\"i-circle-help\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /><path d=\"M12 17h.01\" /></symbol>",
         "<symbol id=\"i-loader-circle\" viewBox=\"0 0 24 24\"><path d=\"M21 12a9 9 0 1 1-6.219-8.56\" /></symbol>",
         "<symbol id=\"i-chevron-down\" viewBox=\"0 0 24 24\"><path d=\"m6 9 6 6 6-6\" /></symbol>",
+        "<symbol id=\"i-skip-back\" viewBox=\"0 0 24 24\"><polygon points=\"19 20 9 12 19 4 19 20\" /><line x1=\"5\" x2=\"5\" y1=\"19\" y2=\"5\" /></symbol>",
+        "<symbol id=\"i-skip-forward\" viewBox=\"0 0 24 24\"><polygon points=\"5 4 15 12 5 20 5 4\" /><line x1=\"19\" x2=\"19\" y1=\"5\" y2=\"19\" /></symbol>",
+        "<symbol id=\"i-repeat\" viewBox=\"0 0 24 24\"><path d=\"m17 2 4 4-4 4\" /><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /><path d=\"m7 22-4-4 4-4\" /><path d=\"M21 13v1a4 4 0 0 1-4 4H3\" /></symbol>",
+        "<symbol id=\"i-repeat-1\" viewBox=\"0 0 24 24\"><path d=\"m17 2 4 4-4 4\" /><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /><path d=\"m7 22-4-4 4-4\" /><path d=\"M21 13v1a4 4 0 0 1-4 4H3\" /><path d=\"M11 10h1v4\" /></symbol>",
+        "<symbol id=\"i-shuffle\" viewBox=\"0 0 24 24\"><path d=\"m18 14 4 4-4 4\" /><path d=\"m18 2 4 4-4 4\" /><path d=\"M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-7.6a4 4 0 0 1 3.3-1.7H22\" /><path d=\"M2 6h1.972a4 4 0 0 1 3.6 2.2\" /><path d=\"M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45\" /></symbol>",
+        "<symbol id=\"i-arrow-right-to-line\" viewBox=\"0 0 24 24\"><path d=\"M17 12H3\" /><path d=\"m11 18 6-6-6-6\" /><path d=\"M21 5v14\" /></symbol>",
+        "<symbol id=\"i-grip-vertical\" viewBox=\"0 0 24 24\"><circle cx=\"9\" cy=\"12\" r=\"1\" /><circle cx=\"9\" cy=\"5\" r=\"1\" /><circle cx=\"9\" cy=\"19\" r=\"1\" /><circle cx=\"15\" cy=\"12\" r=\"1\" /><circle cx=\"15\" cy=\"5\" r=\"1\" /><circle cx=\"15\" cy=\"19\" r=\"1\" /></symbol>",
         "<symbol id=\"i-mouse-pointer-click\" viewBox=\"0 0 24 24\"><path d=\"M14 4.1 12 6\" /><path d=\"m5.1 8-2.9-.8\" /><path d=\"m6 12-1.9 2\" /><path d=\"M7.2 2.2 8 5.1\" /><path d=\"M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z\" /></symbol>",
     ];
     const NS = 'http://www.w3.org/2000/svg';

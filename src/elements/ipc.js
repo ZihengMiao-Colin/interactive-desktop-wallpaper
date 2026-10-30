@@ -105,9 +105,12 @@ function registerElementsIpc({ ipcMain, dialog, store, elementsDir, getDialogPar
         return draft ? placement.start(draft) : false;
     });
 
+    // 摆放窗口取草稿：唱片机是 { kind: 'vinyl', vinyl }（main.js 里开始），元素是 { instance, asset }
     ipcMain.handle('placement:getDraft', () => {
         const draft = placement.getDraft();
-        return draft ? { instance: draft.instance, asset: draft.asset } : null;
+        if (!draft) return null;
+        if (draft.kind === 'vinyl') return { kind: 'vinyl', vinyl: draft.vinyl };
+        return { instance: draft.instance, asset: draft.asset };
     });
 
     ipcMain.handle('placement:commit', (_event, instance) => placement.commit(instance));

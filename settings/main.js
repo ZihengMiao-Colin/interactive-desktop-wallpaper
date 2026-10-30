@@ -11,6 +11,7 @@
     const api = window.electronAPI;
     const shell = initShell();
     const preview = initDepthPreview();
+    Controls.initHelpTips();
     const previewSlots = {
         wallpaper: document.getElementById('preview-slot-wallpaper'),
         parallax: document.getElementById('preview-slot-parallax'),

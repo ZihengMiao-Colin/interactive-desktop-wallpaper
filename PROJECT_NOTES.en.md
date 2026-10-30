@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-10-29 (README links to the Android repository)
+> Last updated: 2026-10-30 (a batch of user-requested improvements: settings window opens on launch, drag-to-place record player, tonearm returns to rest on pause, playlist, etc.; see §9 Phase 7)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -60,14 +60,14 @@ On top of that you can layer:
 │   ├── settings.css         Settings window layout
 │   ├── main.js              Entry: assembles the shell and pages, reads config once and hands it to each page
 │   ├── shell.js             Page switching, bottom-right toast (setStatus), "In use" card, nav badges
-│   ├── controls.js          Small helpers shared by pages: node builders, sliders, segmented buttons, toggles, buttons
+│   ├── controls.js          Small helpers shared by pages: node builders, sliders, segmented buttons, toggles, buttons, help popovers (open up / down)
 │   ├── depth-preview.js     Live parallax preview (WebGL, same formula as the wallpaper) + image / depth map toggle
 │   ├── wallpaper-page.js    "Wallpaper" page: pick image, generate depth map (progress in the action bar), apply, images sent from the tray
-│   ├── gallery-panel.js     Default wallpaper gallery below the "Wallpaper" page (tiled, "Choose from computer" at the end)
+│   ├── gallery-panel.js     Default wallpaper gallery below the "Wallpaper" page (tiled, "Choose from computer" as the first tile)
 │   ├── parallax-page.js     "Parallax" page: strength, responsiveness, focus depth, restore recommended values
 │   ├── elements-tab.js      "Elements" page: asset library + two columns (element list / adjustment panel)
 │   ├── effects-page.js      "Effects" page: weather + video effects
-│   ├── music-page.js        "Record player" page
+│   ├── music-page.js        "Record player" page: playback controls, playlist (add / delete / drag to reorder / click to play), play order, appearance
 │   ├── system-page.js       "Settings" page: launch at startup, depth map cache
 │   └── thumbnail.js         Generates thumbnails when importing assets
 ├── renderer/                Wallpaper page scripts (plain global scripts, loaded in index.html order)
@@ -77,7 +77,7 @@ On top of that you can layer:
 │   ├── parallax-scene.js    Scene: Pixi app, background parallax filter, wallpaper / depth map textures
 │   ├── weather.js           Weather manager: canvas, switches effects by config, computes wind and parallax per frame
 │   ├── weather/             Five weather types: kit.js (offscreen textures, texture matrices, particle base class) + rain / snow / sakura / leaves / sunlight
-│   ├── vinyl.js             Record player: tonearm lift / swing / lower, record spin-up and spin-down (Web Animations), music fade in/out
+│   ├── vinyl.js             Record player: tonearm lift / swing / lower, record spin-up and spin-down (Web Animations), music fade in/out, position and size
 │   ├── video-overlay.js     Full-screen video effects
 │   ├── elements/
 │   │   ├── sources.js       Asset sources: image / animated image (ImageDecoder) / video → Pixi texture
@@ -85,6 +85,7 @@ On top of that you can layer:
 │   │   ├── elements-layer.js Element layer: parallax offset, depth occlusion, rotation / perspective warp / recolor, interval playback, click playback, sorting
 │   │   └── depth-sampler.js Reads the depth map on the CPU (auto ground placement)
 │   ├── edit-mode.js         Placement mode: drag, corner resize, edge stretch, rotate handle, free warp, flip, depth slider, Enter / Esc
+│   ├── vinyl-edit-mode.js   Placing the record player (same placement window): drag, corner resize, reset
 │   └── main.js              Entry: config, mouse, animation loop, IPC
 ├── shared/                  Pure logic (UMD, shared by Node tests and the renderer, attached to window.Shared)
 │   ├── parallax-math.js     Cover mapping, parallax offset, element screen offset
@@ -92,7 +93,8 @@ On top of that you can layer:
 │   ├── playback.js          Animated frame lookup, interval playback scheduling, click playback state machine
 │   ├── frame-pacing.js      Idle frame-stop decision
 │   ├── config-sync.js       Throttled config saving, apply only changed config sections
-│   ├── vinyl-player.js      Record player logic: uniform spin-up/down, tonearm angle by progress, desktop click hit test
+│   ├── vinyl-player.js      Record player logic: uniform spin-up/down, tonearm angle by progress, desktop click hit test, position and size (normalizeLayout / clampCenter)
+│   ├── playlist.js          Playlist logic: old-config migration, add / remove, reorder, previous / next, what plays after a track ends
 │   └── placement-math.js    Placement geometry: box ↔ screen coords, drag, resize, stretch, rotate, free warp, perspective weights, hit testing, depth sampling
 ├── src/
 │   ├── elements/
@@ -129,7 +131,7 @@ On top of that you can layer:
 ## 4. Core flows
 
 ### 4.1 Startup
-1. `app.whenReady` → `new AppStore()` → **migrate old sticker config** → register IPC → create wallpaper window → tray → full-screen detection → power listeners.
+1. `app.whenReady` → `new AppStore()` → **migrate old sticker config** → register IPC → create wallpaper window → tray → full-screen detection → power listeners → open the settings window (not when started at login with `--autostart`).
 2. Wallpaper window `ready-to-show`: send `config:load`, start 30fps mouse polling, inject into WorkerW asynchronously.
 3. Renderer `start()`: read config → if there is a previous wallpaper, use it and its cached depth map (placeholder depth map if not cached) → `Scene.load` → load custom elements → start the ticker.
 
@@ -155,7 +157,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 
 | Channel | Direction | Purpose |
 |---|---|---|
-| `dialog:selectImage` / `selectAudio` / `selectCover` / `selectOverlayVideo` | R→M | File dialogs, return paths only |
+| `dialog:selectImage` / `selectAudioFiles` (multi-select) / `selectCover` / `selectOverlayVideo` | R→M | File dialogs, return paths only |
 | `settings:prepareImage` | M→R | The tray picked an image with no depth map: the settings window generates it and then applies automatically |
 | `overlay:getPresets` | R→M | Full-screen video effect list |
 | `gallery:list` | R→M | Default wallpaper gallery list |
@@ -167,7 +169,8 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | `desktop:click` | M→R | The desktop was clicked (coords relative to the primary monitor): hitting the record player toggles play / pause, otherwise triggers "click to play" elements; not sent while the wallpaper is paused or placing |
 | `renderer:pause` / `renderer:resume` | M→R | Pause / resume; with `{ silent: true }` no toast is shown |
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | Custom elements |
-| `placement:getDraft` / `commit` / `cancel` | R→M | Placement window |
+| `placement:getDraft` / `commit` / `cancel` | R→M | Placement window (the draft is an element `{ instance, asset }` or the record player `{ kind: 'vinyl', vinyl }`) |
+| `vinyl:startPlacement` | R→M | Open the placement window to drag the record player |
 | `renderer:ready`, `app:*` | R→M | Ready notification, app control |
 
 ---
@@ -176,9 +179,12 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 
 ```js
 {
-  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 8,
+  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 8,   // parallax strength 5 ~ 30 (older configs above 30 read as 30)
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
-  vinyl:        { enabled, position, scale, volume, playing, loop, audioPath, audioName, coverPath },
+  vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
+                  playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
+                // older audioPath / audioName / loop become a one-track playlist when the config is read (normalizeVinyl in shared/playlist.js)
+                // position: one of the four corners or 'custom' (x / y = platter center as a fraction of the screen); scale 0.5 ~ 2
   weather:      { type, density, speed, parallax },
   videoOverlay: { enabled, presetId, customPath, customName, blendMode, opacity, speed },
   customElements: {
@@ -309,7 +315,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
    - Tested (Electron, 1708×1068 @1.5): all five weather types at "Moderate" and "Dense" run at the 60fps cap, with 0.1–0.55ms per frame for weather. Compared with the old version in the browser, maple leaves, sakura and light spots are cheaper; rain and snow doubled their particle counts and cost a few hundred extra microseconds per frame.
 6. [x] Record player animation (2026-10-26; user request: on play the tonearm moves onto the record first and then it starts spinning; on stop the record stops and the tonearm may stay on the record).
    - Play: lift the needle → swing the tonearm onto the record (1.1 s) → lower the needle → the record spins up uniformly to 33⅓ rpm (1.3 s) while the music fades in. The record does not spin before the needle drops.
-   - Pause: the music fades out (0.3 s), the record spins down uniformly, the tonearm stays on the record; playing again skips the lift and just spins up. The tonearm only lifts and re-aligns if it is more than 3° from the progress position (when changing tracks).
+   - Pause: the music fades out (0.3 s), the record spins down uniformly, the tonearm stays on the record; playing again skips the lift and just spins up. The tonearm only lifts and re-aligns if it is more than 3° from the progress position (when changing tracks). (Changed on 2026-10-30: the tonearm now returns to rest on pause, see Phase 7)
    - During playback the tonearm moves with progress from the outermost groove (4°) to the innermost (26°); on single-track loop it lifts back to the outer edge when the track restarts; without loop it returns to the rest position (-32°) when finished. If paused mid-swing it turns around immediately back to rest.
    - Record rotation now uses Web Animations (runs on the compositor thread, no per-frame wallpaper redraw needed): each spin-up/down segment continues from the current angle and speed, so changing your mind mid-way does not stutter (`shared/vinyl-player.js`, with unit tests). The tonearm uses a CSS transition.
    - The tonearm is now positioned inside the platter (it was relative to the whole component, so long track names pushed it right and it could not reach the record); the highlight moved outside the record so it does not rotate (on a real record the reflection stays still while spinning); faint groove lines added.
@@ -324,6 +330,29 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
      - Limitation: when a desktop icon overlaps the record player, clicking that icon also toggles playback (we can't tell whether the click was on the icon).
 - ~~Model selection in settings~~: not doing it; only the small model (user decision).
 - ~~Multiple monitors~~: not doing it (user decision).
+
+### Phase 7 — User-requested improvements (2026-10-30)
+The user sent 7 items at once, said they need not all be done together and left the order to the assistant.
+1. [x] **Settings window opens on launch**: before, launching only showed a tray icon (Windows 11 hides new tray icons in the overflow area by default), so users could not find a way in. Now launching the app yourself opens the settings window (with a taskbar icon; in development the window icon is `assets/icon.png`). The login-item command carries `--autostart` and only shows the wallpaper. Login items registered by older versions lack the argument; on startup `migrateAutoLaunch` rewrites them to the new command (same registry value). Launching again while the settings window is minimized restores it.
+   - Tested (Electron, separate data directory): a normal launch shows the settings and wallpaper windows; with `--autostart` only the wallpaper window. Not tested: a real login-time start (it writes the registry Run key).
+2. [x] **"Choose from computer" is the first gallery tile** (it used to be last and was invisible without scrolling).
+3. [x] **Help icon next to edge smoothing**: hovering it (or tabbing to it) immediately shows an explanation — what a depth map is, what too small / too large does, the recommended value, and that the depth map must be regenerated. It opens upward over the preview, and downward only when there is no room above (`Controls.initHelpTips`). The long `title` on the old label was removed.
+4. [x] **Parallax strength max is 30** (was 100): settings page and debug panel sliders; `AppStore.getConfig` reads older values above 30 as 30.
+5. [x] **Drag-to-place record player** ("like the element edit feature"): the record player page's "Position" row has "拖动摆放…" (Drag to place…), which opens the same placement window as elements (the `PlacementController` draft carries `kind: 'vinyl'`) with only the corner handles and "size / reset / cancel / confirm".
+   - Drag to move; drag a corner to scale around the platter center (0.5 ~ 2; the settings "Size" slider was widened to 50% ~ 200% too); it cannot be dragged off-screen (`clampCenter`); the selection box includes the protruding tonearm; "Reset" goes back to bottom-right at 100%. Confirming saves `position: 'custom'`, `x`, `y`, `scale` and also turns the record player on.
+   - The position is stored as the platter center's fraction of the screen, so it stays roughly in place after a resolution change; it is pushed back on-screen when the track name gets longer or the screen changes. Custom positions use `left/top = 0` plus a transform (with `left` positioning the available width shrinks near the right edge and squashes the track-name capsule).
+   - Clicking one of the four corners on the settings page puts it back in that corner; corner positions now scale from that corner (they used to scale from the center and stuck out of the screen when enlarged). The settings page syncs the toggle, position and size from config broadcasts (except the size slider while it is being dragged).
+   - The record player in the placement window is display-only and does not read the music file; music on the desktop keeps playing during placement.
+   - Tested: browser preview (`index.html?mode=edit&draft=vinyl`) drag, corner scaling, dragging into a screen corner, reset, confirm; in Electron, opening the placement window from settings, and after committing the wallpaper position / click hit test / settings sync, plus 36px corner margins at 200%. Element placement mode regression-checked.
+6. [x] **Tonearm returns to rest on pause** (changes the 10-26 decision "the tonearm stays on the record"): pause = music fades out + tonearm lifts back to rest + record coasts to a stop; playing again swings the tonearm to the groove for the current progress and lowers it. Tested (Electron, silent test audio): pausing after 1 s returns the tonearm to -32°; playing again swings it to 7.9° (1.4 s into an 8 s track) before it starts.
+7. [x] **Playlist** (the user confirmed "both play modes and manual ordering").
+   - Config: `vinyl.playlist: [{ path, name }]` (each file appears once, the path doubles as the id), `current` (path of the current track), `playMode`: list loop `list` / repeat one `one` / shuffle `shuffle` / play in order `once` (stops after the last track). An older `audioPath` becomes a one-track playlist in `AppStore.getConfig`, `loop: false` becomes play-in-order, and the old fields disappear from disk on the next save. The playlist fields are not in the defaults (whether `playlist` exists tells an old config apart). The pure logic is in `shared/playlist.js`, with unit tests.
+   - Settings page: the player gained previous / next (switching while paused only changes the track, it does not start playing); a "歌单" (Playlist) group: add tracks (the file dialog allows multi-select, tracks already in the list are skipped; if the list was empty the record player is shown and starts playing), click a track to play it, a delete button on hover, drag to reorder (a line marks the insertion point), missing files marked in red; a "播放顺序" (Play order) row with the four options and a description. The settings page refreshes the playlist from config broadcasts (the highlight follows when the wallpaper changes track) but not while a drag is in progress.
+   - Wallpaper: when a track ends the next one is chosen by play mode — `current` is saved to the config, and when the broadcast comes back the tonearm lifts back to the outer groove and lowers again (the record keeps spinning); in play-in-order mode, after the last track the tonearm returns to rest, `playing` becomes false and `current` goes back to the first track. Repeat-one, or a single track in any mode other than play-in-order, uses `<audio loop>`. Unreadable files (deleted, moved) or unsupported formats show "放不了「name」，跳到下一首" (can't play "name", skipping to the next) and are skipped; once as many consecutive failures as the playlist length have happened it stops.
+   - Removed the "导入音乐…" (Import music…) button and the `dialog:selectAudio` IPC, replaced by `dialog:selectAudioFiles` (returns an array of paths). Desktop click detection is now enabled when the playlist has tracks.
+   - Tested (Electron, separate data directory, 3-second silent test audio): old-config migration; list loop track 2 → skip the missing file → track 3 → back to the first; play-in-order stops after the last track with the tonearm at rest and the first track current; repeat one; shuffle never picks the same track twice in a row; previous / next wrap around; the saved order is correct after delete and drag-reorder; emptying the playlist while playing stops the wallpaper with "请添加歌曲" (Please add tracks); no horizontal scroll bar at 820×560. Not tested: multi-select in the file dialog (needs a human), dragging with a real mouse (tested with synthetic drag-and-drop events).
+
+8. [x] Removed the white spindle dot at the record center (`.vinyl-spindle`): it covered the middle of the cover image.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

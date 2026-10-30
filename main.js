@@ -17,6 +17,7 @@
  *     → 创建壁纸窗口 → 注入 WorkerW 层
  *     → 创建系统托盘
  *     → 启动全屏检测轮询
+ *     → 打开设置窗口（开机自启带 --autostart，不打开）
  * ============================================================================
  */
 
@@ -51,7 +52,7 @@ const { AppStore } = require('./src/store');
 const { registerElementsIpc } = require('./src/elements/ipc');
 const { PlacementController } = require('./src/elements/placement-controller');
 const { upsertInstance, hasClickTriggers } = require('./shared/elements-model');
-const { isClickable: isVinylClickable } = require('./shared/vinyl-player');
+const { isClickable: isVinylClickable, normalizeLayout: normalizeVinylLayout } = require('./shared/vinyl-player');
 const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
@@ -123,6 +124,10 @@ function nudgeWallpaperRepaint(win, width, height) {
 
 /** 是否为开发模式 */
 const isDev = process.argv.includes('--dev');
+
+/** 开机自启时带上这个参数：只显示壁纸，不弹设置窗口（用户自己打开程序时才弹） */
+const AUTOSTART_ARG = '--autostart';
+const launchedAtLogin = process.argv.includes(AUTOSTART_ARG);
 
 // ==================== 壁纸窗口创建 ====================
 
@@ -307,6 +312,9 @@ function stopMousePolling() {
  */
 function createSettingsWindow() {
     if (settingsWindow) {
+        // 最小化在任务栏里时 focus() 不会把它还原出来
+        if (settingsWindow.isMinimized()) settingsWindow.restore();
+        settingsWindow.show();
         settingsWindow.focus();
         return settingsWindow;
     }
@@ -318,6 +326,8 @@ function createSettingsWindow() {
         minHeight: 560,
         resizable: true,
         title: '互动3D壁纸 - 设置',
+        // 任务栏图标（安装版的 exe 自带图标，开发时不设就是 Electron 的图标）
+        icon: path.join(__dirname, 'assets', 'icon.png'),
         autoHideMenuBar: true,
         // 深色标题栏：页面自己画标题栏，系统的最小化 / 最大化 / 关闭按钮叠在右上角
         titleBarStyle: 'hidden',
@@ -422,9 +432,14 @@ function createPlacementWindow() {
 function createPlacementController() {
     return new PlacementController({
         createWindow: createPlacementWindow,
-        onCommit: (instance) => {
+        onCommit: (result, draft) => {
+            // 摆放唱片机：保存位置和大小，并显示出来（关着的时候摆完也看得到）
+            if (draft.kind === 'vinyl') {
+                store.saveConfig({ vinyl: { ...normalizeVinylLayout(result), enabled: true } });
+                return;
+            }
             const { customElements } = store.getConfig();
-            store.saveConfig({ customElements: upsertInstance(customElements, instance) });
+            store.saveConfig({ customElements: upsertInstance(customElements, result) });
         },
         onEnd: () => {
             if (wallpaperWindow && !wallpaperWindow.isDestroyed() && isRenderingActive) {
@@ -510,24 +525,17 @@ function registerIpcHandlers() {
     // ---- 选择新图片（只返回路径，应用要等用户点"应用壁纸"） ----
     ipcMain.handle('dialog:selectImage', () => showImageDialog());
 
-    // ---- 选择本地音乐文件 ----
-    ipcMain.handle('dialog:selectAudio', async () => {
+    // ---- 往歌单里添加本地音乐（可以一次选多首），只返回路径，歌名由歌单逻辑从文件名取 ----
+    ipcMain.handle('dialog:selectAudioFiles', async () => {
         const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
-            title: '选择本地音乐/音频文件',
+            title: '添加歌曲（可以多选）',
             filters: [
                 { name: '音频文件', extensions: ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'] },
                 { name: '所有文件', extensions: ['*'] }
             ],
-            properties: ['openFile'],
+            properties: ['openFile', 'multiSelections'],
         });
-
-        if (result.canceled || result.filePaths.length === 0) {
-            return null;
-        }
-
-        const filePath = result.filePaths[0];
-        const fileName = path.basename(filePath);
-        return { path: filePath, name: fileName };
+        return result.canceled ? [] : result.filePaths;
     });
 
     // ---- 选择唱片中心封面图片 ----
@@ -546,6 +554,10 @@ function registerIpcHandlers() {
 
         return result.filePaths[0];
     });
+
+    // ---- 在摆放窗口里拖动唱片机（和摆放元素共用一个摆放会话） ----
+    ipcMain.handle('vinyl:startPlacement', () =>
+        placement.start({ kind: 'vinyl', vinyl: store.getConfig().vinyl }));
 
     // ---- 选择自定义视频特效文件 ----
     ipcMain.handle('dialog:selectOverlayVideo', async () => {
@@ -787,12 +799,13 @@ function registerIpcHandlers() {
 /**
  * 开机自启的启动命令。打包后就是安装目录里的 exe；
  * 开发时 process.execPath 是 electron.exe，要带上项目目录，否则开机打开的是 Electron 的默认页。
+ * 末尾带 --autostart，开机时不弹设置窗口。
  * 查询时必须传同样的 path / args 才能找到这一条。
  */
-function loginItemOptions() {
-    return app.isPackaged
-        ? { path: process.execPath }
-        : { path: process.execPath, args: [app.getAppPath()] };
+function loginItemOptions(withAutostartArg = true) {
+    const args = app.isPackaged ? [] : [app.getAppPath()];
+    if (withAutostartArg) args.push(AUTOSTART_ARG);
+    return { path: process.execPath, args };
 }
 
 function getAutoLaunch() {
@@ -801,6 +814,18 @@ function getAutoLaunch() {
 
 function setAutoLaunch(enabled) {
     app.setLoginItemSettings({ openAtLogin: enabled, ...loginItemOptions() });
+}
+
+/** 旧版本登记的开机自启没有 --autostart（开机会弹设置窗口）：换成新的启动命令（注册表里是同一项，直接覆盖） */
+function migrateAutoLaunch() {
+    try {
+        if (!getAutoLaunch() && app.getLoginItemSettings(loginItemOptions(false)).openAtLogin) {
+            setAutoLaunch(true);
+            console.log('[Main] 开机自启命令已加上 ' + AUTOSTART_ARG);
+        }
+    } catch (err) {
+        console.warn('[Main] 更新开机自启命令失败:', err.message);
+    }
 }
 
 // ==================== 暂停 / 恢复 ====================
@@ -966,6 +991,10 @@ function startApp() {
 
     // 6. 监听电源事件
     setupPowerMonitor();
+
+    // 7. 用户自己打开程序时直接显示设置窗口（任务栏上也有图标）；开机自启只显示壁纸，留在托盘里
+    migrateAutoLaunch();
+    if (!launchedAtLogin) createSettingsWindow();
 
     console.log('[Main] App startup complete');
 }

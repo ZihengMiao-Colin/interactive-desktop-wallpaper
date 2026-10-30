@@ -51,11 +51,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** 打开系统文件对话框，选择壁纸图片（只返回路径，不会应用） */
     selectImage: () => ipcRenderer.invoke('dialog:selectImage'),
 
-    /** 打开系统文件对话框，选择本地音乐 */
-    selectAudio: () => ipcRenderer.invoke('dialog:selectAudio'),
+    /** 打开系统文件对话框，选择要加进歌单的本地音乐（可多选）→ 路径数组，取消时为 [] */
+    selectAudioFiles: () => ipcRenderer.invoke('dialog:selectAudioFiles'),
 
     /** 打开系统文件对话框，选择唱片中心封面 */
     selectCover: () => ipcRenderer.invoke('dialog:selectCover'),
+
+    /** 打开摆放窗口拖动唱片机（位置和大小） */
+    startVinylPlacement: () => ipcRenderer.invoke('vinyl:startPlacement'),
 
     /** 打开系统文件对话框，选择本地视频特效 */
     selectOverlayVideo: () => ipcRenderer.invoke('dialog:selectOverlayVideo'),

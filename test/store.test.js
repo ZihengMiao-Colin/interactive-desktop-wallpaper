@@ -20,6 +20,30 @@ test('没有 customElements 的旧配置读出空结构', () => {
     assert.equal(config.parallaxMultiplier, 30);
 });
 
+test('旧配置的视差强度超过 30 时读出 30', () => {
+    const { store } = storeWithConfig({ parallaxMultiplier: 80 });
+    assert.equal(store.getConfig().parallaxMultiplier, 30);
+});
+
+test('旧配置的单首歌读成一首歌的歌单，保存后写回磁盘的是歌单', () => {
+    const { store, dir } = storeWithConfig({ vinyl: { enabled: true, audioPath: 'C:/m/a.mp3', audioName: 'a.mp3', loop: true } });
+    const vinyl = store.getConfig().vinyl;
+    assert.deepEqual(vinyl.playlist, [{ path: 'C:/m/a.mp3', name: 'a' }]);
+    assert.equal(vinyl.current, 'C:/m/a.mp3');
+    assert.equal(vinyl.playMode, 'list');
+    assert.equal(vinyl.volume, 0.6);
+    store.saveConfig({ vinyl: { playing: true } });
+    const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')).vinyl;
+    assert.equal(onDisk.playing, true);
+    assert.equal(onDisk.audioPath, undefined);
+    assert.equal(onDisk.playlist.length, 1);
+});
+
+test('新用户没有歌单：空歌单、列表循环', () => {
+    const { vinyl } = storeWithConfig().store.getConfig();
+    assert.deepEqual([vinyl.playlist, vinyl.current, vinyl.playMode], [[], '', 'list']);
+});
+
 test('instances 不是数组时回退为空数组', () => {
     const { store } = storeWithConfig({ customElements: { library: [], instances: 'oops' } });
     assert.deepEqual(store.getConfig().customElements.instances, []);

@@ -21,9 +21,13 @@ const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
 const { emptyCustomElements, normalizeCustomElements } = require('../shared/elements-model');
+const { normalizeVinyl } = require('../shared/playlist');
 
 /** 需要按字段合并保存的嵌套配置项 */
 const NESTED_KEYS = ['vinyl', 'weather', 'videoOverlay'];
+
+/** 视差强度上限（设置页滑块 5 ~ 30）。旧版本最大能调到 100，读配置时压到上限 */
+const PARALLAX_MAX = 30;
 
 class AppStore {
 
@@ -144,14 +148,17 @@ class AppStore {
      */
     getConfig() {
         const defaults = this._defaultConfig();
-        return {
+        const config = {
             ...defaults,
             ...this._config,
-            vinyl: { ...defaults.vinyl, ...(this._config.vinyl || {}) },
+            // 歌单字段由 normalizeVinyl 补齐（旧版本的单首歌 audioPath 在这里换成歌单）
+            vinyl: normalizeVinyl({ ...defaults.vinyl, ...(this._config.vinyl || {}) }),
             weather: { ...defaults.weather, ...(this._config.weather || {}) },
             videoOverlay: { ...defaults.videoOverlay, ...(this._config.videoOverlay || {}) },
             customElements: normalizeCustomElements(this._config.customElements),
         };
+        if (config.parallaxMultiplier > PARALLAX_MAX) config.parallaxMultiplier = PARALLAX_MAX;
+        return config;
     }
 
     /**
@@ -308,14 +315,14 @@ class AppStore {
             // 1. 黑胶唱片机组件
             vinyl: {
                 enabled: false,             // 是否开启唱片机
-                position: 'bottom-right',   // 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
-                scale: 1.0,                 // 缩放大小 0.7 ~ 1.3
+                position: 'bottom-right',   // 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'custom'
+                // x, y: position 为 'custom' 时唱盘中心在屏幕上的比例位置 0 ~ 1（在摆放窗口里拖出来的）
+                scale: 1.0,                 // 缩放大小 0.5 ~ 2.0
                 volume: 0.6,                // 音量 0.0 ~ 1.0
                 playing: false,             // 是否正在播放
-                loop: true,                 // 循环播放
-                audioPath: '',              // 本地音频文件路径
-                audioName: '',              // 音频文件名
                 coverPath: '',              // 唱片中心封面图片路径
+                // 歌单 playlist / current / playMode 不写在默认值里：没有 playlist 才说明是旧配置，
+                // 要把旧的 audioPath 换成歌单（shared/playlist.js 的 normalizeVinyl）
             },
             // 2. 天气粒子特效
             weather: {

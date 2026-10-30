@@ -70,6 +70,10 @@ function saveParallaxConfig() {
 
 const weatherManager = new WeatherParticleManager();
 const vinylManager = new VinylPlayerManager();
+// 唱片机换歌、放完停下：存进配置再由广播回来执行，设置页的歌单也跟着变
+if (isElectron && !isEditMode) {
+    vinylManager.onRequestChange = (partial) => window.electronAPI.saveConfig({ vinyl: partial });
+}
 const videoOverlayManager = new VideoOverlayManager();
 
 /** 用户自定义元素（图片 / 动图 / 视频），在 Pixi 场景内渲染 */
@@ -349,7 +353,7 @@ async function start() {
     UI.hideLoading();
 
     if (isEditMode) {
-        await startEditMode({ scene: Scene, layer: elementsLayer, host: Host });
+        await startEditMode({ scene: Scene, layer: elementsLayer, host: Host, vinyl: vinylManager });
         return;
     }
 

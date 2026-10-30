@@ -1,7 +1,7 @@
 /**
  * gallery-panel.js — 壁纸页下方的默认壁纸图库
  *
- * 平铺显示，最后一格是"从电脑选择…"。点某张壁纸只是选中（预览跟着变），
+ * 平铺显示，第一格是"从电脑选择…"（放在最后的话不往下翻就看不到）。点某张壁纸只是选中（预览跟着变），
  * 和自己的图片一样要点"应用壁纸"才会换上。正在用的那张标"使用中"。
  */
 
@@ -69,7 +69,7 @@ function initGalleryPanel({ api, onSelect, onPickFile }) {
     }
 
     function render() {
-        grid.replaceChildren(...entries.map(renderCard), renderAddCard());
+        grid.replaceChildren(renderAddCard(), ...entries.map(renderCard));
     }
 
     // 应用了别的壁纸后，"使用中"标记跟着走

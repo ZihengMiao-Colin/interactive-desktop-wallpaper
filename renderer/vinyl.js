@@ -1,13 +1,16 @@
 /**
  * vinyl.js — 黑胶唱片机组件与本地音乐播放
  *
- * 播放：抬起唱臂 → 摆到唱片上 → 放下唱针 → 唱片加速到 33⅓ 转、音乐淡入。
- * 暂停：音乐淡出，唱片靠惯性慢慢停下，唱臂留在唱片上；再播放时从原地接着转。
- * 播放中唱臂随进度从最外圈慢慢移向最内圈；循环回到开头时抬臂回到外圈重新放下；
- * 不循环时播完自动抬臂回到停靠位。
+ * 播放：抬起唱臂 → 摆到唱片上（当前进度对应的那一圈）→ 放下唱针 → 唱片加速到 33⅓ 转、音乐淡入。
+ * 暂停：音乐淡出，唱臂抬起回到停靠位，唱片靠惯性慢慢停下；再播放时唱臂重新摆回唱片上。
+ * 播放中唱臂随进度从最外圈慢慢移向最内圈；单曲循环回到开头时抬臂回到外圈重新放下。
+ * 歌单（shared/playlist.js）：一首播完按播放模式换下一首，唱臂抬起回到外圈再放下；
+ * 顺序播放放完最后一首时唱臂回停靠位。换歌、停下都先存进配置，再由广播回来执行，设置页跟着变。
+ * 读不出来、放不了的歌提示一下跳过。
  *
  * 唱片旋转用 Web Animations（在合成器线程上跑，不需要壁纸每帧重绘），
  * 唱臂用 CSS transition（中途被打断时会从当前位置接着转）。
+ * 位置：停在四个角之一，或者在摆放窗口里拖到任意位置（renderer/vinyl-edit-mode.js）。
  */
 
 'use strict';
@@ -67,12 +70,33 @@ class VinylPlayerManager {
         this.fadeTimer = null;
         /** 上一次在桌面上点中唱片机的时间 */
         this.lastClickAt = -Infinity;
+        /** 位置和大小（Shared.vinylPlayer.normalizeLayout）；自定义位置时唱盘中心的屏幕坐标、唱盘半高 */
+        this.layout = Shared.vinylPlayer.normalizeLayout(null);
+        this.center = null;
+        this.deckHalf = 0;
+        /** 最近一次的视差偏移（像素） */
+        this.shift = { x: 0, y: 0 };
+        /** 摆放窗口里只显示外观，不加载、不播放音乐 */
+        this.previewOnly = false;
+        /** 要改配置（换歌、停下）时调用；壁纸页设成保存配置，没设时（浏览器预览）直接应用 */
+        this.onRequestChange = null;
+        /** 连着放不了的歌数（够整张歌单就停下）；正在跳过的那首（error 事件和 play() 失败只算一次） */
+        this.failures = 0;
+        this.skippingPath = '';
 
+        window.addEventListener('resize', () => this.applyLayout());
         if (this.audio) {
             this.audio.addEventListener('timeupdate', () => this.followProgress());
             this.audio.addEventListener('ended', () => this.onEnded());
-            this.audio.addEventListener('playing', () => this.showStatus());
+            this.audio.addEventListener('playing', () => {
+                this.failures = 0;
+                this.showStatus();
+            });
             this.audio.addEventListener('pause', () => this.showStatus());
+            // 文件坏了、格式不支持：播放中才跳过（暂停时等用户按播放再说）
+            this.audio.addEventListener('error', () => {
+                if (this.wantPlaying && this.currentAudioPath) this.skipBroken();
+            });
         }
         this.setArm(ARM_REST, 0);
     }
@@ -90,33 +114,24 @@ class VinylPlayerManager {
 
         this.widget.style.display = 'flex';
 
-        // 停靠方位
-        const posClass = `pos-${config.position || 'bottom-right'}`;
-        this.widget.className = `vinyl-widget ${posClass}`;
-
-        // 音频加载
+        // 歌单里的当前这首（换歌时重新加载）
+        const track = Shared.playlist.currentTrack(config);
+        const path = track ? track.path : '';
         let songChanged = false;
-        if (config.audioPath && this.currentAudioPath !== config.audioPath) {
-            this.currentAudioPath = config.audioPath;
-            this.loadAudioFile(config.audioPath);
+        let loadFailed = false;
+        if (this.previewOnly) {
+            // 摆放窗口：不读音乐文件
+        } else if (path && this.currentAudioPath !== path) {
+            this.currentAudioPath = path;
+            this.skippingPath = '';
+            loadFailed = !this.loadAudioFile(path);
             songChanged = true;
-        } else if (!config.audioPath && this.currentAudioPath) {
+        } else if (!path && this.currentAudioPath) {
             this.currentAudioPath = '';
-            this.audio.pause();
-            this.audio.src = '';
+            this.clearAudio();
         }
 
-        // 歌曲名称显示
-        if (this.songNameEl) {
-            if (config.audioName) {
-                this.songNameEl.textContent = config.audioName;
-            } else if (config.audioPath) {
-                const name = config.audioPath.split('\\').pop().split('/').pop().replace(/\.[^/.]+$/, '');
-                this.songNameEl.textContent = name;
-            } else {
-                this.songNameEl.textContent = '未选择音乐';
-            }
-        }
+        if (this.songNameEl) this.songNameEl.textContent = track ? track.name : '未选择音乐';
 
         // 唱片中心封面图片
         if (config.coverPath && this.currentCoverPath !== config.coverPath) {
@@ -135,20 +150,67 @@ class VinylPlayerManager {
             if (this.defaultCover) this.defaultCover.style.display = 'flex';
         }
 
+        // 位置和大小（放在歌名之后：歌名长短会改变唱片机的宽度）
+        this.setLayout(config);
+
         // 音量（淡入淡出进行中就让它淡到新音量）
         this.volume = config.volume !== undefined ? Math.max(0, Math.min(1, config.volume)) : 0.6;
         if (!this.fadeTimer) this.audio.volume = this.volume;
-        this.audio.loop = config.loop !== false;
+        this.audio.loop = Shared.playlist.loopsCurrent(config);
 
-        // 播放状态：只有真的变了（或者换了歌）才走一遍唱臂动作
-        const want = !!(config.playing && config.audioPath);
-        if (want !== this.wantPlaying || (want && songChanged)) {
+        // 播放状态：只有真的变了（或者换了歌）才走一遍唱臂动作；要放的歌读不出来就直接跳过
+        const want = !!(config.playing && path);
+        if (want && loadFailed) {
+            this.wantPlaying = true;
+            this.skipBroken();
+        } else if (want !== this.wantPlaying || (want && songChanged)) {
             this.wantPlaying = want;
             if (want) this.play();
-            else if (config.audioPath) this.pause();
             else this.returnToRest();
         }
         this.showStatus();
+    }
+
+    // ==================== 歌单 ====================
+
+    /** 改配置里的唱片机字段（换歌、停下） */
+    requestChange(partial) {
+        if (this.onRequestChange) this.onRequestChange(partial);
+        else this.setConfig({ ...this.config, ...partial });
+    }
+
+    /** 一首播完：按播放模式换下一首；顺序播放放完最后一首就停下，下次从第一首开始 */
+    onEnded() {
+        if (this.audio.loop || this.previewOnly || !this.config) return;
+        const next = Shared.playlist.afterEnded(this.config);
+        if (next === null) {
+            this.returnToRest();
+            const first = this.config.playlist[0];
+            this.requestChange({ playing: false, current: first ? first.path : '' });
+        } else if (next === this.currentAudioPath) {
+            this.play();
+        } else {
+            this.requestChange({ current: next });
+        }
+        this.showStatus();
+    }
+
+    /** 当前这首放不了：提示并跳到下一首；连着放不了的歌够整张歌单了就停下 */
+    skipBroken() {
+        if (this.previewOnly || !this.config || this.skippingPath === this.currentAudioPath) return;
+        this.skippingPath = this.currentAudioPath;
+        const track = Shared.playlist.currentTrack(this.config);
+        const name = track ? track.name : '这首歌';
+        this.failures += 1;
+        if (this.failures >= this.config.playlist.length) {
+            this.failures = 0;
+            UI.showToast(`放不了「${name}」，歌单里没有能放的歌了`, 3000);
+            this.returnToRest();
+            this.requestChange({ playing: false });
+            return;
+        }
+        UI.showToast(`放不了「${name}」，跳到下一首`, 2500);
+        this.requestChange({ current: Shared.playlist.step(this.config, 1) });
     }
 
     // ==================== 播放流程 ====================
@@ -183,17 +245,10 @@ class VinylPlayerManager {
         this.tracking = true;
     }
 
-    /** 音乐淡出，唱片靠惯性停下；唱针已经在唱片上就留在原处，还在半路就回停靠位 */
-    pause() {
-        const seq = ++this.seq;
-        this.tracking = false;
-        this.stopAudio();
-        this.spinTo(0);
-        if (this.onRecord) this.lift(false);
-        else this.toRest(seq);
-    }
-
-    /** 播完或音乐被移除：唱片停下，唱臂抬起回到停靠位 */
+    /**
+     * 暂停、播完或音乐被移除：音乐淡出，唱片靠惯性停下，唱臂抬起回到停靠位
+     * （摆到一半被暂停也是立刻掉头回去）。
+     */
     returnToRest() {
         const seq = ++this.seq;
         this.tracking = false;
@@ -258,13 +313,6 @@ class VinylPlayerManager {
             return null;
         }
         return !this.wantPlaying;
-    }
-
-    /** 不循环时播完：唱臂自动回到停靠位 */
-    onEnded() {
-        if (this.audio.loop) return;
-        this.returnToRest();
-        this.showStatus();
     }
 
     // ==================== 唱臂 ====================
@@ -382,6 +430,8 @@ class VinylPlayerManager {
         this.fadeVolume(null);
         this.audio.play().catch((err) => {
             console.warn('[Vinyl] 播放音频未启动:', err);
+            // 被新的 load / pause 打断（AbortError）不算；没有能放的音频源才跳过
+            if (err.name === 'NotSupportedError' && this.wantPlaying) this.skipBroken();
         });
     }
 
@@ -418,16 +468,31 @@ class VinylPlayerManager {
         const sounding = !this.audio.paused && !this.audio.ended;
         if (this.soundWaves) this.soundWaves.classList.toggle('active', sounding);
         if (!this.statusEl) return;
-        if (!this.config || !this.config.audioPath) this.statusEl.textContent = '请导入音乐';
+        if (!this.config || !Shared.playlist.currentTrack(this.config)) this.statusEl.textContent = '请添加歌曲';
         else if (sounding) this.statusEl.textContent = '正在播放';
         else if (this.audio.ended) this.statusEl.textContent = '播放完毕';
         else this.statusEl.textContent = this.wantPlaying ? '放下唱针…' : '已暂停';
     }
 
+    /** 停掉并清空音频（不设成 src = ''：那样会触发 error 事件） */
+    clearAudio() {
+        this.audio.pause();
+        this.audio.removeAttribute('src');
+        this.audio.load();
+        if (this.audioBlobUrl) {
+            URL.revokeObjectURL(this.audioBlobUrl);
+            this.audioBlobUrl = null;
+        }
+    }
+
+    /**
+     * 读音乐文件换上去。
+     * @returns {boolean} 读不出来（文件被删了、挪走了）时清空音频并返回 false，不会接着放上一首
+     */
     loadAudioFile(filePath) {
         if (!isElectron || !window.electronAPI) {
             this.audio.src = filePath;
-            return;
+            return true;
         }
 
         try {
@@ -444,7 +509,7 @@ class VinylPlayerManager {
                     this.audioBlobUrl = URL.createObjectURL(blob);
                     this.audio.src = this.audioBlobUrl;
                     console.log('[Vinyl] 音频加载成功 (Blob URL)');
-                    return;
+                    return true;
                 }
             }
 
@@ -453,18 +518,88 @@ class VinylPlayerManager {
             if (dataUrl) {
                 this.audio.src = dataUrl;
                 console.log('[Vinyl] 音频加载成功 (Data URL)');
+                return true;
             }
         } catch (err) {
             console.error('[Vinyl] 音频加载失败:', err);
         }
+        console.warn('[Vinyl] 读不到音乐文件:', filePath);
+        this.clearAudio();
+        return false;
+    }
+
+    // ==================== 位置和大小 ====================
+
+    /** 摆放窗口用：显示唱片机的样子（停着、唱臂在停靠位），不加载音乐 */
+    showPreview(config) {
+        this.previewOnly = true;
+        this.setConfig({ ...config, enabled: true, playing: false });
+    }
+
+    /**
+     * 换位置和大小：四个角之一，或者 custom（唱盘中心在屏幕上的比例位置）。
+     * @returns {object} 实际用上的位置：custom 时坐标已挪到让整个唱片机露在屏幕里
+     */
+    setLayout(layout) {
+        this.layout = Shared.vinylPlayer.normalizeLayout(layout);
+        this.applyLayout();
+        return this.layout;
+    }
+
+    /**
+     * 按 layout 摆好唱片机。自定义位置用 left/top = 0 加 transform 定位（不用 left 定位：
+     * 靠近右边时可用宽度变窄，歌名胶囊会被挤扁），以唱盘中心为原点缩放。
+     */
+    applyLayout() {
+        if (!this.widget || this.widget.style.display === 'none') return;
+        const { position, scale } = this.layout;
+        this.widget.className = `vinyl-widget pos-${position}`;
+        if (position === 'custom') {
+            const w = this.widget.offsetWidth;
+            const h = this.widget.offsetHeight;
+            this.deckHalf = this.deck ? this.deck.offsetHeight / 2 : h / 2;
+            const extent = { left: (w / 2) * scale, right: (w / 2) * scale, top: this.deckHalf * scale, bottom: (h - this.deckHalf) * scale };
+            const c = Shared.vinylPlayer.clampCenter(this.layout.x, this.layout.y, extent, window.innerWidth, window.innerHeight);
+            this.layout = { ...this.layout, x: c.x, y: c.y };
+            this.center = { x: c.x * window.innerWidth, y: c.y * window.innerHeight };
+            this.widget.style.transformOrigin = `50% ${this.deckHalf}px`;
+        } else {
+            // 停在角上时以那个角为原点缩放：放大了也是往屏幕里长，离屏幕边的距离不变
+            this.center = null;
+            this.widget.style.transformOrigin = position.replace('-', ' ');
+        }
+        this.applyTransform();
+    }
+
+    /** 唱盘中心的屏幕坐标（摆放窗口里把角上的位置换成自定义位置、按角点缩放时用） */
+    deckCenter() {
+        const p = (this.platter || this.widget).getBoundingClientRect();
+        return { x: p.left + p.width / 2, y: p.top + p.height / 2 };
+    }
+
+    /** 唱片机在屏幕上占的范围（停靠位的唱臂会伸出唱片机右上角，一起算上），摆放窗口画选框用 */
+    bounds() {
+        const rects = [this.widget, this.tonearm].filter(Boolean).map((el) => el.getBoundingClientRect());
+        return {
+            left: Math.min(...rects.map((r) => r.left)),
+            top: Math.min(...rects.map((r) => r.top)),
+            right: Math.max(...rects.map((r) => r.right)),
+            bottom: Math.max(...rects.map((r) => r.bottom)),
+        };
+    }
+
+    applyTransform() {
+        const { x, y } = this.shift;
+        const scale = this.layout.scale;
+        this.widget.style.transform = this.center
+            ? `translate3d(${this.center.x + x}px, ${this.center.y + y}px, 0) translate(-50%, ${-this.deckHalf}px) scale(${scale})`
+            : `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
     }
 
     update(mouseX, mouseY) {
         if (!this.widget || !this.config || !this.config.enabled) return;
-        const scale = this.config.scale !== undefined ? this.config.scale : 1.0;
         // 微小视差浮动
-        const pX = -mouseX * 10;
-        const pY = -mouseY * 10;
-        this.widget.style.transform = `translate3d(${pX}px, ${pY}px, 0) scale(${scale})`;
+        this.shift = { x: -mouseX * 10, y: -mouseY * 10 };
+        this.applyTransform();
     }
 }

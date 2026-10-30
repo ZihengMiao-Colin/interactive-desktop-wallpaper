@@ -60,11 +60,24 @@
                 <!-- 深度图状态 + 生成 / 应用 -->
                 <div class="depth-bar">
                     <div class="depth-state" id="depth-state"></div>
-                    <label class="smooth" title="近处物体的轮廓先向外扩一圈再平滑，移动时主体边缘保持完整，拉伸落在背景上。数值越大过渡越柔和，改了要重新生成深度图">
-                        边缘平滑
+                    <div class="smooth">
+                        <label for="depth-blur">边缘平滑</label>
+                        <!-- 鼠标移上去（或 Tab 选中）立刻显示用法，不用等系统 title 提示 -->
+                        <span class="help" tabindex="0" role="button" aria-label="边缘平滑是什么" aria-describedby="blur-help">
+                            <svg class="i"><use href="#i-circle-help"/></svg>
+                            <span class="help-pop" id="blur-help" role="tooltip">
+                                <b>边缘平滑是什么？</b>
+                                <span>程序会先算出画面里每个地方离你有多远（这张"远近图"就是深度图），移动鼠标时近处和远处错开移动，看起来就有立体感。</span>
+                                <span>这个数值管的是近处物体（人、树、建筑）和后面背景交界的地方：</span>
+                                <span class="li"><b>太小</b>：物体边缘容易被扯开，出现拉丝、撕裂</span>
+                                <span class="li"><b>太大</b>：物体周围一圈背景会跟着物体一起晃</span>
+                                <span class="li"><b>建议</b>：先用默认的 8px；边缘有拉丝就调大，周围背景乱晃就调小</span>
+                                <span class="note">改完要点"生成深度图"才会生效。默认壁纸自带深度图，不受这里影响。</span>
+                            </span>
+                        </span>
                         <input type="range" id="depth-blur" min="0" max="30" value="8" step="1">
                         <span class="value" id="blur-value">8px</span>
-                    </label>
+                    </div>
                     <div class="depth-actions">
                         <button type="button" class="btn" id="btn-generate-depth" disabled><svg class="i"><use href="#i-wand-sparkles"/></svg>生成深度图</button>
                         <button type="button" class="btn primary" id="btn-apply-wallpaper" disabled><svg class="i"><use href="#i-check"/></svg>应用壁纸</button>
@@ -98,7 +111,7 @@
                     <div class="row">
                         <div class="row-label"><div class="t">视差强度</div><div class="d">越大，近处和远处错开得越多</div></div>
                         <div class="row-ctrl">
-                            <input type="range" id="parallax-strength" min="5" max="100" value="10" step="1">
+                            <input type="range" id="parallax-strength" min="5" max="30" value="10" step="1">
                             <span class="value" id="parallax-value">10</span>
                         </div>
                     </div>
@@ -243,7 +256,7 @@
                 <div class="page-head">
                     <div>
                         <h1>唱片机</h1>
-                        <p>在壁纸一角放一台转动的黑胶唱片机，播放本地音乐。导入音乐后，直接点桌面上的唱片也能播放 / 暂停。</p>
+                        <p>在壁纸上放一台转动的黑胶唱片机，播放歌单里的本地音乐。直接点桌面上的唱片也能播放 / 暂停。</p>
                     </div>
                     <div class="actions">
                         <label class="switch" title="显示唱片机"><input type="checkbox" id="vinyl-enabled"><span></span></label>
@@ -252,15 +265,41 @@
                 <div class="player">
                     <div class="disc"><span class="disc-cover" id="vinyl-disc-cover"></span></div>
                     <div class="player-text">
-                        <b id="vinyl-current-music-name">还没有导入音乐</b>
-                        <small id="vinyl-play-state">导入一首本地音乐就会开始播放</small>
+                        <b id="vinyl-current-music-name">歌单是空的</b>
+                        <small id="vinyl-play-state">添加本地音乐后就会开始播放</small>
                     </div>
                     <div class="player-actions">
-                        <button type="button" class="btn" id="btn-import-audio"><svg class="i"><use href="#i-music"/></svg>导入音乐…</button>
+                        <button type="button" class="btn icon ghost" id="btn-prev-track" title="上一首" aria-label="上一首"><svg class="i"><use href="#i-skip-back"/></svg></button>
                         <button type="button" class="play-btn" id="btn-play-pause-toggle" title="播放"><svg class="i"><use href="#i-play"/></svg></button>
+                        <button type="button" class="btn icon ghost" id="btn-next-track" title="下一首" aria-label="下一首"><svg class="i"><use href="#i-skip-forward"/></svg></button>
                     </div>
                 </div>
+
+                <!-- 歌单：拖动排序，点一首直接播放（settings/music-page.js） -->
+                <div class="group">
+                    <div class="group-head">
+                        <h2>歌单</h2>
+                        <span class="count" id="playlist-count"></span>
+                        <span class="hint">拖动调整顺序，点一首直接播放</span>
+                        <div class="end">
+                            <button type="button" class="btn sm" id="btn-add-tracks"><svg class="i"><use href="#i-plus"/></svg>添加歌曲…</button>
+                        </div>
+                    </div>
+                    <div class="playlist" id="vinyl-playlist"></div>
+                </div>
+
                 <div class="list">
+                    <div class="row">
+                        <div class="row-label"><div class="t">播放顺序</div><div class="d" id="vinyl-play-mode-desc"></div></div>
+                        <div class="row-ctrl">
+                            <div class="seg" id="vinyl-play-mode">
+                                <button type="button" data-value="list"><svg class="i"><use href="#i-repeat"/></svg>列表循环</button>
+                                <button type="button" data-value="one"><svg class="i"><use href="#i-repeat-1"/></svg>单曲循环</button>
+                                <button type="button" data-value="shuffle"><svg class="i"><use href="#i-shuffle"/></svg>随机播放</button>
+                                <button type="button" data-value="once"><svg class="i"><use href="#i-arrow-right-to-line"/></svg>顺序播放</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="row">
                         <div class="row-label"><div class="t">音量</div></div>
                         <div class="row-ctrl">
@@ -269,8 +308,9 @@
                         </div>
                     </div>
                     <div class="row">
-                        <div class="row-label"><div class="t">位置</div><div class="d">停在屏幕的哪个角</div></div>
+                        <div class="row-label"><div class="t">位置</div><div class="d" id="vinyl-position-desc">停在屏幕的哪个角，或者拖到任意位置</div></div>
                         <div class="row-ctrl">
+                            <button type="button" class="btn sm" id="btn-place-vinyl" title="在桌面上拖动唱片机，拖角点调大小"><svg class="i"><use href="#i-move"/></svg>拖动摆放…</button>
                             <div class="corner-pick" id="vinyl-position" role="radiogroup" aria-label="位置">
                                 <button type="button" data-value="top-left" title="左上角" aria-label="左上角"></button>
                                 <button type="button" data-value="top-right" title="右上角" aria-label="右上角"></button>
@@ -282,7 +322,7 @@
                     <div class="row">
                         <div class="row-label"><div class="t">大小</div></div>
                         <div class="row-ctrl">
-                            <input type="range" id="vinyl-scale" min="70" max="130" value="100" step="5">
+                            <input type="range" id="vinyl-scale" min="50" max="200" value="100" step="5">
                             <span class="value" id="vinyl-scale-val">100%</span>
                         </div>
                     </div>
@@ -343,6 +383,7 @@
     <script src="shared/parallax-math.js"></script>
     <script src="shared/frame-pacing.js"></script>
     <script src="shared/elements-model.js"></script>
+    <script src="shared/playlist.js"></script>
     <script src="renderer/shaders.js"></script>
     <script src="settings/controls.js"></script>
     <script src="settings/shell.js"></script>
