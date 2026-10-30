@@ -38,7 +38,7 @@ npm start
 npm run build
 ```
 
-Produces `dist/Interactive3DWallpaper-Setup-1.0.0.exe` (an NSIS installer; the file name has no Chinese characters so it uploads cleanly to GitHub Releases). Packaging requires `depth_anything_v2_small_ir9.onnx` in the project root; it is copied into the installer. If the first build fails extracting `winCodeSign` with "Cannot create symbolic link", see [PROJECT_NOTES.en.md](PROJECT_NOTES.en.md) §9 Phase 6.
+Produces `dist/Interactive3DWallpaper-Setup-<version>.exe` (an NSIS installer; the file name has no Chinese characters so it uploads cleanly to GitHub Releases). Packaging requires `depth_anything_v2_small_ir9.onnx` in the project root; it is copied into the installer. If the first build fails extracting `winCodeSign` with "Cannot create symbolic link", see [PROJECT_NOTES.en.md](PROJECT_NOTES.en.md) §9 Phase 6.
 
 ## Development
 

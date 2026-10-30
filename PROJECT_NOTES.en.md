@@ -33,7 +33,7 @@ On top of that you can layer:
 | Depth model | Depth Anything V2 Small. The app runs it with `onnxruntime-node` (1.31.1, pinned) in a utilityProcess child process (`src/depth/`); pre/post-processing is ported from `generate_depth_map.py` and the results match the Python version pixel for pixel. ONNX input is fixed at 518×518 (aspect ratio cannot be kept); the output depth map's longest side is 1920 |
 | Python | In-project `venv/` (3.11.9) with only onnxruntime / numpy / pillow. The app no longer uses Python; it is only for the asset scripts under `tools/` and the Python tests |
 | ONNX models | Project root (ignored by `.gitignore`): `_ir9.onnx` 100MB (the largest is picked; this is the one actually used), `_int8.onnx` 28MB, and a 2MB empty shell. Packaging copies `_ir9.onnx` to `resources/models/depth_anything_v2_small.onnx` |
-| Packaging | electron-builder, NSIS installer only (`npm run build` → `dist/Interactive3DWallpaper-Setup-1.0.0.exe`, ~334MB; ~560MB installed). Assets and the model live under `resources/` (outside asar); onnxruntime's DLLs are unpacked to `app.asar.unpacked` |
+| Packaging | electron-builder, NSIS installer only (`npm run build` → `dist/Interactive3DWallpaper-Setup-<version>.exe`, ~334MB; ~560MB installed). Assets and the model live under `resources/` (outside asar); onnxruntime's DLLs are unpacked to `app.asar.unpacked` |
 | Tests | Node's built-in `node --test` (`npm test`); preprocessing scripts use Python `unittest` |
 | Platform | Windows only, primary monitor only |
 
@@ -353,6 +353,8 @@ The user sent 7 items at once, said they need not all be done together and left 
    - Tested (Electron, separate data directory, 3-second silent test audio): old-config migration; list loop track 2 → skip the missing file → track 3 → back to the first; play-in-order stops after the last track with the tonearm at rest and the first track current; repeat one; shuffle never picks the same track twice in a row; previous / next wrap around; the saved order is correct after delete and drag-reorder; emptying the playlist while playing stops the wallpaper with "请添加歌曲" (Please add tracks); no horizontal scroll bar at 820×560. Not tested: multi-select in the file dialog (needs a human), dragging with a real mouse (tested with synthetic drag-and-drop events).
 
 8. [x] Removed the white spindle dot at the record center (`.vinyl-spindle`): it covered the middle of the cover image.
+
+All of the above ships as **v1.1.0** (user request, 2026-10-30): `package.json` version set to 1.1.0, all 157 `npm test` tests pass; after packaging, the extracted `app.asar` matches the source file by file (only `package.json`, which electron-builder trims, differs, and its version is 1.1.0); the app in `dist/win-unpacked` was run with a fresh data directory: the settings window opens on launch, the first gallery tile is "Choose from computer", the playlist advances to the next track when one ends, the record player placement window opens, and it quits cleanly with no errors in the log. The release still follows the Phase 6 steps: create a draft first, publish after the user confirms the release notes.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

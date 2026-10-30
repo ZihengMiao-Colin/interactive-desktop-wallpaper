@@ -38,7 +38,7 @@ npm start
 npm run build
 ```
 
-生成 `dist/Interactive3DWallpaper-Setup-1.0.0.exe`（NSIS 安装包，文件名不带中文，方便传到 GitHub Releases）。打包要求项目根目录有 `depth_anything_v2_small_ir9.onnx`，它会被复制进安装包。第一次打包遇到 `winCodeSign` 解压报"Cannot create symbolic link"的处理办法见 [PROJECT_NOTES.md](PROJECT_NOTES.md) §9 阶段 6。
+生成 `dist/Interactive3DWallpaper-Setup-<版本>.exe`（NSIS 安装包，文件名不带中文，方便传到 GitHub Releases）。打包要求项目根目录有 `depth_anything_v2_small_ir9.onnx`，它会被复制进安装包。第一次打包遇到 `winCodeSign` 解压报"Cannot create symbolic link"的处理办法见 [PROJECT_NOTES.md](PROJECT_NOTES.md) §9 阶段 6。
 
 ## 开发
 

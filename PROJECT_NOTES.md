@@ -32,7 +32,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 深度模型 | Depth Anything V2 Small。应用里用 `onnxruntime-node`（1.31.1，版本锁定）在 utilityProcess 子进程里推理（`src/depth/`），前后处理从 `generate_depth_map.py` 移植，结果和 Python 版逐像素一致。ONNX 输入固定 518×518（不能保持原图比例）；输出深度图最长边 1920 |
 | Python | 项目内 `venv/`（3.11.9），只装了 onnxruntime / numpy / pillow。应用本身不再用 Python，只给 `tools/` 下的素材脚本和 Python 测试用 |
 | ONNX 模型 | 根目录（`.gitignore` 忽略）：`_ir9.onnx` 100MB（选最大的，实际用这个）、`_int8.onnx` 28MB、2MB 的空壳。打包时 `_ir9.onnx` 复制成 `resources/models/depth_anything_v2_small.onnx` |
-| 打包 | electron-builder，只出 NSIS 安装包（`npm run build` → `dist/Interactive3DWallpaper-Setup-1.0.0.exe`，约 334MB；装好约 560MB）。素材和模型在 `resources/` 下（asar 外），onnxruntime 的 dll 解包到 `app.asar.unpacked` |
+| 打包 | electron-builder，只出 NSIS 安装包（`npm run build` → `dist/Interactive3DWallpaper-Setup-<版本>.exe`，约 334MB；装好约 560MB）。素材和模型在 `resources/` 下（asar 外），onnxruntime 的 dll 解包到 `app.asar.unpacked` |
 | 测试 | Node 内置 `node --test`（`npm test`）；预处理脚本用 Python `unittest` |
 | 平台 | 仅 Windows，仅主显示器 |
 
@@ -352,6 +352,8 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
    - 实测（Electron，单独的数据目录，3 秒静音测试音频）：旧配置迁移；列表循环 短歌二 → 跳过不存在的文件 → 短歌三 → 回到第一首；顺序播放放完最后一首停下、唱臂回停靠位、当前歌回到第一首；单曲循环；随机播放不会连着两次同一首；上一首 / 下一首循环；删除、拖动排序后配置里的顺序对；播放中删光歌单，壁纸停下显示"请添加歌曲"；窗口缩到 820×560 没有横向滚动条。没实测：文件对话框里多选（要人工点）、真实鼠标拖动排序（用合成的拖放事件测的）。
 
 8. [x] 去掉唱片中心的白色轴孔（`.vinyl-spindle`）：它盖在封面图正中间。
+
+以上作为 **v1.1.0** 发版（用户要求，2026-10-30）：`package.json` 版本号改为 1.1.0，`npm test` 157 个全过；打包后解出 `app.asar` 和源码逐个比对一致（只有 electron-builder 精简过的 `package.json` 不同，版本号是 1.1.0）；用全新数据目录跑了 `dist/win-unpacked` 里的程序：启动有设置窗口、图库第一格是"从电脑选择"、歌单播完自动换下一首、能打开摆放唱片机的窗口、正常退出，日志没有报错。发版仍按阶段 6 的步骤：先建草稿，发布说明给用户确认后再公开。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。

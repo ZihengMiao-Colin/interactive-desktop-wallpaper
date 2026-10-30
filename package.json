@@ -1,6 +1,6 @@
 {
   "name": "interactive-desktop-wallpaper",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "互动 3D 桌面壁纸 — 基于 Pixi.js + Electron 的伪 3D 深度视差壁纸",
   "main": "main.js",
   "author": "ZihengMiao",
