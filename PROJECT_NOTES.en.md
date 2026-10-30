@@ -2,12 +2,12 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-10-27 (v1.0.0 published on GitHub Releases)
+> Last updated: 2026-10-29 (README links to the Android repository)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
 **Current scope**
-- **Desktop only**. The Android version lives in `C:\Users\24418\Desktop\2\Wallpaper3D phone` and is not being updated for now.
+- **Desktop only**. The Android version is a separate repository, [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper) (locally `C:\Users\24418\Desktop\2\Wallpaper3D phone`), brought to 1.1.0 on 2026-10-29. It ports this project's parallax shader (`renderer/shaders.js`), parallax math, idle-frame logic, throttled config saving and depth-map post-processing (`src/depth/processing.js`); keep both sides in sync when changing these files (the mapping is in the Android project's `PROJECT_NOTES.md`).
 - 2026-10-27: the existing feature set was declared **v1** and packaged (replacing the 10-25 decision of "no packaging for now"): `npm run build` produces an NSIS installer, the installed build was tested, and it was published the same day as v1.0.0 on GitHub Releases. The process and future release steps are in §9 Phase 6.
 - Effect video assets (`overlay/`, `elements/`) are committed to git.
 
@@ -388,7 +388,7 @@ Public distribution notes (v1.0.0 is public; these still hold):
 |---|---|
 | Purpose of the `elements/` explosion videos | Make them custom elements users can add to the wallpaper individually |
 | Personal use or distribution | Personal development for now; from 2026-10-27 the existing features are v1 and packaged (depth maps via onnxruntime-node, fp32 model, NSIS installer only), and v1.0.0 was published publicly on GitHub Releases the same day |
-| Android version | In `C:\Users\24418\Desktop\2\Wallpaper3D phone`, not being updated for now |
+| Android version | A separate repository, [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper), brought to 1.1.0 on 2026-10-29 (see "Current scope") |
 | Video assets in git | Yes |
 | Default playback for video elements | One-shot assets use interval playback (wait 10±3 seconds after finishing), others loop |
 | Multiple elements at once | Yes, including several copies of the same asset |

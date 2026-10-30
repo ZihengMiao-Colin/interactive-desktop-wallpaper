@@ -2,11 +2,11 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-10-27（v1.0.0 发布到 GitHub Releases）
+> 最近更新：2026-10-29（README 加上安卓版仓库链接）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
-- 只做**电脑端**。Android 版在 `C:\Users\24418\Desktop\2\Wallpaper3D phone`，暂不更新。
+- 只做**电脑端**。Android 版是单独的仓库 [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper)（本地 `C:\Users\24418\Desktop\2\Wallpaper3D phone`），2026-10-29 做到 1.1.0，移植了本项目的视差着色器（`renderer/shaders.js`）、视差数学、停帧、配置节流和深度图后处理（`src/depth/processing.js`）。改这些文件时记得两边同步，对应关系见安卓版的 `PROJECT_NOTES.md`。
 - 2026-10-27：现有功能定为 **v1** 并完成打包（取代 10-25 的"暂不考虑打包"）：`npm run build` 出 NSIS 安装包，安装版已实测，同一天以 v1.0.0 发布到 GitHub Releases。过程和以后的发版步骤见 §9 阶段 6。
 - 特效视频素材（`overlay/`、`elements/`）进 git。
 
@@ -387,7 +387,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 |---|---|
 | `elements/` 爆炸视频用途 | 做成用户可以单独加到壁纸上的自定义元素 |
 | 自用还是分发 | 目前自己开发；2026-10-27 起现有功能定为 v1 并打包（深度图改 onnxruntime-node、fp32 模型、只出 NSIS 安装包），同日 v1.0.0 公开发布到 GitHub Releases |
-| Android 版 | 在 `C:\Users\24418\Desktop\2\Wallpaper3D phone`，暂不更新 |
+| Android 版 | 单独的仓库 [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper)，2026-10-29 做到 1.1.0（见"当前范围"） |
 | 视频素材进 git | 进 |
 | 视频元素默认播放方式 | 一次性素材间隔播放（播完等 10±3 秒），其余循环 |
 | 同时放多个元素 | 可以，同一素材也可以放多份 |

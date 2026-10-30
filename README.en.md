@@ -4,6 +4,8 @@
 
 A pseudo-3D parallax live wallpaper for the Windows desktop: pick an image, an AI model generates its depth map, and as you move the mouse the scene shifts by distance, like looking at a 3D scene through a window. You can also place your own images, GIFs and videos on the wallpaper; they move with the scene and are naturally occluded by foreground objects.
 
+The Android version is at [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper): the same parallax effect, driven by tilting the phone, with depth maps generated on the phone.
+
 ## Features
 
 - **Depth parallax wallpaper**: Depth Anything V2 generates the depth map and a custom shader offsets the image by depth; parallax strength, smoothing and focus depth are adjustable.

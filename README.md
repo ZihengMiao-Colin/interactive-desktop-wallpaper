@@ -4,6 +4,8 @@
 
 Windows 桌面上的伪 3D 视差动态壁纸：选一张图片，AI 自动生成深度图，移动鼠标时画面按远近产生视差，像透过窗户看一个立体场景。还可以往壁纸上放自己的图片、GIF、视频，它们会和场景一起移动，并被前景物体自然遮挡。
 
+安卓手机版在 [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper)：同样的视差效果，倾斜手机驱动，深度图在手机本地生成。
+
 ## 功能
 
 - **深度视差壁纸**：Depth Anything V2 生成深度图，自定义着色器按深度偏移画面；可调视差强度、平滑度、对焦深度。
