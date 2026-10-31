@@ -81,7 +81,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /**
      * 生成深度图：这里解码图片，主进程用 ONNX 模型推理并存进缓存。
      * @param {string} imagePath - 原始图片路径
-     * @param {number} [blurRadius] - 边缘平滑高斯模糊半径（像素），0为不平滑，默认 8
+     * @param {number} [blurRadius] - 边缘平滑高斯模糊半径（像素），0为不平滑，默认 5
      * @returns {Promise<{success: boolean, depthDataUrl?: string, error?: string}>}
      */
     generateDepthMap: async (imagePath, blurRadius) => {

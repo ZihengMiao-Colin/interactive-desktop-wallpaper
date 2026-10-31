@@ -32,7 +32,7 @@ MAX_IMAGE_WIDTH = 3840
 # 缩略图尺寸（设置页网格是 16:10）
 THUMB_SIZE = (320, 200)
 # 深度图边缘平滑半径，和设置页默认值一致
-DEPTH_BLUR = 8.0
+DEPTH_BLUR = 5.0
 
 
 def fit_width(width, height, max_width):

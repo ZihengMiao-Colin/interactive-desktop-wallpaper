@@ -25,6 +25,31 @@ test('旧配置的视差强度超过 30 时读出 30', () => {
     assert.equal(store.getConfig().parallaxMultiplier, 30);
 });
 
+test('新用户的边缘平滑默认 5', () => {
+    const { store } = storeWithConfig();
+    assert.equal(store.getConfig().blurRadius, 5);
+});
+
+test('旧配置里还是旧默认值 8 的边缘平滑读成 5，保存后带上标记写回磁盘', () => {
+    const { store, dir } = storeWithConfig({ blurRadius: 8 });
+    assert.equal(store.getConfig().blurRadius, 5);
+    store.saveConfig({ focusDepth: 0.4 });
+    const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
+    assert.equal(onDisk.blurRadius, 5);
+    assert.equal(onDisk.blurRadiusVersion, 2);
+});
+
+test('旧配置里自己调过的边缘平滑不变', () => {
+    const { store } = storeWithConfig({ blurRadius: 12 });
+    assert.equal(store.getConfig().blurRadius, 12);
+});
+
+test('迁移过之后再调回 8 不会又被改成 5', () => {
+    const { store } = storeWithConfig({ blurRadius: 5, blurRadiusVersion: 2 });
+    store.saveConfig({ blurRadius: 8 });
+    assert.equal(store.getConfig().blurRadius, 8);
+});
+
 test('旧配置的单首歌读成一首歌的歌单，保存后写回磁盘的是歌单', () => {
     const { store, dir } = storeWithConfig({ vinyl: { enabled: true, audioPath: 'C:/m/a.mp3', audioName: 'a.mp3', loop: true } });
     const vinyl = store.getConfig().vinyl;

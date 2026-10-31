@@ -69,14 +69,14 @@
                                 <b>边缘平滑是什么？</b>
                                 <span>程序会先算出画面里每个地方离你有多远（这张"远近图"就是深度图），移动鼠标时近处和远处错开移动，看起来就有立体感。</span>
                                 <span>这个数值管的是近处物体（人、树、建筑）和后面背景交界的地方：</span>
-                                <span class="li"><b>太小</b>：物体边缘容易被扯开，出现拉丝、撕裂</span>
-                                <span class="li"><b>太大</b>：物体周围一圈背景会跟着物体一起晃</span>
-                                <span class="li"><b>建议</b>：先用默认的 8px；边缘有拉丝就调大，周围背景乱晃就调小</span>
+                                <span class="li"><b>太小</b>：毛发、胡须、细树枝这类细的东西容易在边缘被切断</span>
+                                <span class="li"><b>太大</b>：物体周围一圈背景会跟着物体一起晃，被拉扯变形</span>
+                                <span class="li"><b>建议</b>：先用默认的 5px；细的东西被切断就调大，周围背景乱晃就调小</span>
                                 <span class="note">改完要点"生成深度图"才会生效。默认壁纸自带深度图，不受这里影响。</span>
                             </span>
                         </span>
-                        <input type="range" id="depth-blur" min="0" max="30" value="8" step="1">
-                        <span class="value" id="blur-value">8px</span>
+                        <input type="range" id="depth-blur" min="0" max="30" value="5" step="1">
+                        <span class="value" id="blur-value">5px</span>
                     </div>
                     <div class="depth-actions">
                         <button type="button" class="btn" id="btn-generate-depth" disabled><svg class="i"><use href="#i-wand-sparkles"/></svg>生成深度图</button>
@@ -103,7 +103,7 @@
                         <p>画面跟着鼠标移动的幅度和手感。拖动滑块，上面的预览会立刻变化。</p>
                     </div>
                     <div class="actions">
-                        <button type="button" class="btn sm ghost" id="btn-reset-default" title="视差强度 10、跟手程度 0.08、对焦深度 0.50、边缘平滑 8px"><svg class="i"><use href="#i-rotate-ccw"/></svg>恢复推荐值</button>
+                        <button type="button" class="btn sm ghost" id="btn-reset-default" title="视差强度 10、跟手程度 0.08、对焦深度 0.50、边缘平滑 5px"><svg class="i"><use href="#i-rotate-ccw"/></svg>恢复推荐值</button>
                     </div>
                 </div>
                 <div class="preview-slot compact" id="preview-slot-parallax"></div>

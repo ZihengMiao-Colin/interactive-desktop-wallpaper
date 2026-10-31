@@ -17,7 +17,7 @@ const IMAGENET_STD = [0.229, 0.224, 0.225].map(Math.fround);
 /** 输出深度图的最长边。深度图本身很平滑，再大看不出差别，只会让后处理变慢、缓存变大 */
 const DEPTH_MAX_SIDE = 1920;
 
-const DEFAULT_BLUR = 8;
+const DEFAULT_BLUR = 5;
 
 const f32 = Math.fround;
 

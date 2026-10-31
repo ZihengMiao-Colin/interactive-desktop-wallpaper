@@ -84,6 +84,7 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 ## 技术要点
 
 - **视差公式**：`offset = mouse × (depth − focus) × strength`，带软截断；背景和元素共用同一段 GLSL（`renderer/shaders.js`）和 JS 版本（`shared/parallax-math.js`）。
+- **光线步进**：每个像素从最近一层往最远一层找第一个碰到的表面，近处物体挪动时盖住后面的背景，不会被拉扯出重影（思路参考 [depthy](https://github.com/panrafal/depthy)）。
 - **深度遮挡**：元素像素和"该像素上实际显示的背景内容"的深度比较，鼠标移动时遮挡边缘跟着前景物体走。
 - **动图**：用 Chromium 自带的 WebCodecs `ImageDecoder` 解码，不依赖第三方库。
 - **数据**：配置在 `%APPDATA%/interactive-desktop-wallpaper/config.json`；导入的素材复制到同目录的 `custom_elements/`，原文件挪走也不影响。

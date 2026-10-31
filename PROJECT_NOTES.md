@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-10-30（用户反馈的一批优化：启动直接打开设置窗口、唱片机拖动摆放、暂停时唱臂回停靠位、歌单等，见 §9 阶段 7）
+> 最近更新：2026-10-30（视差改用光线步进、边缘平滑默认 5，未提交，见 §9 阶段 8；之前是用户反馈的一批优化，见阶段 7）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -87,7 +87,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── vinyl-edit-mode.js   摆放唱片机（同一个摆放窗口）：拖动、角点缩放、复原
 │   └── main.js              入口：配置、鼠标、动画循环、IPC
 ├── shared/                  纯逻辑（UMD，Node 测试和渲染进程共用，挂在 window.Shared）
-│   ├── parallax-math.js     Cover 映射、视差位移、元素屏幕位移
+│   ├── parallax-math.js     Cover 映射、视差位移、光线步进（着色器的 JS 版，测试用）、元素屏幕位移
 │   ├── elements-model.js    自定义元素数据结构与纯函数
 │   ├── playback.js          动图取帧、间隔播放调度、点击播放状态机
 │   ├── frame-pacing.js      空闲停帧判断
@@ -138,9 +138,11 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 `选择壁纸` → `生成深度图`（preload 用 Chromium 解码成 RGBA → 主进程开推理子进程 → 存进深度缓存）→ `应用壁纸`（保存 `currentImage`，发 `image:new`）→ 壁纸窗口 `Scene.load` 换纹理并释放旧纹理。
 
 ### 4.3 视差渲染
-- 背景：屏幕 UV 按 Cover 映射到图片 UV → 取深度 → `parallaxUV = mouse × (depth − focus) × strength`（软截断）→ 偏移采样。
+- 位移公式：深度 t 的内容挪 `−parallaxUV(t)`，`parallaxUV = mouse × (t − focus) × strength`（软截断）。
+- 背景：屏幕 UV 按 Cover 映射到图片 UV → **光线步进**（`rayMarchUV`）找出这个像素实际显示的图片位置：从最近一层往最远一层试，第一个碰到的表面就是挡在最前面的，再二分收准 → 取色。原来是"取该处深度、直接偏移一次"，前景挪动时会被拉扯、对折出重影（见阶段 8）。
 - 自定义元素：整体按自身深度平移 `−parallaxUV / coverScale`，和同深度的背景移动完全一致。
-- 遮挡：元素每个像素和"该像素上实际显示的背景内容"的深度比较（先按背景的视差偏移再取深度），场景更近就挡住，边缘 `smoothstep` 过渡。
+- 遮挡：元素每个像素和"该像素上实际显示的背景内容"的深度比较（用同一个光线步进找到显示的位置再取深度），场景更近就挡住，边缘 `smoothstep` 过渡。
+- `rayMarchUV` 在 `renderer/shaders.js`（GLSL）和 `shared/parallax-math.js`（JS，有单元测试）各有一份，算法和步数参数要一致；设置页预览（`settings/depth-preview.js`）也用它。
 
 ### 4.4 自定义元素
 - 设置页点素材 → `elements:startPlacement` → 主进程开全屏置顶的摆放窗口（`index.html?mode=edit`），同时静默暂停壁纸。
@@ -178,7 +180,8 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 
 ```js
 {
-  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 8,   // 视差强度 5 ~ 30（旧配置超过 30 读出 30）
+  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // 视差强度 5 ~ 30（旧配置超过 30 读出 30）
+  blurRadiusVersion: 2,   // 边缘平滑默认值从 8 改成 5 的标记：没有它的旧配置里 blurRadius 还是 8 的读成 5
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
   vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
                   playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
@@ -354,6 +357,22 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 8. [x] 去掉唱片中心的白色轴孔（`.vinyl-spindle`）：它盖在封面图正中间。
 
 以上作为 **v1.1.0** 发版（用户要求，2026-10-30）：`package.json` 版本号改为 1.1.0，`npm test` 157 个全过；打包后解出 `app.asar` 和源码逐个比对一致（只有 electron-builder 精简过的 `package.json` 不同，版本号是 1.1.0）；用全新数据目录跑了 `dist/win-unpacked` 里的程序：启动有设置窗口、图库第一格是"从电脑选择"、歌单播完自动换下一首、能打开摆放唱片机的窗口、正常退出，日志没有报错。发版仍按阶段 6 的步骤：先建草稿，发布说明给用户确认后再公开。2026-10-30 已公开并设为最新版：https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.1.0 ，tag `v1.1.0` 指向 `e0c1920`，附件 `Interactive3DWallpaper-Setup-1.1.0.exe`（SHA-256 和本地检查过的安装包一致）。发布说明在 v1.0.0 的基础上加了"v1.1.0 更新内容"和"从 v1.0.0 升级"（覆盖安装，设置和歌曲保留），中文在前、英文在后。
+
+### 阶段 8 — 视差算法：光线步进 + 边缘平滑默认 5（2026-10-30，未提交）
+用户反馈：分割的地方移动幅度大时有拉扯感。原因是旧算法每个像素只查自己位置的深度、挪一次：深度过渡带（σ=8 时三四十像素）要承接前后景的位移差（强度 30、鼠标在屏幕边上时约 50 像素），一侧被拉长，另一侧被压扁甚至对折出重影；把深度图模糊得更厉害只能把拉扯摊开。
+- 参考：[depthy](https://github.com/panrafal/depthy)（MIT，也是 Pixi 滤镜）、[DepthFlow](https://github.com/BrokenSource/DepthFlow)（AGPL-3.0，只看思路不抄代码）都用光线步进；同类的 Lively 深度壁纸和我们原来一样。
+- 做法：`rayMarchUV`，步数按位移在深度图上跨过的像素数定（每步最多 2.5 像素，最多 48 步，再二分 5 次）。深度图关掉 mipmap（循环里读纹理算不出 mipmap 级别）。
+- 对比（浏览器预览，强度 30，鼠标在屏幕左右边缘；对比图在 `out/raymarch/`，已被 .gitignore 忽略）：
+  - 同样用现在的深度图（σ=8）时，两种算法差别不大：光线步进少了对折，但前景外扩出去的那圈背景滑过其他背景时会留一道细缝。
+  - 深度图更锐利（σ=3）时，旧算法会把马耳朵、马腿对折出很明显的重影；光线步进没有重影，前景边缘干净，被盖住一侧的背景也不再弯成波浪。
+  - 没解决的：①前景挪开、露出原来被挡住的地方时，仍显示边缘像素拉成的横向条纹（那里本来就没有画面，要补背景，即第二步）；②深度图里没有的细东西（猫胡须、毛发）在 σ 小时会被切断——头部范围内的跟着头走，外面的留在背景上；σ=8 时和旧算法差不多是弯过去。σ=5 介于两者之间。
+  - 性能：这台机器（RTX 5070 Laptop）上新旧算法每帧都约 0.19ms，看不出差别；最坏每像素读约 47 次深度图（原来 2 次）。集成显卡没测。
+- 用户看过对比图后决定：用光线步进，边缘平滑默认值从 8 改成 5（σ=3 时胡须断得太多）。试做时的对比开关已删掉。
+  - 默认值改了这些地方：`src/depth/processing.js` 的 `DEFAULT_BLUR`（主进程的兜底值也用它）、`generate_depth_map.py`、`tools/prepare_wallpapers.py`、`src/store.js` 默认配置、设置页滑块和"恢复推荐值"。问号说明改成"太小：毛发、胡须、细树枝容易在边缘被切断；太大：周围一圈背景跟着晃、被拉扯变形"。
+  - 旧配置迁移：`saveConfig` 会把完整配置写进磁盘，所以老用户的 config.json 里都有 `blurRadius: 8`。`AppStore.getConfig` 在配置里没有 `blurRadiusVersion: 2` 时把 8 读成 5（当成没调过），下次保存时标记一起写进去，之后用户自己调回 8 不会再被改；调过别的值的不动。有单元测试。
+  - 17 张默认壁纸的深度图已按 5 重算（`prepare_wallpapers.py --depth-only`），和单独用 `--blur 5` 生成的逐像素一致。用户自己图片的旧缓存仍是旧值生成的，重新点"生成深度图"才会换。
+  - 验证：`npm test` 166 个、三组 Python 测试全过；浏览器预览里壁纸页正常渲染（含自定义元素）、设置页滑块默认 5 和新说明、预览着色器在 WebGL1 下能编译。没在 Electron 里跑（主进程只做了语法检查）。
+- 待定：①安卓版同步（着色器、`parallax-math.js`、深度图默认值）；②要不要做第二步：前景 / 背景分层，补出被挡住的背景（参考 [3D Photo Inpainting](https://github.com/vt-vl-lab/3d-photo-inpainting)、[SLIDE](https://arxiv.org/abs/2109.01068) 的软分层，补图可用 [MI-GAN](https://github.com/Picsart-AI-Research/MI-GAN) 的 ONNX），能同时解决露出处的条纹和胡须被切断。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。

@@ -38,7 +38,7 @@ IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 # 输出深度图的最长边。深度图本身很平滑，再大看不出差别，只会让后处理变慢、缓存变大
 DEPTH_MAX_SIDE = 1920
 
-DEFAULT_BLUR = 8.0
+DEFAULT_BLUR = 5.0
 
 
 # ==================== 深度图后处理 ====================
@@ -268,7 +268,7 @@ def main():
     parser.add_argument('-m', '--model', choices=['small', 'base', 'large'], default='small',
                         help='模型档位，本地只有 small 时自动用 small（默认 small）')
     parser.add_argument('--blur', type=float, default=DEFAULT_BLUR,
-                        help='边缘平滑半径（像素，按输出深度图尺寸计）：近处轮廓先外扩再平滑，0 关闭（默认 8）')
+                        help='边缘平滑半径（像素，按输出深度图尺寸计）：近处轮廓先外扩再平滑，0 关闭（默认 5）')
     parser.add_argument('--invert', action='store_true', help='反转深度图（黑=近）')
     parser.add_argument('--device', choices=['cuda', 'cpu', 'mps'], default=None, help='HuggingFace 模式下强制指定设备')
     parser.add_argument('--onnx-path', default=None, help='手动指定 ONNX 模型文件')

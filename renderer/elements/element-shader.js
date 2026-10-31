@@ -13,6 +13,7 @@ function createElementShader(texture, depthTexture) {
     return PIXI.Shader.from(ELEMENT_VERTEX_SHADER, ELEMENT_FRAGMENT_SHADER, {
         uSampler: texture,
         uDepth: depthTexture,
+        uDepthSize: new Float32Array([1, 1]),
         uScreenSize: new Float32Array([1, 1]),
         uCoverScale: new Float32Array([1, 1]),
         uCoverOffset: new Float32Array([0, 0]),

@@ -84,6 +84,7 @@ For architecture details, known issues and the development plan, see [PROJECT_NO
 ## Technical notes
 
 - **Parallax formula**: `offset = mouse × (depth − focus) × strength`, with a soft clamp; the background and elements share the same GLSL (`renderer/shaders.js`) and JS version (`shared/parallax-math.js`).
+- **Ray marching**: each pixel searches from the nearest layer to the farthest for the first surface it hits, so near objects cover the background behind them as they move instead of being stretched into ghost copies (approach based on [depthy](https://github.com/panrafal/depthy)).
 - **Depth occlusion**: each element pixel is compared against the depth of the background content actually shown at that pixel, so occlusion edges follow foreground objects as the mouse moves.
 - **Animated images**: decoded with Chromium's built-in WebCodecs `ImageDecoder`, no third-party library.
 - **Data**: config lives in `%APPDATA%/interactive-desktop-wallpaper/config.json`; imported assets are copied into `custom_elements/` in the same folder, so moving the original files does not break anything.

@@ -34,6 +34,7 @@ precision highp float;
 varying vec2 vUV;
 uniform sampler2D uImage;
 uniform sampler2D uDepth;
+uniform vec2 uDepthSize;
 uniform vec2 uMouse;
 uniform vec2 uCoverScale;
 uniform vec2 uCoverOffset;
@@ -43,8 +44,7 @@ uniform float uShowDepth;
 ${PARALLAX_GLSL}
 void main(void) {
     vec2 baseUV = vUV * uCoverScale + uCoverOffset;
-    float depth = texture2D(uDepth, baseUV).r;
-    vec2 finalUV = clamp(baseUV + parallaxUV(uMouse, depth, uFocus, uStrength), vec2(0.001), vec2(0.999));
+    vec2 finalUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), vec2(0.001), vec2(0.999));
     gl_FragColor = uShowDepth > 0.5 ? texture2D(uDepth, finalUV) : texture2D(uImage, finalUV);
 }
 `;
@@ -113,7 +113,7 @@ function initDepthPreview() {
         ctx.vertexAttribPointer(aPos, 2, ctx.FLOAT, false, 0, 0);
 
         const uniforms = {};
-        for (const name of ['uImage', 'uDepth', 'uMouse', 'uCoverScale', 'uCoverOffset', 'uStrength', 'uFocus', 'uShowDepth']) {
+        for (const name of ['uImage', 'uDepth', 'uDepthSize', 'uMouse', 'uCoverScale', 'uCoverOffset', 'uStrength', 'uFocus', 'uShowDepth']) {
             uniforms[name] = ctx.getUniformLocation(program, name);
         }
         ctx.uniform1i(uniforms.uImage, 0);
@@ -191,8 +191,10 @@ function initDepthPreview() {
         ctx.uniform1f(uniforms.uFocus, params.focusDepth);
         ctx.uniform1f(uniforms.uShowDepth, mode === 'depth' && gl.depth ? 1 : 0);
         // 没有深度图时深度纹理位绑原图，反正强度是 0，不会偏移
+        const depth = gl.depth || gl.image;
+        ctx.uniform2f(uniforms.uDepthSize, depth.width, depth.height);
         ctx.activeTexture(ctx.TEXTURE1);
-        ctx.bindTexture(ctx.TEXTURE_2D, (gl.depth || gl.image).texture);
+        ctx.bindTexture(ctx.TEXTURE_2D, depth.texture);
         ctx.drawArrays(ctx.TRIANGLE_STRIP, 0, 4);
     }
 

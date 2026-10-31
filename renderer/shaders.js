@@ -30,8 +30,8 @@ void main(void) {
 `;
 
 /**
- * 视差位移公式（GLSL 版），背景和自定义元素的着色器共用。
- * 与 shared/parallax-math.js 的 parallaxUV 是同一公式，改一边必须同步另一边。
+ * 视差位移公式和光线步进（GLSL 版），背景、自定义元素和设置页预览的着色器共用。
+ * 与 shared/parallax-math.js 的 parallaxUV / rayMarchUV 是同一算法，改一边必须同步另一边。
  *
  * - 对焦平面：depth == focus 时位移为 0，主体不撕裂
  * - 软截断：位移超过 maxDist 后只按 20% 继续增长，避免大幅移动拉出缝隙
@@ -46,11 +46,40 @@ vec2 parallaxUV(vec2 mouse, float depth, float focus, float strength) {
     }
     return p;
 }
+
+// 光线步进参数，和 shared/parallax-math.js 的 RAY_* 一致
+#define RAY_STEP_PX 2.5
+#define RAY_MAX_STEPS 48
+#define RAY_REFINE_STEPS 5
+
+// 屏幕上这一点实际显示的是图片的哪个位置（图片 UV）。算法见 shared/parallax-math.js 的 rayMarchUV：
+// 从最近一层往最远一层试，第一个碰到的表面就是挡在最前面的，前景挪动时能盖住背景、不会被拉扯变形。
+// depthSize 是深度图的像素尺寸，用来决定走几步。
+vec2 rayMarchUV(sampler2D depthMap, vec2 depthSize, vec2 baseUV, vec2 mouse, float focus, float strength) {
+    vec2 spanPx = (parallaxUV(mouse, 1.0, focus, strength) - parallaxUV(mouse, 0.0, focus, strength)) * depthSize;
+    float n = clamp(ceil(length(spanPx) / RAY_STEP_PX), 1.0, float(RAY_MAX_STEPS));
+    float lo = 1.0;
+    float hi = 0.0;
+    for (int i = 0; i <= RAY_MAX_STEPS; i++) {
+        // i 走到 n 时 t = 0，深度一定 >= 0，循环在这里结束
+        float t = max(1.0 - float(i) / n, 0.0);
+        if (texture2D(depthMap, baseUV + parallaxUV(mouse, t, focus, strength)).r >= t) {
+            hi = t;
+            break;
+        }
+        lo = t;
+    }
+    for (int k = 0; k < RAY_REFINE_STEPS; k++) {
+        float mid = 0.5 * (lo + hi);
+        if (texture2D(depthMap, baseUV + parallaxUV(mouse, mid, focus, strength)).r >= mid) hi = mid;
+        else lo = mid;
+    }
+    return baseUV + parallaxUV(mouse, hi, focus, strength);
+}
 `;
 
 /**
- * 背景片元着色器：屏幕 UV 先按 Cover 映射到图片 UV，
- * 再按该处深度偏移采样坐标。
+ * 背景片元着色器：屏幕 UV 先按 Cover 映射到图片 UV，再用光线步进找出这里显示的图片位置。
  */
 const PARALLAX_FRAGMENT_SHADER = `
 precision highp float;
@@ -59,6 +88,7 @@ varying vec2 vTextureCoord;
 
 uniform sampler2D uImage;
 uniform sampler2D uDepth;
+uniform vec2 uDepthSize;
 uniform vec2 uMouse;
 uniform float uStrength;
 uniform float uFocus;
@@ -67,9 +97,8 @@ uniform vec2 uCoverOffset;
 ${PARALLAX_GLSL}
 void main(void) {
     vec2 baseUV = vTextureCoord * uCoverScale + uCoverOffset;
-    float depth = texture2D(uDepth, baseUV).r;
-    vec2 finalUV = clamp(baseUV + parallaxUV(uMouse, depth, uFocus, uStrength), vec2(0.001), vec2(0.999));
-    gl_FragColor = texture2D(uImage, finalUV);
+    vec2 shownUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), vec2(0.001), vec2(0.999));
+    gl_FragColor = texture2D(uImage, shownUV);
 }
 `;
 
@@ -103,7 +132,7 @@ void main(void) {
  * 自定义元素的片元着色器：透视贴图 + 翻转 + 绿幕抠像 + 变色 + 深度遮挡 + 不透明度。
  *
  * 遮挡：比较元素深度和"这个像素上实际显示的背景内容"的深度。
- * 背景在屏幕点 p 显示的是图片 baseUV + parallax 处的颜色，所以要在同一位置取深度，
+ * 背景在屏幕点 p 显示的是光线步进找到的那个图片位置，所以要在同一位置取深度，
  * 否则鼠标移动时前景物体动了、遮挡边缘却还停在原地。
  */
 const ELEMENT_FRAGMENT_SHADER = `
@@ -114,6 +143,7 @@ varying vec2 vScreenUV;
 
 uniform sampler2D uSampler;
 uniform sampler2D uDepth;
+uniform vec2 uDepthSize;
 uniform vec2 uCoverScale;
 uniform vec2 uCoverOffset;
 uniform vec2 uMouse;
@@ -156,8 +186,7 @@ vec3 adjustColor(vec3 rgb) {
 void main(void) {
     // 深度遮挡：场景比元素近的地方把元素挡住，边缘柔和过渡；+0.02 避免贴地时底边自己挡自己
     vec2 baseUV = vScreenUV * uCoverScale + uCoverOffset;
-    float d0 = texture2D(uDepth, baseUV).r;
-    vec2 shownUV = clamp(baseUV + parallaxUV(uMouse, d0, uFocus, uStrength), vec2(0.001), vec2(0.999));
+    vec2 shownUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), vec2(0.001), vec2(0.999));
     float sceneDepth = texture2D(uDepth, shownUV).r;
     float vis = smoothstep(-0.03, 0.03, (uElemDepth + 0.02) - sceneDepth);
 

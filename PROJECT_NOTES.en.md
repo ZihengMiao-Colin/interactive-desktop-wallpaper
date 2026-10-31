@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-10-30 (a batch of user-requested improvements: settings window opens on launch, drag-to-place record player, tonearm returns to rest on pause, playlist, etc.; see §9 Phase 7)
+> Last updated: 2026-10-30 (parallax switched to ray marching, edge smoothing default 5, not committed, see §9 Phase 8; before that a batch of user-requested improvements, see Phase 7)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -88,7 +88,7 @@ On top of that you can layer:
 │   ├── vinyl-edit-mode.js   Placing the record player (same placement window): drag, corner resize, reset
 │   └── main.js              Entry: config, mouse, animation loop, IPC
 ├── shared/                  Pure logic (UMD, shared by Node tests and the renderer, attached to window.Shared)
-│   ├── parallax-math.js     Cover mapping, parallax offset, element screen offset
+│   ├── parallax-math.js     Cover mapping, parallax offset, ray marching (JS version of the shader, for tests), element screen offset
 │   ├── elements-model.js    Custom element data structures and pure functions
 │   ├── playback.js          Animated frame lookup, interval playback scheduling, click playback state machine
 │   ├── frame-pacing.js      Idle frame-stop decision
@@ -139,9 +139,11 @@ On top of that you can layer:
 `Choose wallpaper` → `Generate depth map` (preload decodes to RGBA with Chromium → main process starts the inference child process → saved to the depth cache) → `Apply wallpaper` (saves `currentImage`, sends `image:new`) → the wallpaper window's `Scene.load` swaps textures and frees the old ones.
 
 ### 4.3 Parallax rendering
-- Background: screen UV is cover-mapped to image UV → sample depth → `parallaxUV = mouse × (depth − focus) × strength` (soft clamp) → offset the sample.
+- Shift formula: content at depth t moves by `−parallaxUV(t)`, `parallaxUV = mouse × (t − focus) × strength` (soft clamp).
+- Background: screen UV is cover-mapped to image UV → **ray marching** (`rayMarchUV`) finds which image position this pixel actually shows: try layers from nearest to farthest, the first surface hit is the one in front, then refine by bisection → sample the color. Previously it was "sample the depth here and offset once", which stretched the image and folded it into ghost copies when the foreground moved (see Phase 8).
 - Custom elements: translated as a whole by `−parallaxUV / coverScale` at their own depth, matching the movement of background at the same depth exactly.
-- Occlusion: each element pixel is compared against the depth of the background content actually shown at that pixel (apply the background's parallax offset first, then sample depth); if the scene is closer it covers the element, with a `smoothstep` edge.
+- Occlusion: each element pixel is compared against the depth of the background content actually shown at that pixel (find the shown position with the same ray march, then sample depth); if the scene is closer it covers the element, with a `smoothstep` edge.
+- `rayMarchUV` exists in `renderer/shaders.js` (GLSL) and `shared/parallax-math.js` (JS, unit-tested); the algorithm and step parameters must match. The settings preview (`settings/depth-preview.js`) uses it too.
 
 ### 4.4 Custom elements
 - Click an asset in settings → `elements:startPlacement` → the main process opens a full-screen, always-on-top placement window (`index.html?mode=edit`) and silently pauses the wallpaper.
@@ -179,7 +181,8 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 
 ```js
 {
-  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 8,   // parallax strength 5 ~ 30 (older configs above 30 read as 30)
+  parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // parallax strength 5 ~ 30 (older configs above 30 read as 30)
+  blurRadiusVersion: 2,   // marks the edge smoothing default change from 8 to 5: older configs without it read blurRadius 8 as 5
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
   vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
                   playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
@@ -355,6 +358,22 @@ The user sent 7 items at once, said they need not all be done together and left 
 8. [x] Removed the white spindle dot at the record center (`.vinyl-spindle`): it covered the middle of the cover image.
 
 All of the above ships as **v1.1.0** (user request, 2026-10-30): `package.json` version set to 1.1.0, all 157 `npm test` tests pass; after packaging, the extracted `app.asar` matches the source file by file (only `package.json`, which electron-builder trims, differs, and its version is 1.1.0); the app in `dist/win-unpacked` was run with a fresh data directory: the settings window opens on launch, the first gallery tile is "Choose from computer", the playlist advances to the next track when one ends, the record player placement window opens, and it quits cleanly with no errors in the log. The release still follows the Phase 6 steps: create a draft first, publish after the user confirms the release notes. Published and marked latest on 2026-10-30: https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.1.0 . Tag `v1.1.0` points at `e0c1920`, with the asset `Interactive3DWallpaper-Setup-1.1.0.exe` (SHA-256 matches the locally checked installer). The release notes build on v1.0.0's with a "What's new in v1.1.0" section and "Upgrading from v1.0.0" (install over the old version; settings and tracks are kept), Chinese first, then English.
+
+### Phase 8 — Parallax algorithm: ray marching + edge smoothing default 5 (2026-10-30, not committed)
+User feedback: where the image splits, large movements feel like the picture is being stretched. Cause: the old algorithm looks up the depth only at each pixel's own position and offsets once. The depth transition band (30–40 px at σ=8) has to absorb the shift difference between foreground and background (about 50 px at strength 30 with the mouse at the screen edge), so one side stretches and the other is squeezed or even folds into ghost copies; blurring the depth map more only spreads the stretch out.
+- References: [depthy](https://github.com/panrafal/depthy) (MIT, also a Pixi filter) and [DepthFlow](https://github.com/BrokenSource/DepthFlow) (AGPL-3.0, ideas only, no code copied) both use ray marching; Lively's depth wallpaper works like our old one.
+- Approach: `rayMarchUV`. Step count follows how many depth-map pixels the shift spans (at most 2.5 px per step, at most 48 steps, then 5 bisection steps). Mipmaps are off for the depth texture (mip levels can't be computed for texture reads inside the loop).
+- Comparison (browser preview, strength 30, mouse at the left/right screen edge; images in `out/raymarch/`, ignored by .gitignore):
+  - With the current depth maps (σ=8) the two algorithms look similar: ray marching removes the folding, but the ring of background pulled out with the dilated foreground leaves a thin seam as it slides over other background.
+  - With sharper depth maps (σ=3) the old algorithm folds the horse's ear and legs into obvious ghost copies; ray marching has no ghosts, foreground edges are clean, and the background on the covered side no longer bends into waves.
+  - Not solved: (1) where the foreground moves away and reveals what it was covering, edge pixels are still drawn as horizontal streaks (there is no image there; it needs the background filled in, i.e. step 2); (2) thin things missing from the depth map (cat whiskers, hair) get cut at small σ — the part inside the head moves with the head, the rest stays with the background; at σ=8 they bend like with the old algorithm. σ=5 is in between.
+  - Performance: on this machine (RTX 5070 Laptop) both algorithms take about 0.19 ms per frame, no visible difference; worst case is about 47 depth reads per pixel (was 2). Not tested on integrated GPUs.
+- After seeing the comparison images the user decided: use ray marching and change the default edge smoothing from 8 to 5 (σ=3 cut too many whiskers). The trial comparison switch has been removed.
+  - The default changed in: `DEFAULT_BLUR` in `src/depth/processing.js` (the main process fallback uses it too), `generate_depth_map.py`, `tools/prepare_wallpapers.py`, the default config in `src/store.js`, and the settings slider and "Restore recommended". The help popup now says "too small: hair, whiskers and thin branches get cut at the edge; too large: a ring of background moves with the object and gets stretched".
+  - Old config migration: `saveConfig` writes the full config to disk, so existing users' config.json all contain `blurRadius: 8`. When the config has no `blurRadiusVersion: 2`, `AppStore.getConfig` reads 8 as 5 (treated as untouched), and the marker is written on the next save, so a user who later sets 8 again keeps it; other values are left alone. Unit-tested.
+  - The 17 gallery depth maps were regenerated at 5 (`prepare_wallpapers.py --depth-only`) and are pixel-identical to ones generated separately with `--blur 5`. Old caches of users' own images were generated with the old value and only change after clicking "Generate depth map" again.
+  - Verification: all 166 `npm test` tests and the three Python suites pass; in the browser preview the wallpaper page renders correctly (including custom elements), the settings slider defaults to 5 with the new help text, and the preview shader compiles under WebGL1. Not run in Electron (the main process was only syntax-checked).
+- Open: (1) sync the Android version (shader, `parallax-math.js`, depth map default); (2) whether to do step 2: split foreground/background layers and fill in the hidden background (see [3D Photo Inpainting](https://github.com/vt-vl-lab/3d-photo-inpainting) and the soft layering in [SLIDE](https://arxiv.org/abs/2109.01068); [MI-GAN](https://github.com/Picsart-AI-Research/MI-GAN) has an ONNX model for the fill), which would fix both the streaks and the cut whiskers.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

@@ -57,6 +57,7 @@ const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
 const { findDepthModel, generateDepthPng } = require('./src/depth/generator');
+const { DEFAULT_BLUR } = require('./src/depth/processing');
 
 // ==================== 资源位置 ====================
 
@@ -741,7 +742,7 @@ function registerIpcHandlers() {
 
     // ---- 生成深度图（onnxruntime-node，在单独的子进程里跑；像素由设置窗口的 preload 解码好传过来） ----
     ipcMain.handle('depth:generate', async (event, { imagePath, blurRadius, width, height, rgba }) => {
-        const blur = Number.isFinite(Number(blurRadius)) ? Number(blurRadius) : 8;
+        const blur = Number.isFinite(Number(blurRadius)) ? Number(blurRadius) : DEFAULT_BLUR;
         const progress = (message) => {
             console.log('[Depth]', message);
             if (!event.sender.isDestroyed()) event.sender.send('depth:progress', { message });

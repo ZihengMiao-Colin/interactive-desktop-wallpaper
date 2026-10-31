@@ -1,9 +1,9 @@
 /**
  * parallax-scene.js — 背景场景：Pixi 应用、深度视差滤镜与壁纸 / 深度图纹理
  *
- * 原理：全屏精灵挂一个自定义滤镜，片元着色器按深度图把每个像素的采样坐标
- * 沿鼠标方向偏移，偏移量 = mouse × (depth − focus) × strength。
- * 深度等于对焦深度的地方完全不动，离得越远偏移越大，形成伪 3D 视差。
+ * 原理：全屏精灵挂一个自定义滤镜。深度 t 的内容沿鼠标方向挪 mouse × (t − focus) × strength，
+ * 深度等于对焦深度的地方完全不动，离得越远挪得越多，形成伪 3D 视差。
+ * 片元着色器用光线步进找出每个像素实际显示的图片位置，近处的内容挪过来会盖住远处的。
  */
 
 'use strict';
@@ -17,6 +17,7 @@ class DepthParallaxFilter extends PIXI.Filter {
         super(PARALLAX_VERTEX_SHADER, PARALLAX_FRAGMENT_SHADER, {
             uImage: imageTexture,
             uDepth: depthTexture,
+            uDepthSize: new Float32Array([1.0, 1.0]),
             uMouse: new Float32Array([0.0, 0.0]),
             uStrength: 0.025,
             uFocus: 0.50,
@@ -141,6 +142,8 @@ const Scene = (() => {
 
         bgTexture = makeTexture(bgImg);
         depthTexture = makeTexture(depthSrc);
+        // 光线步进在分支和循环里读深度图，读的时候算不出该用哪级 mipmap，所以深度图不要 mipmap
+        depthTexture.baseTexture.mipmap = PIXI.MIPMAP_MODES.OFF;
         depthImage = depthSrc;
         bgWidth = bgImg.naturalWidth;
         bgHeight = bgImg.naturalHeight;
@@ -156,6 +159,7 @@ const Scene = (() => {
             filter.uniforms.uImage = bgTexture;
             filter.uniforms.uDepth = depthTexture;
         }
+        filter.uniforms.uDepthSize = getDepthSize();
         updateCover();
 
         // 新纹理已经挂上滤镜，旧纹理可以连同 GPU 资源一起释放
@@ -182,6 +186,12 @@ const Scene = (() => {
         filter.uniforms.uFocus = focus;
     }
 
+    /** 深度图的像素尺寸（光线步进按它决定走几步） */
+    function getDepthSize() {
+        if (!depthImage) return [1, 1];
+        return [depthImage.naturalWidth || depthImage.width, depthImage.naturalHeight || depthImage.height];
+    }
+
     /** 在背景之上追加一个显示层 */
     function addLayer(displayObject) {
         app.stage.addChild(displayObject);
@@ -202,6 +212,7 @@ const Scene = (() => {
         addLayer,
         getCover: () => ({ ...cover }),
         getDepthTexture: () => depthTexture,
+        getDepthSize,
         getDepthImage: () => depthImage,
     };
 })();

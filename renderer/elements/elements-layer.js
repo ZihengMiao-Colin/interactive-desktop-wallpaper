@@ -76,6 +76,7 @@ class ElementsLayer {
         const screenH = window.innerHeight;
         const cover = this.scene.getCover();
         const depthTexture = this.scene.getDepthTexture();
+        const depthSize = this.scene.getDepthSize();
         const { elementSize } = Shared.placement;
         const { elementScreenShift } = Shared.parallax;
 
@@ -120,6 +121,7 @@ class ElementsLayer {
 
             const u = mesh.shader.uniforms;
             u.uDepth = depthTexture;
+            u.uDepthSize = depthSize;
             u.uScreenSize = [screenW, screenH];
             u.uCoverScale = [cover.scaleX, cover.scaleY];
             u.uCoverOffset = [cover.offsetX, cover.offsetY];

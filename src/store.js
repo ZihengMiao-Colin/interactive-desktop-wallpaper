@@ -29,6 +29,13 @@ const NESTED_KEYS = ['vinyl', 'weather', 'videoOverlay'];
 /** 视差强度上限（设置页滑块 5 ~ 30）。旧版本最大能调到 100，读配置时压到上限 */
 const PARALLAX_MAX = 30;
 
+/**
+ * 边缘平滑的旧默认值。视差改成光线步进后默认值改成 5；旧配置里还是 8 的当成没调过，读成新默认值。
+ * 配置里没有 blurRadiusVersion 才这样换：保存时会带上它，之后用户自己调回 8 不会再被改。
+ */
+const LEGACY_BLUR_DEFAULT = 8;
+const BLUR_RADIUS_VERSION = 2;
+
 class AppStore {
 
     /**
@@ -158,6 +165,9 @@ class AppStore {
             customElements: normalizeCustomElements(this._config.customElements),
         };
         if (config.parallaxMultiplier > PARALLAX_MAX) config.parallaxMultiplier = PARALLAX_MAX;
+        if (this._config.blurRadiusVersion !== BLUR_RADIUS_VERSION && config.blurRadius === LEGACY_BLUR_DEFAULT) {
+            config.blurRadius = defaults.blurRadius;
+        }
         return config;
     }
 
@@ -307,7 +317,8 @@ class AppStore {
             parallaxMultiplier: 10,
             smoothness: 0.08,
             focusDepth: 0.50,
-            blurRadius: 8,
+            blurRadius: 5,
+            blurRadiusVersion: BLUR_RADIUS_VERSION,
             autoLaunch: false,
             currentImage: '',
             depthCacheDir: '',

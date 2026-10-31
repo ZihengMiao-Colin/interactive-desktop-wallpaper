@@ -59,6 +59,63 @@
         return [px, py];
     }
 
+    /** 光线步进每一步在深度图上最多走几个像素：越小越不容易跳过细的前景，也越慢 */
+    const RAY_STEP_PX = 2.5;
+    /** 最多走几步（鼠标在屏幕角、强度最大时约 40 步） */
+    const RAY_MAX_STEPS = 48;
+    /** 找到交点后再二分几次，把位置收准 */
+    const RAY_REFINE_STEPS = 5;
+
+    /**
+     * 光线步进：屏幕上一点实际显示的是图片的哪个位置（图片 UV）。和着色器里的 rayMarchUV 是同一算法。
+     *
+     * 深度为 t 的内容在画面上挪了 −parallaxUV(t)，所以屏幕点 p 显示的图片坐标 u 满足 u = p + parallaxUV(D(u))。
+     * 前景挪过来盖住背景时有好几个 u 满足，要取最近的：从最近（t=1）往最远（t=0）逐层试
+     * u(t) = p + parallaxUV(t)，第一个 D(u(t)) ≥ t 的就是挡在最前面的表面，再在最后一步里二分收准。
+     * 前景挪开、露出原来被挡住的地方时没有真正的交点，会停在深度的台阶上，显示台阶处的颜色。
+     *
+     * @param {(u: number, v: number) => number} sampleDepth - 图片 UV 处的深度 0~1
+     * @param {number} u - 屏幕点对应的图片 UV（还没加视差）
+     * @param {number} v
+     * @param {number} mouseX - 写入 uMouse 的值（已取反）
+     * @param {number} mouseY
+     * @param {number} focus
+     * @param {number} strength
+     * @param {number} depthW - 深度图宽高（像素），按它决定走几步
+     * @param {number} depthH
+     * @returns {[number, number]}
+     */
+    function rayMarchUV(sampleDepth, u, v, mouseX, mouseY, focus, strength, depthW, depthH) {
+        const at = (t) => {
+            const [px, py] = parallaxUV(mouseX, mouseY, t, focus, strength);
+            return [u + px, v + py];
+        };
+        const hits = (t) => sampleDepth(...at(t)) >= t;
+
+        const [nearX, nearY] = parallaxUV(mouseX, mouseY, 1, focus, strength);
+        const [farX, farY] = parallaxUV(mouseX, mouseY, 0, focus, strength);
+        const spanPx = Math.hypot((nearX - farX) * depthW, (nearY - farY) * depthH);
+        const n = Math.min(Math.max(Math.ceil(spanPx / RAY_STEP_PX), 1), RAY_MAX_STEPS);
+
+        // lo：最后一个还在表面前面的层；hi：第一个碰到表面的层（t = 0 一定碰到）
+        let lo = 1;
+        let hi = 0;
+        for (let i = 0; i <= n; i++) {
+            const t = Math.max(1 - i / n, 0);
+            if (hits(t)) {
+                hi = t;
+                break;
+            }
+            lo = t;
+        }
+        for (let k = 0; k < RAY_REFINE_STEPS; k++) {
+            const mid = (lo + hi) / 2;
+            if (hits(mid)) hi = mid;
+            else lo = mid;
+        }
+        return at(hi);
+    }
+
     /**
      * 深度为 depth 的内容在屏幕上的位移（屏幕归一化单位）。
      * 背景着色器在屏幕点 p 采样 baseUV(p) + parallax，所以内容看起来移动了 −parallax，
@@ -74,5 +131,5 @@
         return [u * cover.scaleX + cover.offsetX, v * cover.scaleY + cover.offsetY];
     }
 
-    return { coverTransform, strengthFromMultiplier, parallaxUV, elementScreenShift, screenToImageUV };
+    return { coverTransform, strengthFromMultiplier, parallaxUV, rayMarchUV, elementScreenShift, screenToImageUV };
 });
