@@ -155,6 +155,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** 退出应用 */
     quitApp: () => ipcRenderer.send('app:quit'),
 
+    /** 能不能卸载：{ available, reason? }（开发版、找不到卸载程序时不能） */
+    getUninstallInfo: () => ipcRenderer.invoke('app:getUninstallInfo'),
+
+    /** 打开卸载程序并退出软件：{ success, error? } */
+    uninstall: (deleteData) => ipcRenderer.invoke('app:uninstall', { deleteData }),
+
     // ==================== 渲染控制事件（主进程 → 渲染进程） ====================
 
     /**

@@ -58,6 +58,7 @@ const { cleanupOrphanFiles } = require('./src/elements/library');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
 const { findDepthModel, generateDepthPng } = require('./src/depth/generator');
 const { DEFAULT_BLUR } = require('./src/depth/processing');
+const { findUninstaller, launchUninstaller } = require('./src/uninstaller');
 
 // ==================== 资源位置 ====================
 
@@ -739,6 +740,31 @@ function registerIpcHandlers() {
     });
 
     ipcMain.handle('app:getAutoLaunch', async () => getAutoLaunch());
+
+    // ---- 卸载软件（设置页）：打开安装目录里的卸载程序，然后退出 ----
+    // 删数据、删开机自启都由卸载程序做（build/installer.nsh），用户在卸载向导里点了取消就什么都不动
+    const uninstallerPath = () => (app.isPackaged ? findUninstaller(path.dirname(process.execPath)) : null);
+
+    ipcMain.handle('app:getUninstallInfo', () => {
+        if (!app.isPackaged) return { available: false, reason: '开发版没有卸载程序，只有安装版可以卸载' };
+        if (!uninstallerPath()) return { available: false, reason: '没找到卸载程序，请到 Windows 设置 → 应用 里卸载' };
+        return { available: true };
+    });
+
+    ipcMain.handle('app:uninstall', async (_event, { deleteData } = {}) => {
+        const exe = uninstallerPath();
+        if (!exe) return { success: false, error: '没找到卸载程序' };
+        try {
+            await launchUninstaller(exe, !!deleteData);
+        } catch (err) {
+            console.error('[Main] 打开卸载程序失败:', err);
+            return { success: false, error: err.message };
+        }
+        console.log(`[Main] 已打开卸载程序（${deleteData ? '删除' : '保留'}用户数据），退出`);
+        // 等这次 IPC 回复发出去再退出
+        setTimeout(cleanupAndQuit, 200);
+        return { success: true };
+    });
 
     // ---- 生成深度图（onnxruntime-node，在单独的子进程里跑；像素由设置窗口的 preload 解码好传过来） ----
     ipcMain.handle('depth:generate', async (event, { imagePath, blurRadius, width, height, rgba }) => {

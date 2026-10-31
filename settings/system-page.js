@@ -1,5 +1,5 @@
 /**
- * system-page.js — 设置窗口"设置"页：开机自启、深度图缓存位置和清除
+ * system-page.js — 设置窗口"设置"页：开机自启、深度图缓存位置和清除、卸载软件
  */
 
 'use strict';
@@ -63,10 +63,50 @@ function initSystemPage({ api, setStatus, onCacheCleared }) {
         setStatus('深度图缓存已清除');
     });
 
+    // ---- 卸载：确认框里选要不要删数据，然后打开卸载程序（软件随即退出） ----
+    const uninstallBtn = document.getElementById('btn-uninstall');
+    const uninstallDesc = document.getElementById('uninstall-desc');
+    const dialog = document.getElementById('uninstall-dialog');
+    const deleteData = document.getElementById('uninstall-delete-data');
+    const confirmBtn = document.getElementById('uninstall-confirm');
+
+    uninstallBtn.addEventListener('click', () => {
+        deleteData.checked = false;
+        confirmBtn.disabled = false;
+        dialog.showModal();
+    });
+    document.getElementById('uninstall-cancel').addEventListener('click', () => dialog.close());
+
+    confirmBtn.addEventListener('click', async () => {
+        confirmBtn.disabled = true;
+        try {
+            const res = await api.uninstall(deleteData.checked);
+            if (res && res.success) {
+                setStatus('正在打开卸载程序，软件马上退出…');
+                return;
+            }
+            setStatus('打开卸载程序失败：' + ((res && res.error) || '未知错误'), 'error');
+        } catch (err) {
+            setStatus('打开卸载程序失败：' + err.message, 'error');
+        }
+        dialog.close();
+    });
+
+    async function refreshUninstall() {
+        try {
+            const info = await api.getUninstallInfo();
+            uninstallBtn.disabled = !info.available;
+            if (!info.available) uninstallDesc.textContent = info.reason;
+        } catch (err) {
+            console.error('检查卸载程序失败:', err);
+        }
+    }
+
     return {
         async load() {
             await refreshDir();
             autoLaunch.checked = await api.getAutoLaunch();
+            await refreshUninstall();
         },
     };
 }

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { AppStore } = require('../src/store');
+const { AppStore, UNINSTALL_LIST_FILE } = require('../src/store');
 
 function storeWithConfig(config) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-store-'));
@@ -150,4 +150,110 @@ test('深度缓存：原图被删除时不命中', () => {
     fs.unlinkSync(image);
     assert.equal(store.hasDepthCache(image), false);
     assert.equal(store.getDepthCache(image), null);
+});
+
+// ==================== 卸载用的深度图清单 ====================
+
+/** 读卸载清单（UTF-16LE 带 BOM、CRLF 分行），没有清单返回 null */
+function readUninstallList(dir) {
+    const file = path.join(dir, UNINSTALL_LIST_FILE);
+    if (!fs.existsSync(file)) return null;
+    const buf = fs.readFileSync(file);
+    assert.deepEqual([...buf.subarray(0, 2)], [0xff, 0xfe], '清单要以 UTF-16LE 的 BOM 开头');
+    return buf.subarray(2).toString('utf16le').split('\r\n').filter(Boolean);
+}
+
+/** 深度图放到 userData 以外的文件夹（路径带中文和空格） */
+function storeWithExternalDepthDir() {
+    const ctx = storeWithImage();
+    const externalDir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wp-ext-')), '我的 深度图');
+    ctx.store.setDepthCacheDir(externalDir);
+    return { ...ctx, externalDir };
+}
+
+test('卸载清单：深度图在默认位置时不写清单', () => {
+    const { store, image, dir } = storeWithImage();
+    store.saveDepthCache(image, DEPTH_URL);
+    assert.equal(readUninstallList(dir), null);
+});
+
+test('卸载清单：深度图换到别的文件夹后，清单里是那里的每一张深度图', () => {
+    const { store, image, dir, externalDir } = storeWithExternalDepthDir();
+    store.saveDepthCache(image, DEPTH_URL);
+    const list = readUninstallList(dir);
+    assert.equal(list.length, 1);
+    assert.equal(path.dirname(list[0]), externalDir);
+    assert.ok(fs.existsSync(list[0]));
+    // 卸载脚本只删 depth_*.png（build/installer.nsh）
+    assert.match(path.basename(list[0]), /^depth_[0-9a-f]+\.png$/);
+});
+
+test('卸载清单：先生成深度图再换位置，清单里是搬过去之后的路径', () => {
+    const { store, image, dir } = storeWithImage();
+    store.saveDepthCache(image, DEPTH_URL);
+    const externalDir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wp-ext-')), 'depth');
+    store.setDepthCacheDir(externalDir);
+    const list = readUninstallList(dir);
+    assert.equal(list.length, 1);
+    assert.equal(path.dirname(list[0]), externalDir);
+});
+
+test('卸载清单：原图改过、缓存失效后从清单里去掉', () => {
+    const { store, image, dir } = storeWithExternalDepthDir();
+    store.saveDepthCache(image, DEPTH_URL);
+    replaceSameSize(image);
+    store.hasDepthCache(image);
+    assert.equal(readUninstallList(dir), null);
+});
+
+test('卸载清单：清除缓存后清单也删掉', () => {
+    const { store, image, dir } = storeWithExternalDepthDir();
+    store.saveDepthCache(image, DEPTH_URL);
+    store.clearAllCache();
+    assert.equal(readUninstallList(dir), null);
+});
+
+test('卸载清单：旧版本没有清单，打开软件时补上', () => {
+    const { store, image, dir } = storeWithExternalDepthDir();
+    store.saveDepthCache(image, DEPTH_URL);
+    fs.unlinkSync(path.join(dir, UNINSTALL_LIST_FILE));
+    new AppStore({ userDataPath: dir });
+    assert.equal(readUninstallList(dir).length, 1);
+});
+
+// ==================== 深度图文件夹里有用户自己的文件 ====================
+
+/** 深度图放在一个本来就有用户文件的文件夹里（比如"图片"） */
+function storeWithSharedDepthDir() {
+    const ctx = storeWithImage();
+    const shared = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-shared-'));
+    fs.writeFileSync(path.join(shared, '旅行照片.png'), 'PNG');
+    fs.writeFileSync(path.join(shared, 'notes.txt'), 'text');
+    fs.mkdirSync(path.join(shared, '子文件夹'));
+    ctx.store.setDepthCacheDir(shared);
+    ctx.store.saveDepthCache(ctx.image, DEPTH_URL);
+    return { ...ctx, shared };
+}
+
+test('清除缓存只删深度图：同一文件夹里用户自己的图片、文件和子文件夹都留着', () => {
+    const { store, image, shared } = storeWithSharedDepthDir();
+    store.clearAllCache();
+    assert.deepEqual(fs.readdirSync(shared).sort(), ['notes.txt', '子文件夹', '旅行照片.png'].sort());
+    assert.equal(store.getDepthCache(image), null);
+});
+
+test('清除缓存也删掉索引里没有的旧深度图（depth_*.png）', () => {
+    const { store, shared } = storeWithSharedDepthDir();
+    fs.writeFileSync(path.join(shared, 'depth_abc123.png'), 'old');
+    store.clearAllCache();
+    assert.equal(fs.readdirSync(shared).filter(f => f.startsWith('depth_')).length, 0);
+});
+
+test('更改位置只搬深度图：用户自己的图片留在原来的文件夹', () => {
+    const { store, shared } = storeWithSharedDepthDir();
+    const next = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-next-'));
+    const res = store.setDepthCacheDir(next);
+    assert.equal(res.movedCount, 1);
+    assert.deepEqual(fs.readdirSync(shared).sort(), ['notes.txt', '子文件夹', '旅行照片.png'].sort());
+    assert.deepEqual(fs.readdirSync(next).map(f => /^depth_[0-9a-f]+\.png$/.test(f)), [true]);
 });

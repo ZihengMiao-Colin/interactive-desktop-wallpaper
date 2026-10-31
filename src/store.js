@@ -36,6 +36,19 @@ const PARALLAX_MAX = 30;
 const LEGACY_BLUR_DEFAULT = 8;
 const BLUR_RADIUS_VERSION = 2;
 
+/**
+ * 卸载清单：放在 userData 以外的深度图（用户换过存放位置时）。
+ * 卸载时勾了"同时删除我的数据"，卸载程序按这份清单逐个删除（build/installer.nsh）。
+ * UTF-16LE 带 BOM、CRLF 分行，方便 NSIS 读中文路径。
+ */
+const UNINSTALL_LIST_FILE = 'uninstall_extra_files.txt';
+
+/**
+ * 软件生成的深度图文件名：depth_<hash>.png（见 _hashPath）。
+ * 深度图文件夹可能是用户选的、本来就有别的文件的文件夹，清除和搬家只碰这种文件。
+ */
+const DEPTH_FILE_RE = /^depth_[0-9a-f]+\.png$/i;
+
 class AppStore {
 
     /**
@@ -68,6 +81,8 @@ class AppStore {
 
         // 加载缓存索引
         this._cacheIndex = this._loadJSON(this._cacheIndexPath, {});
+        // 旧版本没有卸载清单，打开时补上
+        this._writeUninstallList();
 
         console.log('[Store] Data dir:', this._userDataPath);
         console.log('[Store] Depth cache dir:', this._cacheDir);
@@ -109,11 +124,11 @@ class AppStore {
             }
 
             let movedCount = 0;
-            // 迁移已有深度图文件
+            // 迁移已有深度图文件（只搬 depth_*.png，旧文件夹里用户自己的图片留在原处）
             if (moveExisting && fs.existsSync(oldDir)) {
                 const files = fs.readdirSync(oldDir);
                 for (const file of files) {
-                    if (file.toLowerCase().endsWith('.png')) {
+                    if (DEPTH_FILE_RE.test(file)) {
                         const oldFile = path.join(oldDir, file);
                         const newFile = path.join(normalizedNewDir, file);
                         try {
@@ -138,7 +153,7 @@ class AppStore {
 
             this._cacheDir = normalizedNewDir;
             this.saveConfig({ depthCacheDir: normalizedNewDir });
-            this._saveJSON(this._cacheIndexPath, this._cacheIndex);
+            this._saveCacheIndex();
 
             console.log(`[Store] 深度图存储位置已更新: ${normalizedNewDir} (迁移了 ${movedCount} 个文件)`);
             return { success: true, path: normalizedNewDir, movedCount };
@@ -244,7 +259,7 @@ class AppStore {
                 imageMtimeMs: Math.round(stat.mtimeMs),
             };
 
-            this._saveJSON(this._cacheIndexPath, this._cacheIndex);
+            this._saveCacheIndex();
             console.log('[Store] Depth cached:', cacheKey);
             return true;
         } catch (err) {
@@ -285,19 +300,23 @@ class AppStore {
     }
 
     /**
-     * 清理所有深度图缓存。
+     * 清理所有深度图缓存。只删软件生成的深度图（depth_*.png，包括索引里没有的旧文件），
+     * 文件夹里用户自己的文件和子文件夹不动。
      */
     clearAllCache() {
         try {
-            // 删除所有缓存文件
-            const files = fs.readdirSync(this._cacheDir);
-            for (const file of files) {
-                fs.unlinkSync(path.join(this._cacheDir, file));
+            for (const file of fs.readdirSync(this._cacheDir)) {
+                if (!DEPTH_FILE_RE.test(file)) continue;
+                try {
+                    fs.unlinkSync(path.join(this._cacheDir, file));
+                } catch (err) {
+                    console.warn(`[Store] 删除深度图 ${file} 失败:`, err.message);
+                }
             }
 
             // 清空索引
             this._cacheIndex = {};
-            this._saveJSON(this._cacheIndexPath, this._cacheIndex);
+            this._saveCacheIndex();
             console.log('[Store] All caches cleared');
         } catch (err) {
             console.error('[Store] Clear cache failed:', err.message);
@@ -377,6 +396,34 @@ class AppStore {
         }
     }
 
+    /** 保存缓存索引，同时更新卸载清单 */
+    _saveCacheIndex() {
+        this._saveJSON(this._cacheIndexPath, this._cacheIndex);
+        this._writeUninstallList();
+    }
+
+    /**
+     * 写卸载清单：列出放在 userData 以外的深度图（userData 整个文件夹卸载时会一起删，不用列）。
+     * 一张都没有就删掉清单。
+     */
+    _writeUninstallList() {
+        const listPath = path.join(this._userDataPath, UNINSTALL_LIST_FILE);
+        const inside = path.resolve(this._userDataPath).toLowerCase() + path.sep;
+        const files = Object.values(this._cacheIndex)
+            .map(entry => entry && entry.depthFile)
+            .filter(file => file && !path.resolve(file).toLowerCase().startsWith(inside));
+        try {
+            if (files.length === 0) {
+                if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+                return;
+            }
+            const text = files.map(file => path.resolve(file) + '\r\n').join('');
+            fs.writeFileSync(listPath, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]));
+        } catch (err) {
+            console.error('[Store] Write uninstall list failed:', err.message);
+        }
+    }
+
     /**
      * 将文件路径 hash 为安全的缓存 key。
      */
@@ -422,8 +469,8 @@ class AppStore {
             try { fs.unlinkSync(entry.depthFile); } catch {}
         }
         delete this._cacheIndex[cacheKey];
-        this._saveJSON(this._cacheIndexPath, this._cacheIndex);
+        this._saveCacheIndex();
     }
 }
 
-module.exports = { AppStore };
+module.exports = { AppStore, UNINSTALL_LIST_FILE };

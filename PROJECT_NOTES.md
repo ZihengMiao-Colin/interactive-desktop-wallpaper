@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-10-30（视差改用光线步进、边缘平滑默认 5，未提交，见 §9 阶段 8；之前是用户反馈的一批优化，见阶段 7）
+> 最近更新：2026-10-31（设置页加卸载软件，卸载时可选删除数据，未提交，见 §9 阶段 9；之前是视差改用光线步进、边缘平滑默认 5，见阶段 8）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -67,7 +67,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── elements-tab.js      "元素"页：素材库 + 左右两栏（元素列表 / 调整面板）
 │   ├── effects-page.js      "特效"页：天气 + 视频特效
 │   ├── music-page.js        "唱片机"页：播放控制、歌单（添加 / 删除 / 拖动排序 / 点一首播放）、播放顺序、外观
-│   ├── system-page.js       "设置"页：开机自启、深度图缓存
+│   ├── system-page.js       "设置"页：开机自启、深度图缓存、卸载软件（确认框里选要不要删数据）
 │   └── thumbnail.js         导入素材时生成缩略图
 ├── renderer/                壁纸页脚本（普通全局脚本，按 index.html 里的顺序加载）
 │   ├── shaders.js           背景着色器 + 元素着色器，共用 PARALLAX_GLSL 视差公式
@@ -110,7 +110,8 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   │   ├── inference-process.js 推理子进程（utilityProcess）：缩放 → ONNX → 后处理 → PNG
 │   │   ├── processing.js    数值处理（Pillow 兼容的 bicubic、外扩、三次均值模糊、量化）
 │   │   └── png.js           8 位灰度 PNG 编码
-│   ├── store.js             config.json / 深度缓存 / custom_elements 目录
+│   ├── store.js             config.json / 深度缓存 / custom_elements 目录 / 卸载清单
+│   ├── uninstaller.js       设置页卸载：找安装目录里的卸载程序，带上删不删数据的参数打开它
 │   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移
 │   └── tray-manager.js      托盘菜单
 ├── elements/                默认元素：manifest.json + 裁剪后的 *_cut.mp4 + 缩略图（原始 bomb*.mp4 保留）
@@ -119,6 +120,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ├── tools/prepare_builtin_element.py  默认绿幕元素预处理（裁剪 / 缩放 / 缩略图）
 ├── tools/prepare_wallpapers.py       默认壁纸图库素材生成（缩图 / 缩略图 / 深度图；`--depth-only` 只重算深度图）
 ├── dev/                     浏览器预览用的假配置和示例 GIF
+├── build/installer.nsh      NSIS 自定义脚本：卸载向导的"同时删除我的数据"勾选框、删数据、删开机自启
 ├── test/                    Node 单元测试
 ├── generate_depth_map.py / export_onnx.py / 生成深度图.bat   Python 版深度图（tools/prepare_wallpapers.py 在用；应用里已换成 src/depth/）
 ├── background.png / background2.png / depth_map.png   默认素材
@@ -172,6 +174,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | 自定义元素 |
 | `placement:getDraft` / `commit` / `cancel` | R→M | 摆放窗口（草稿是元素 `{ instance, asset }` 或唱片机 `{ kind: 'vinyl', vinyl }`） |
 | `vinyl:startPlacement` | R→M | 打开摆放窗口拖动唱片机 |
+| `app:getUninstallInfo` / `app:uninstall` | R→M | 能不能卸载（开发版、找不到卸载程序时不能）/ 打开卸载程序（带 `{ deleteData }`）并退出 |
 | `renderer:ready`、`app:*` | R→M | 就绪通知、应用控制 |
 
 ---
@@ -200,7 +203,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   },
 }
 ```
-- 存储位置：`%APPDATA%/interactive-desktop-wallpaper/`（`config.json`、`cache_index.json`、`depth_cache/`、`custom_elements/`）。
+- 存储位置：`%APPDATA%/interactive-desktop-wallpaper/`（`config.json`、`cache_index.json`、`depth_cache/`、`custom_elements/`；深度图换到别的文件夹时还有卸载清单 `uninstall_extra_files.txt`，见 §9 阶段 9）。
 - 默认元素不在配置里，来自 `elements/manifest.json`，id 为 `builtin:<id>`。
 
 ---
@@ -221,6 +224,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 默认壁纸图库（`wallpapers/`） | ✅ | |
 | 设置窗口 / 壁纸页界面 | ✅ 2026-10-26 改版 | 左侧导航分六页、统一控件和 Lucide 图标、实时视差预览；摆放模式、Toast、调试面板同一套样式 |
 | 打包后独立运行 | ✅ v1 | NSIS 安装包，见 §9 阶段 6 |
+| 卸载 | ✅ 2026-10-31 | 设置页"卸载软件…"或 Windows 设置 → 应用，两边都能选要不要删数据，见 §9 阶段 9 |
 | 多显示器 | ❌ 不支持 | |
 
 ---
@@ -358,7 +362,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 
 以上作为 **v1.1.0** 发版（用户要求，2026-10-30）：`package.json` 版本号改为 1.1.0，`npm test` 157 个全过；打包后解出 `app.asar` 和源码逐个比对一致（只有 electron-builder 精简过的 `package.json` 不同，版本号是 1.1.0）；用全新数据目录跑了 `dist/win-unpacked` 里的程序：启动有设置窗口、图库第一格是"从电脑选择"、歌单播完自动换下一首、能打开摆放唱片机的窗口、正常退出，日志没有报错。发版仍按阶段 6 的步骤：先建草稿，发布说明给用户确认后再公开。2026-10-30 已公开并设为最新版：https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.1.0 ，tag `v1.1.0` 指向 `e0c1920`，附件 `Interactive3DWallpaper-Setup-1.1.0.exe`（SHA-256 和本地检查过的安装包一致）。发布说明在 v1.0.0 的基础上加了"v1.1.0 更新内容"和"从 v1.0.0 升级"（覆盖安装，设置和歌曲保留），中文在前、英文在后。
 
-### 阶段 8 — 视差算法：光线步进 + 边缘平滑默认 5（2026-10-30，未提交）
+### 阶段 8 — 视差算法：光线步进 + 边缘平滑默认 5（2026-10-30）
 用户反馈：分割的地方移动幅度大时有拉扯感。原因是旧算法每个像素只查自己位置的深度、挪一次：深度过渡带（σ=8 时三四十像素）要承接前后景的位移差（强度 30、鼠标在屏幕边上时约 50 像素），一侧被拉长，另一侧被压扁甚至对折出重影；把深度图模糊得更厉害只能把拉扯摊开。
 - 参考：[depthy](https://github.com/panrafal/depthy)（MIT，也是 Pixi 滤镜）、[DepthFlow](https://github.com/BrokenSource/DepthFlow)（AGPL-3.0，只看思路不抄代码）都用光线步进；同类的 Lively 深度壁纸和我们原来一样。
 - 做法：`rayMarchUV`，步数按位移在深度图上跨过的像素数定（每步最多 2.5 像素，最多 48 步，再二分 5 次）。深度图关掉 mipmap（循环里读纹理算不出 mipmap 级别）。
@@ -388,6 +392,29 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   - 虚化背景（猫、金刚鹦鹉）和没有明显前后景的风景（石桥）：单层本来就看不出条纹，两层没有改善；猫胡须附近反而多出断掉的胡须碎片和小块糊斑。
   - 胡须被切断的问题这个办法解决不了（要做抠图，SLIDE 用的是 U2Net + FBA matting）。
 - 代价：生成时间从约 1 秒变成 10 秒（MI-GAN 不分档）到 70 秒（分档，这台机器 CPU）；安装包多 27MB 模型；每张壁纸多存一张背景颜色图和一张背景深度图；着色器在换背景层的地方多做一次光线步进；安卓版要在手机上跑 MI-GAN。
+
+### ✅ 阶段 9 — 卸载软件（2026-10-31，未提交）
+用户要求：设置页加卸载选项，卸载时可以选要不要一起删除自己的数据（除了软件自带的都算）；从 Windows"设置 → 应用"卸载时也要问。
+- 设置页"设置"→"卸载"→"卸载软件…"：确认框里勾"同时删除我的数据"（默认不勾）→ 主进程找安装目录里的 `Uninstall 互动3D壁纸.exe`，带 `--delete-user-data` / `--keep-user-data` 打开（`src/uninstaller.js`），然后退出。开发版或找不到卸载程序时按钮变灰，说明里写原因。
+- 真正删东西的是卸载程序（`build/installer.nsh`，electron-builder 自动包含）：
+  - 卸载向导欢迎页加勾选框（简体系统显示简体，繁体系统显示繁体，其他语言显示英文），设置页带过来的选择预先勾好。NSIS 自带的简体语言包本来就把"卸载"叫"解除安装"。
+  - 勾了：删 `%APPDATA%\interactive-desktop-wallpaper` 整个文件夹，以及卸载清单里放在别处的深度图（只删 `depth_*.png`，删完文件夹空了才删文件夹）。用户的原图、音乐、封面软件只记了路径，不删。没用 electron-builder 自带的 `--delete-app-data`：带了它不管向导里怎么勾都会删。
+  - 不管勾没勾：删掉命令指向安装目录的开机自启项（`Run` 和 `StartupApproved\Run`）。Electron 写的名字是 `electron.app.互动3D壁纸`，命令不带引号；脚本按命令找，不依赖名字。用户在向导里点取消就什么都不动，所以软件里不提前关自启。
+  - 顺手修了 electron-builder 卸载后留下空安装文件夹的问题（它在 `un.onInit` 里把当前目录设成了安装目录，`RMDir /r` 删不掉这一层）。
+  - 升级时（新版安装程序带 `--updated` 在后台运行旧版卸载程序）以上都不做。
+- 卸载清单 `uninstall_extra_files.txt`（数据文件夹里，UTF-16LE 带 BOM，一行一个路径，方便 NSIS 读中文路径）：`AppStore` 每次保存缓存索引时更新，只列数据文件夹以外的深度图，一张都没有就删掉清单；启动时也补写一次（旧版本里换过位置的用户）。
+- 验证：`npm test` 176 个全过（新增卸载清单 6 个、找卸载程序 4 个）。打包后在这台电脑上实测（先备份数据文件夹，测完把数据和原来装的 1.0.0 都恢复了）：
+  - 像 Windows 那样打开向导：勾选框默认不勾；从设置页的代码打开：已经勾好；两种都点取消后，安装、数据、自启项都没动。
+  - 覆盖安装（升级）：数据和自启项都保留。
+  - 用调试端口（`--remote-debugging-port`）在安装版的设置页里打开自启、勾选删除数据、点"继续卸载"→ 软件退出，向导里已勾好 → 走完向导：安装、数据文件夹、外部文件夹里的深度图、软件自己写的和测试加的两条自启项、快捷方式、卸载登记都删了；外部文件夹里另放的 `keep-me.txt`、`photo.png` 和文件夹本身都在；Steam 等其他自启项不动。
+  - Windows 方式、不勾 → 走完向导：安装文件夹完全删掉，数据和备份逐字节一致，自启项删了。
+  - 截图看过：向导里勾选框的位置、设置页"卸载"区块、确认框。
+- 同一天修的已有问题：深度图位置改成一个本来就有别的文件的文件夹（比如"图片"）时，"清除缓存"会删掉那个文件夹里的所有文件（碰到子文件夹还会出错停下，索引也没清），"更改位置"会把里面所有 `.png` 一起搬走。现在两处都只处理 `depth_*.png`（深度图从第一个版本起就叫这个名字），用户自己的文件和子文件夹不动。有单元测试（`npm test` 179 个全过）；只跑了单元测试，没在应用里点。
+- 测试时遇到的坑（以后测安装包会再遇到）：
+  - 在受限的 shell（沙盒）里跑安装程序会一直不动（写不进 `%LOCALAPPDATA%\Programs`，报错框在看不见的桌面上），要在沙盒外跑。
+  - 沙盒外也有一次静默安装停在检查"软件是否在运行"那一步（CPU 不动、没有子进程），结束后重装就好了。原因没查清，和这次改动无关（还没执行到卸载脚本）。
+  - 屏幕缩放 150%，PowerShell 截窗口前要先调 `SetProcessDPIAware`，否则截偏；PowerShell 5.1 读不带 BOM 的 UTF-8 脚本会把中文读坏。
+  - 本地的 `dist/Interactive3DWallpaper-Setup-1.1.0.exe` 现在是带卸载功能的测试包（版本号没改），和已发布的 v1.1.0 不是同一个文件。发版前先改版本号再打包。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。

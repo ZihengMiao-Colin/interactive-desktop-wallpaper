@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-10-30 (parallax switched to ray marching, edge smoothing default 5, not committed, see §9 Phase 8; before that a batch of user-requested improvements, see Phase 7)
+> Last updated: 2026-10-31 (uninstall option on the settings page, with an optional delete-data choice, not committed, see §9 Phase 9; before that parallax switched to ray marching and edge smoothing default 5, see Phase 8)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -68,7 +68,7 @@ On top of that you can layer:
 │   ├── elements-tab.js      "Elements" page: asset library + two columns (element list / adjustment panel)
 │   ├── effects-page.js      "Effects" page: weather + video effects
 │   ├── music-page.js        "Record player" page: playback controls, playlist (add / delete / drag to reorder / click to play), play order, appearance
-│   ├── system-page.js       "Settings" page: launch at startup, depth map cache
+│   ├── system-page.js       "Settings" page: launch at startup, depth map cache, uninstall (the confirmation dialog asks whether to delete data)
 │   └── thumbnail.js         Generates thumbnails when importing assets
 ├── renderer/                Wallpaper page scripts (plain global scripts, loaded in index.html order)
 │   ├── shaders.js           Background + element shaders, sharing the PARALLAX_GLSL parallax formula
@@ -111,7 +111,8 @@ On top of that you can layer:
 │   │   ├── inference-process.js Inference child process (utilityProcess): resize → ONNX → post-process → PNG
 │   │   ├── processing.js    Numeric processing (Pillow-compatible bicubic, dilation, triple box blur, quantization)
 │   │   └── png.js           8-bit grayscale PNG encoder
-│   ├── store.js             config.json / depth cache / custom_elements folder
+│   ├── store.js             config.json / depth cache / custom_elements folder / uninstall list
+│   ├── uninstaller.js       Uninstall from the settings page: find the uninstaller in the install folder and launch it with the delete-data choice
 │   ├── gallery.js           Default wallpaper gallery: read manifest, look up by path, migrate old paths
 │   └── tray-manager.js      Tray menu
 ├── elements/                Default elements: manifest.json + cropped *_cut.mp4 + thumbnails (original bomb*.mp4 kept)
@@ -120,6 +121,7 @@ On top of that you can layer:
 ├── tools/prepare_builtin_element.py  Default green-screen element preprocessing (crop / scale / thumbnail)
 ├── tools/prepare_wallpapers.py       Default wallpaper gallery asset generation (downscale / thumbnail / depth map; `--depth-only` recomputes depth maps only)
 ├── dev/                     Fake config and sample GIF for browser preview
+├── build/installer.nsh      NSIS custom script: "Also delete my data" checkbox in the uninstall wizard, deleting data, removing the startup entry
 ├── test/                    Node unit tests
 ├── generate_depth_map.py / export_onnx.py / 生成深度图.bat   Python depth-map generation (used by tools/prepare_wallpapers.py; the app now uses src/depth/)
 ├── background.png / background2.png / depth_map.png   Default assets
@@ -173,6 +175,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | Custom elements |
 | `placement:getDraft` / `commit` / `cancel` | R→M | Placement window (the draft is an element `{ instance, asset }` or the record player `{ kind: 'vinyl', vinyl }`) |
 | `vinyl:startPlacement` | R→M | Open the placement window to drag the record player |
+| `app:getUninstallInfo` / `app:uninstall` | R→M | Whether uninstalling is possible (not in the dev build or without an uninstaller) / launch the uninstaller (with `{ deleteData }`) and quit |
 | `renderer:ready`, `app:*` | R→M | Ready notification, app control |
 
 ---
@@ -201,7 +204,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
   },
 }
 ```
-- Storage location: `%APPDATA%/interactive-desktop-wallpaper/` (`config.json`, `cache_index.json`, `depth_cache/`, `custom_elements/`).
+- Storage location: `%APPDATA%/interactive-desktop-wallpaper/` (`config.json`, `cache_index.json`, `depth_cache/`, `custom_elements/`; when depth maps are moved to another folder there is also an uninstall list `uninstall_extra_files.txt`, see §9 Phase 9).
 - Default elements are not in the config; they come from `elements/manifest.json` with id `builtin:<id>`.
 
 ---
@@ -222,6 +225,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | Default wallpaper gallery (`wallpapers/`) | ✅ | |
 | Settings window / wallpaper page UI | ✅ redesigned 2026-10-26 | Six pages in a left nav, unified controls and Lucide icons, live parallax preview; placement mode, Toast and debug panel share the same style |
 | Standalone packaged build | ✅ v1 | NSIS installer, see §9 Phase 6 |
+| Uninstall | ✅ 2026-10-31 | Settings page "卸载软件…" or Windows Settings → Apps; both let you choose whether to delete data, see §9 Phase 9 |
 | Multiple monitors | ❌ Not supported | |
 
 ---
@@ -359,7 +363,7 @@ The user sent 7 items at once, said they need not all be done together and left 
 
 All of the above ships as **v1.1.0** (user request, 2026-10-30): `package.json` version set to 1.1.0, all 157 `npm test` tests pass; after packaging, the extracted `app.asar` matches the source file by file (only `package.json`, which electron-builder trims, differs, and its version is 1.1.0); the app in `dist/win-unpacked` was run with a fresh data directory: the settings window opens on launch, the first gallery tile is "Choose from computer", the playlist advances to the next track when one ends, the record player placement window opens, and it quits cleanly with no errors in the log. The release still follows the Phase 6 steps: create a draft first, publish after the user confirms the release notes. Published and marked latest on 2026-10-30: https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.1.0 . Tag `v1.1.0` points at `e0c1920`, with the asset `Interactive3DWallpaper-Setup-1.1.0.exe` (SHA-256 matches the locally checked installer). The release notes build on v1.0.0's with a "What's new in v1.1.0" section and "Upgrading from v1.0.0" (install over the old version; settings and tracks are kept), Chinese first, then English.
 
-### Phase 8 — Parallax algorithm: ray marching + edge smoothing default 5 (2026-10-30, not committed)
+### Phase 8 — Parallax algorithm: ray marching + edge smoothing default 5 (2026-10-30)
 User feedback: where the image splits, large movements feel like the picture is being stretched. Cause: the old algorithm looks up the depth only at each pixel's own position and offsets once. The depth transition band (30–40 px at σ=8) has to absorb the shift difference between foreground and background (about 50 px at strength 30 with the mouse at the screen edge), so one side stretches and the other is squeezed or even folds into ghost copies; blurring the depth map more only spreads the stretch out.
 - References: [depthy](https://github.com/panrafal/depthy) (MIT, also a Pixi filter) and [DepthFlow](https://github.com/BrokenSource/DepthFlow) (AGPL-3.0, ideas only, no code copied) both use ray marching; Lively's depth wallpaper works like our old one.
 - Approach: `rayMarchUV`. Step count follows how many depth-map pixels the shift spans (at most 2.5 px per step, at most 48 steps, then 5 bisection steps). Mipmaps are off for the depth texture (mip levels can't be computed for texture reads inside the loop).
@@ -389,6 +393,29 @@ Based on [3D Photo Inpainting](https://github.com/vt-vl-lab/3d-photo-inpainting)
   - Blurred backgrounds (cat, macaw) and landscapes without clear foreground/background (stone bridge): the single layer shows no visible streaks anyway, so two layers bring no improvement; near the cat's whiskers they add broken whisker fragments and small smudges.
   - This approach doesn't fix cut whiskers (that needs matting; SLIDE uses U2Net + FBA matting).
 - Cost: generation time goes from about 1 s to 10 s (MI-GAN without depth bands) or 70 s (with bands, this machine's CPU); the installer gains a 27 MB model; each wallpaper stores an extra background color image and background depth map; the shader ray-marches a second time where it switches to the background layer; the Android version would need to run MI-GAN on the phone.
+
+### ✅ Phase 9 — Uninstall (2026-10-31, not committed)
+User request: add an uninstall option to the settings page; when uninstalling, let the user choose whether to also delete their own data (everything that didn't ship with the app); uninstalling from Windows "Settings → Apps" should ask too.
+- Settings page "设置" (Settings) → "卸载" (Uninstall) → "卸载软件…": the confirmation dialog has an "同时删除我的数据" (Also delete my data) checkbox, unchecked by default → the main process finds `Uninstall 互动3D壁纸.exe` in the install folder, launches it with `--delete-user-data` / `--keep-user-data` (`src/uninstaller.js`) and quits. In the dev build, or when no uninstaller is found, the button is greyed out and the description says why.
+- The actual deleting is done by the uninstaller (`build/installer.nsh`, included by electron-builder automatically):
+  - A checkbox on the uninstall wizard's welcome page (Simplified Chinese on Simplified systems, Traditional on Traditional systems, English otherwise), pre-checked with the choice passed from the settings page. NSIS's own Simplified Chinese language file calls uninstalling "解除安装".
+  - Checked: delete the whole `%APPDATA%\interactive-desktop-wallpaper` folder, plus depth maps stored elsewhere as listed in the uninstall list (only `depth_*.png`; a folder is removed only if it ends up empty). The user's own images, music and cover are only referenced by path and are never deleted. electron-builder's built-in `--delete-app-data` isn't used: with it, data is deleted no matter what the wizard checkbox says.
+  - Either way: remove startup entries whose command points into the install folder (`Run` and `StartupApproved\Run`). Electron names the entry `electron.app.互动3D壁纸` and writes the command without quotes; the script matches on the command, not the name. Cancelling the wizard changes nothing, which is why the app doesn't turn off launch-at-startup beforehand.
+  - Also fixed electron-builder leaving an empty install folder behind (its `un.onInit` sets the current directory to the install folder, so its `RMDir /r` can't remove that last level).
+  - On upgrade (the new installer runs the old uninstaller in the background with `--updated`) none of the above happens.
+- Uninstall list `uninstall_extra_files.txt` (in the data folder; UTF-16LE with BOM, one path per line, so NSIS can read Chinese paths): `AppStore` rewrites it whenever it saves the cache index, listing only depth maps outside the data folder, and deletes it when there are none; it is also written once at startup (for users of older versions who moved the folder).
+- Verification: `npm test` 176 passing (6 new for the uninstall list, 4 for finding the uninstaller). Tested the packaged build on this machine (backed up the data folder first; afterwards restored the data and the previously installed 1.0.0):
+  - Wizard opened the way Windows does it: checkbox unchecked; opened through the settings-page code: pre-checked; cancelling either one left the install, data and startup entries untouched.
+  - Install over the existing version (upgrade): data and startup entries kept.
+  - Through the debugging port (`--remote-debugging-port`), in the installed app's settings page: turned on launch at startup, ticked delete data, clicked "继续卸载" (Continue) → the app quit and the wizard opened pre-checked → finished the wizard: install, data folder, depth map in the external folder, both startup entries (the app's own and a test one), shortcuts and the uninstall registration were all removed; the extra `keep-me.txt`, `photo.png` and the external folder itself were kept; Steam and other startup entries untouched.
+  - Windows path, unchecked → finished the wizard: install folder removed completely, data byte-identical to the backup, startup entry removed.
+  - Checked screenshots: checkbox position in the wizard, the settings page "卸载" section, the confirmation dialog.
+- Existing bug fixed the same day: when the depth map location was set to a folder that already held other files (e.g. Pictures), "清除缓存" (Clear cache) deleted every file in that folder (and stopped with an error at the first subfolder, leaving the index uncleared), and "更改位置" (Change location) moved every `.png` in it along. Both now only touch `depth_*.png` (depth maps have used that name since the first version); the user's own files and subfolders are left alone. Covered by unit tests (`npm test` 179 passing); only unit-tested, not clicked through in the app.
+- Pitfalls hit while testing (will come up again when testing installers):
+  - Running the installer from a restricted shell (sandbox) hangs (it can't write to `%LOCALAPPDATA%\Programs` and the error box is on an invisible desktop); run it outside the sandbox.
+  - Outside the sandbox, one silent install also stalled at the "is the app running" check (no CPU, no child process); killing it and reinstalling worked. Cause not found; unrelated to this change (the uninstall script hadn't run yet).
+  - With 150% display scaling, PowerShell must call `SetProcessDPIAware` before capturing a window or the capture is offset; PowerShell 5.1 garbles Chinese in UTF-8 scripts without a BOM.
+  - The local `dist/Interactive3DWallpaper-Setup-1.1.0.exe` is now a test build with the uninstall feature (version unchanged), not the same file as the released v1.1.0. Bump the version before building a release.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

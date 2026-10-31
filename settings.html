@@ -369,9 +369,35 @@
                         </div>
                     </div>
                 </div>
+                <div class="group">
+                    <div class="group-head"><h2>卸载</h2></div>
+                    <div class="list">
+                        <div class="row">
+                            <div class="row-label"><div class="t">卸载软件</div><div class="d" id="uninstall-desc">从电脑上删掉互动3D壁纸，可以选择要不要一起删掉你的数据</div></div>
+                            <div class="row-ctrl"><button type="button" class="btn sm danger" id="btn-uninstall"><svg class="i"><use href="#i-trash-2"/></svg>卸载软件…</button></div>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
+
+    <!-- 卸载确认（设置页"卸载软件…"） -->
+    <dialog class="confirm" id="uninstall-dialog" aria-labelledby="uninstall-title">
+        <h2 id="uninstall-title">卸载互动3D壁纸</h2>
+        <p>接下来会打开卸载程序，软件随后退出。在卸载程序里点"下一步"才会开始卸载；点"取消"什么都不会变。</p>
+        <label class="confirm-option">
+            <input type="checkbox" id="uninstall-delete-data">
+            <span>
+                <b>同时删除我的数据</b>
+                <small>各项设置、导入的元素、生成的深度图。你电脑里原来的图片和音乐不会删。</small>
+            </span>
+        </label>
+        <div class="confirm-actions">
+            <button type="button" class="btn ghost" id="uninstall-cancel" autofocus>取消</button>
+            <button type="button" class="btn danger" id="uninstall-confirm"><svg class="i"><use href="#i-trash-2"/></svg>继续卸载</button>
+        </div>
+    </dialog>
 
     <!-- 操作结果提示 -->
     <div class="toast" id="toast" role="status" aria-live="polite">
