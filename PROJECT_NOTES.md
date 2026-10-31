@@ -353,7 +353,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 
 8. [x] 去掉唱片中心的白色轴孔（`.vinyl-spindle`）：它盖在封面图正中间。
 
-以上作为 **v1.1.0** 发版（用户要求，2026-10-30）：`package.json` 版本号改为 1.1.0，`npm test` 157 个全过；打包后解出 `app.asar` 和源码逐个比对一致（只有 electron-builder 精简过的 `package.json` 不同，版本号是 1.1.0）；用全新数据目录跑了 `dist/win-unpacked` 里的程序：启动有设置窗口、图库第一格是"从电脑选择"、歌单播完自动换下一首、能打开摆放唱片机的窗口、正常退出，日志没有报错。发版仍按阶段 6 的步骤：先建草稿，发布说明给用户确认后再公开。
+以上作为 **v1.1.0** 发版（用户要求，2026-10-30）：`package.json` 版本号改为 1.1.0，`npm test` 157 个全过；打包后解出 `app.asar` 和源码逐个比对一致（只有 electron-builder 精简过的 `package.json` 不同，版本号是 1.1.0）；用全新数据目录跑了 `dist/win-unpacked` 里的程序：启动有设置窗口、图库第一格是"从电脑选择"、歌单播完自动换下一首、能打开摆放唱片机的窗口、正常退出，日志没有报错。发版仍按阶段 6 的步骤：先建草稿，发布说明给用户确认后再公开。2026-10-30 已公开并设为最新版：https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.1.0 ，tag `v1.1.0` 指向 `e0c1920`，附件 `Interactive3DWallpaper-Setup-1.1.0.exe`（SHA-256 和本地检查过的安装包一致）。发布说明在 v1.0.0 的基础上加了"v1.1.0 更新内容"和"从 v1.0.0 升级"（覆盖安装，设置和歌曲保留），中文在前、英文在后。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。
