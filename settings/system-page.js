@@ -1,16 +1,19 @@
 /**
- * system-page.js — 设置窗口"设置"页：开机自启、深度图缓存位置和清除、卸载软件
+ * system-page.js — 设置窗口"设置"页：界面主题、开机自启、深度图缓存位置和清除、卸载软件
  */
 
 'use strict';
 
 /**
- * @param {{ api: object, setStatus: (msg: string, cls?: string) => void, onCacheCleared: () => void }} deps
- * @returns {{ load: () => Promise<void> }}
+ * @param {{ api: object, saver: { save: (partial: object) => void }, setStatus: (msg: string, cls?: string) => void, onCacheCleared: () => void }} deps
+ * @returns {{ load: (config: object) => Promise<void> }}
  */
-function initSystemPage({ api, setStatus, onCacheCleared }) {
+function initSystemPage({ api, saver, setStatus, onCacheCleared }) {
     const autoLaunch = document.getElementById('auto-launch-toggle');
     const dirPath = document.getElementById('depth-dir-path');
+
+    // 界面主题：主进程收到后改 nativeTheme，页面颜色跟着 prefers-color-scheme 变
+    const theme = Controls.segmented(document.getElementById('ui-theme'), (value) => saver.save({ theme: value }));
 
     autoLaunch.addEventListener('change', async () => {
         const result = await api.toggleAutoLaunch(autoLaunch.checked);
@@ -103,7 +106,8 @@ function initSystemPage({ api, setStatus, onCacheCleared }) {
     }
 
     return {
-        async load() {
+        async load(config) {
+            theme.set(config.theme || 'dark');
             await refreshDir();
             autoLaunch.checked = await api.getAutoLaunch();
             await refreshUninstall();

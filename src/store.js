@@ -36,6 +36,9 @@ const PARALLAX_MAX = 30;
 const LEGACY_BLUR_DEFAULT = 8;
 const BLUR_RADIUS_VERSION = 2;
 
+/** 设置窗口的界面主题：夜间 / 日间 / 跟随系统（主进程写进 nativeTheme.themeSource） */
+const THEMES = ['dark', 'light', 'system'];
+
 /**
  * 卸载清单：放在 userData 以外的深度图（用户换过存放位置时）。
  * 卸载时勾了"同时删除我的数据"，卸载程序按这份清单逐个删除（build/installer.nsh）。
@@ -180,6 +183,7 @@ class AppStore {
             customElements: normalizeCustomElements(this._config.customElements),
         };
         if (config.parallaxMultiplier > PARALLAX_MAX) config.parallaxMultiplier = PARALLAX_MAX;
+        if (!THEMES.includes(config.theme)) config.theme = defaults.theme;
         if (this._config.blurRadiusVersion !== BLUR_RADIUS_VERSION && config.blurRadius === LEGACY_BLUR_DEFAULT) {
             config.blurRadius = defaults.blurRadius;
         }
@@ -342,6 +346,7 @@ class AppStore {
             currentImage: '',
             depthCacheDir: '',
             hideDebugPanel: true,      // 打包后默认隐藏调试面板
+            theme: 'dark',             // 设置窗口的界面主题：'dark' | 'light' | 'system'
             // 1. 黑胶唱片机组件
             vinyl: {
                 enabled: false,             // 是否开启唱片机

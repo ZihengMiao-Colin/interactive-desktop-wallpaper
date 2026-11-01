@@ -31,7 +31,6 @@ body > canvas {
     right: 16px;
     z-index: 9999;                      /* 浮在 Canvas 上方 */
     width: 240px;
-    border-radius: var(--r-lg);
     font-family: var(--font);
     font-size: 12.5px;
     user-select: none;                  /* 防止拖拽滑块时选中文字 */
@@ -42,8 +41,8 @@ body > canvas {
     align-items: center;
     justify-content: space-between;
     padding: 8px 8px 8px 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    font-weight: 600;
+    border-bottom: 1px solid var(--line);
+    font-weight: 700;
 }
 
 #debug-toggle svg.i { transition: transform 0.2s; }
@@ -67,7 +66,7 @@ body > canvas {
 
 .debug-row label span {
     color: var(--text);
-    font-variant-numeric: tabular-nums;
+    font: 500 11.5px/1 var(--f-mono);
 }
 
 .debug-row input[type="range"] { width: 100%; }
@@ -95,22 +94,26 @@ body > canvas {
 .loading-card {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 14px 20px;
-    border-radius: var(--r-lg);
+    gap: 14px;
+    padding: 14px 22px 14px 18px;
 }
 
+/* 加载：菱形外框慢慢转，中间一块主色 */
 #loading-spinner {
-    width: 20px;
-    height: 20px;
-    border: 2.5px solid rgba(255, 255, 255, 0.15);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+    position: relative;
+    width: 16px;
+    height: 16px;
+    margin: 4px;
+    border: 2px solid var(--text);
+    transform: rotate(45deg);
+    animation: loading-dia 2.4s var(--ease) infinite;
 }
+#loading-spinner::after { content: ''; position: absolute; inset: 3px; background: var(--accent); }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
+@keyframes loading-dia {
+    0% { transform: rotate(45deg); }
+    50% { transform: rotate(225deg); }
+    100% { transform: rotate(405deg); }
 }
 
 #loading-text {
@@ -128,9 +131,7 @@ body > canvas {
     z-index: 99999;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 9px 18px 9px 14px;
-    border-radius: 999px;
+    padding: 10px 18px 10px 16px;
     font-family: var(--font);
     font-size: 13px;
     opacity: 0;
@@ -139,15 +140,8 @@ body > canvas {
     transition: opacity 0.3s, transform 0.3s;
 }
 
-/* 左边一个强调色小圆点 */
-#status-toast::before {
-    content: '';
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-}
+/* 左边一条主色竖条（画在磨砂底那一层上） */
+#status-toast { --glass-bg: linear-gradient(var(--accent), var(--accent)) left / 3px 100% no-repeat, color-mix(in srgb, var(--bg) 82%, transparent); }
 
 #status-toast.visible {
     opacity: 1;
@@ -166,12 +160,12 @@ body > canvas {
     gap: 10px;
     max-width: min(560px, 80vw);
     padding: 22px 28px;
-    border: 1px solid rgba(255, 125, 125, 0.35);
-    border-radius: var(--r-lg);
-    background: rgba(14, 19, 26, 0.88);
+    border: 1px solid var(--line-strong);
+    border-top: 3px solid var(--danger);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
     -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-3);
     color: var(--text);
     font-family: var(--font);
     font-size: 14px;
@@ -499,8 +493,7 @@ body > canvas {
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 7px 16px 7px 14px;
-    border-radius: 999px;
+    padding: 8px 16px 8px 14px;
     color: var(--text-2);
     font-size: 12.5px;
     white-space: nowrap;
@@ -518,11 +511,9 @@ body > canvas {
 
 #placement-title::before {
     content: '';
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
+    width: 6px;
+    height: 6px;
     background: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* 选框：强调色实线，外面一圈暗色描边，任何背景上都看得清 */
@@ -542,7 +533,6 @@ body > canvas {
     height: 12px;
     background: #fff;
     border: 1.5px solid var(--accent);
-    border-radius: 3px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
@@ -551,8 +541,7 @@ body > canvas {
 #placement-box .handle[data-corner="sw"] { left: -7px; bottom: -7px; cursor: nesw-resize; }
 #placement-box .handle[data-corner="se"] { right: -7px; bottom: -7px; cursor: nwse-resize; }
 
-/* 边中点：小胶囊，单向拉伸 */
-#placement-box .handle.edge { border-radius: 4px; }
+/* 边中点：小长条，单向拉伸 */
 #placement-box .handle[data-edge="n"],
 #placement-box .handle[data-edge="s"] { left: calc(50% - 10px); width: 20px; height: 8px; cursor: ns-resize; }
 #placement-box .handle[data-edge="n"] { top: -5px; }
@@ -562,7 +551,8 @@ body > canvas {
 #placement-box .handle[data-edge="w"] { left: -5px; }
 #placement-box .handle[data-edge="e"] { right: -5px; }
 
-/* 旋转手柄：框上方的强调色圆点，用一根竖线连到框 */
+/* 旋转手柄：框上方的主色圆点，用一根竖线连到框。
+   别的手柄都是方的，只有它是圆的，一看就知道是转的（提示文字里也叫"圆点"） */
 #placement-box .rotate-handle {
     position: absolute;
     left: calc(50% - 9px);
@@ -587,14 +577,14 @@ body > canvas {
     pointer-events: none;
 }
 
-/* 自由变形：四个角单独拖动，琥珀色实线画出变形后的轮廓 */
+/* 自由变形：四个角单独拖动（琥珀色菱形），实线画出变形后的轮廓 */
 #placement-box .handle.warp {
-    width: 14px;
-    height: 14px;
-    margin: -8px 0 0 -8px;
+    width: 13px;
+    height: 13px;
+    margin: -7.5px 0 0 -7.5px;
     border: 2px solid #fff;
-    border-radius: 50%;
     background: var(--warp);
+    transform: rotate(45deg);
     cursor: crosshair;
 }
 
@@ -642,7 +632,6 @@ body > canvas {
     align-items: center;
     gap: 4px;
     padding: 6px;
-    border-radius: var(--r-lg);
     font-size: 12.5px;
     white-space: nowrap;
 }
@@ -658,10 +647,11 @@ body > canvas {
 #placement-depth { width: 120px; }
 
 #placement-depth-value,
-#placement-rotation {
+#placement-rotation,
+#placement-scale {
     min-width: 32px;
     color: var(--text);
-    font-variant-numeric: tabular-nums;
+    font: 500 11.5px/1 var(--f-mono);
     text-align: right;
 }
 
@@ -678,16 +668,13 @@ body > canvas {
 #placement-scale {
     min-width: 40px;
     padding: 0 6px 0 8px;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
 }
 
 .placement-sep {
     width: 1px;
     height: 22px;
     margin: 0 2px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--line-strong);
 }
 
 .placement-btn {
@@ -695,9 +682,8 @@ body > canvas {
     align-items: center;
     gap: 6px;
     height: 30px;
-    padding: 0 9px;
+    padding: 0 10px;
     border: 0;
-    border-radius: var(--r-md);
     background: none;
     color: var(--text-2);
     font: inherit;
@@ -705,26 +691,36 @@ body > canvas {
 }
 
 .placement-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--raised);
     color: var(--text);
 }
 
-/* 翻转开着：强调色；自由变形开着：琥珀色，和框上的变形点同色 */
+/* 翻转开着：主色，底下一条线；自由变形开着：琥珀色，和框上的变形点同色 */
 .placement-btn.active {
     background: var(--accent-soft);
-    color: var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent-text);
+    color: var(--accent-text);
 }
 
 #placement-warp.active {
-    background: rgba(255, 204, 106, 0.16);
+    background: color-mix(in srgb, var(--warp) 16%, transparent);
+    box-shadow: inset 0 -2px 0 var(--warp);
     color: var(--warp);
 }
 
+/* 确认：右下单切角的主色按钮，和设置窗口的主按钮一样 */
 .placement-btn.primary {
-    padding: 0 12px;
-    background: var(--accent);
+    padding: 0 14px;
+    background: var(--grain), var(--accent);
     color: var(--accent-ink);
-    font-weight: 600;
+    font-weight: 700;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
 }
 
-.placement-btn.primary:hover { background: var(--accent-hover); }
+.placement-btn.primary:hover { background: var(--grain), var(--accent-hover); }
+
+/* 系统关了动画效果：去掉界面浮层的动画（唱片机、天气这些壁纸内容本身的动画不动） */
+@media (prefers-reduced-motion: reduce) {
+    #loading-spinner { animation: none; }
+    #status-toast, #debug-toggle svg.i { transition: none; }
+}

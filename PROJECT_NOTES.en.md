@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-10-31 (uninstall option on the settings page, with an optional delete-data choice, not committed, see §9 Phase 9; before that parallax switched to ray marching and edge smoothing default 5, see Phase 8)
+> Last updated: 2026-10-31 (UI restyled as a tactical terminal, interface theme setting, bundled Noto Serif SC, not committed, see §9 Phase 10; the uninstall option was added the same day, see Phase 9)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -34,6 +34,7 @@ On top of that you can layer:
 | Python | In-project `venv/` (3.11.9) with only onnxruntime / numpy / pillow. The app no longer uses Python; it is only for the asset scripts under `tools/` and the Python tests |
 | ONNX models | Project root (ignored by `.gitignore`): `_ir9.onnx` 100MB (the largest is picked; this is the one actually used), `_int8.onnx` 28MB, and a 2MB empty shell. Packaging copies `_ir9.onnx` to `resources/models/depth_anything_v2_small.onnx` |
 | Packaging | electron-builder, NSIS installer only (`npm run build` → `dist/Interactive3DWallpaper-Setup-<version>.exe`, ~334MB; ~560MB installed). Assets and the model live under `resources/` (outside asar); onnxruntime's DLLs are unpacked to `app.asar.unpacked` |
+| UI fonts | Bundled in `ui/fonts/` (SIL OFL, about 6.3MB): Noto Serif SC (Chinese headings, split into 101 slices loaded on demand), Saira wide (small English labels), JetBrains Mono (numbers). Body text uses the system's Noto Sans SC / Microsoft YaHei |
 | Tests | Node's built-in `node --test` (`npm test`); preprocessing scripts use Python `unittest` |
 | Platform | Windows only, primary monitor only |
 
@@ -53,7 +54,8 @@ On top of that you can layer:
 ├── index.html               Wallpaper page (also the placement window, ?mode=edit)
 ├── style.css                Wallpaper page styles (incl. placement mode UI)
 ├── ui/                      UI foundations shared by the settings window and wallpaper page
-│   ├── tokens.css           Color / font / radius variables + buttons, toggles, segmented buttons, sliders (incl. depth gradient), tags, keycaps, frosted glass
+│   ├── tokens.css           Color (dark / light) / font / cut-corner variables + .cf cut-corner frame, buttons, toggles, segmented buttons, sliders (incl. depth gradient), status tags, keycaps, .glass frosted panels
+│   ├── fonts/               Bundled fonts and OFL licenses (noto-serif-sc.css is imported by tokens.css)
 │   └── icons.js             Lucide icon sprite (Icons.svg) + slider fill (UIControls.paintRange)
 ├── settings.html            Settings window: structure only (left nav + six pages + status toast)
 ├── settings/
@@ -187,6 +189,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
   parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // parallax strength 5 ~ 30 (older configs above 30 read as 30)
   blurRadiusVersion: 2,   // marks the edge smoothing default change from 8 to 5: older configs without it read blurRadius 8 as 5
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
+  theme: 'dark',          // settings window theme 'dark'|'light'|'system' (unknown values read as dark); main process writes it to nativeTheme.themeSource
   vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
                   playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
                 // older audioPath / audioName / loop become a one-track playlist when the config is read (normalizeVinyl in shared/playlist.js)
@@ -223,7 +226,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | **Custom element system** | ✅ | Image / GIF / animated webp / apng / mp4 / webm; two default explosions; placement mode (resize, stretch, rotate, flip, free warp); depth occlusion; interval playback; click playback; green-screen keying; recolor |
 | Custom stickers | ♻️ Removed | Replaced by custom elements; old config migrates automatically |
 | Default wallpaper gallery (`wallpapers/`) | ✅ | |
-| Settings window / wallpaper page UI | ✅ redesigned 2026-10-26 | Six pages in a left nav, unified controls and Lucide icons, live parallax preview; placement mode, Toast and debug panel share the same style |
+| Settings window / wallpaper page UI | ✅ redesigned 2026-10-26, restyled as a tactical terminal 10-31 | Six pages in a left nav, unified controls and Lucide icons, live parallax preview; placement mode, Toast and debug panel share the same style. 10-31: cut corners, serif Chinese headings with small English labels, dark / light / follow-system theme, see §9 Phase 10 |
 | Standalone packaged build | ✅ v1 | NSIS installer, see §9 Phase 6 |
 | Uninstall | ✅ 2026-10-31 | Settings page "卸载软件…" or Windows Settings → Apps; both let you choose whether to delete data, see §9 Phase 9 |
 | Multiple monitors | ❌ Not supported | |
@@ -394,7 +397,7 @@ Based on [3D Photo Inpainting](https://github.com/vt-vl-lab/3d-photo-inpainting)
   - This approach doesn't fix cut whiskers (that needs matting; SLIDE uses U2Net + FBA matting).
 - Cost: generation time goes from about 1 s to 10 s (MI-GAN without depth bands) or 70 s (with bands, this machine's CPU); the installer gains a 27 MB model; each wallpaper stores an extra background color image and background depth map; the shader ray-marches a second time where it switches to the background layer; the Android version would need to run MI-GAN on the phone.
 
-### ✅ Phase 9 — Uninstall (2026-10-31, not committed)
+### ✅ Phase 9 — Uninstall (2026-10-31)
 User request: add an uninstall option to the settings page; when uninstalling, let the user choose whether to also delete their own data (everything that didn't ship with the app); uninstalling from Windows "Settings → Apps" should ask too.
 - Settings page "设置" (Settings) → "卸载" (Uninstall) → "卸载软件…": the confirmation dialog has an "同时删除我的数据" (Also delete my data) checkbox, unchecked by default → the main process finds `Uninstall 互动3D壁纸.exe` in the install folder, launches it with `--delete-user-data` / `--keep-user-data` (`src/uninstaller.js`) and quits. In the dev build, or when no uninstaller is found, the button is greyed out and the description says why.
 - The actual deleting is done by the uninstaller (`build/installer.nsh`, included by electron-builder automatically):
@@ -416,6 +419,17 @@ User request: add an uninstall option to the settings page; when uninstalling, l
   - Outside the sandbox, one silent install also stalled at the "is the app running" check (no CPU, no child process); killing it and reinstalling worked. Cause not found; unrelated to this change (the uninstall script hadn't run yet).
   - With 150% display scaling, PowerShell must call `SetProcessDPIAware` before capturing a window or the capture is offset; PowerShell 5.1 garbles Chinese in UTF-8 scripts without a BOM.
   - The local `dist/Interactive3DWallpaper-Setup-1.1.0.exe` is now a test build with the uninstall feature (version unchanged), not the same file as the released v1.1.0. Bump the version before building a release.
+
+### ✅ Phase 10 — UI restyled as a tactical terminal (2026-10-31, not committed)
+The user asked the assistant to redo the frontend with their own personal skill `ark-style-ui` (based on the "tactical terminal / industrial sci-fi" design language of the Arknights UI). After seeing the screenshots they said "keep it, keep polishing". Design: [docs/superpowers/specs/2026-10-31-tactical-ui-design.md](docs/superpowers/specs/2026-10-31-tactical-ui-design.md).
+- Appearance only: page structure, class names, page scripts and IPC are the same as the 10-26 redesign, and the variable names in `tokens.css` did not change (only their values), so `style.css` did not need rewriting.
+- Rules: cards cut at the top-left and bottom-right corners, buttons cut only at the bottom-right, no rounded corners (except the record itself and the round rotate handle); Chinese headings in Noto Serif SC next to small uppercase English labels in wide Saira (`.en`, only meaningful words: module names, weather names, eyebrows); numbers and paths in a monospace font; the sky-blue accent only for primary buttons, selected states, toggles and values; yellow only in the hazard stripe at the top of the uninstall dialog; a very faint noise texture on cards and primary buttons.
+- Settings window: two-line (Chinese / English) sidebar items with an accent bar on the selected one; group headings followed by a thin rule to the right, counts as boxed monospace numbers; segmented buttons invert the selected item; vertical-bar slider thumbs; status tags with a colored left bar; segmented progress bar; L-shaped corner brackets around the preview and the wallpaper name in large serif type; selected weather tile gets an accent triangle in its top-right corner; the toast is an inverted bar; the uninstall dialog is a cut-corner frosted panel.
+- Wallpaper page overlays (placement hint, toolbar, toast, loading, debug panel): `.glass` became a cut-corner frosted panel (blur on a pseudo-element; the panel itself must not get filter / opacity / isolation or the blur cannot see the wallpaper, and no box-shadow, because a rectangular shadow shows a bright triangle at the cut corners); loading is a rotating diamond; the toast has an accent bar on the left; scale / stretch handles are squares, warp points became amber diamonds, the rotate handle stays a round dot (the hint text calls it a "dot"); the toolbar's confirm button is an accent button cut at the bottom-right. The vinyl widget, weather and elements themselves look the same.
+- Interface theme (new feature): first row of the "设置" page, "界面主题": dark (default) / light / follow system, saved as `theme`. The main process `applyTheme` writes it to `nativeTheme.themeSource` and the settings page follows `prefers-color-scheme`; the system button strip (`titleBarOverlay`) and the window background follow in `nativeTheme`'s `updated` event (`updateSettingsChrome`). The wallpaper page hard-codes `data-theme="dark"` on `<html>`, so the placement toolbar always stays dark.
+- Fonts: `ui/fonts/` bundles Noto Serif SC (`@fontsource-variable/noto-serif-sc` 5.3.1, variable weight, 101 slices loaded on demand), the width-axis Saira and JetBrains Mono (Fontsource), about 6.3MB in total, with three OFL licenses in the same folder. Noto Sans SC for body text is not bundled (too large); machines without it use Microsoft YaHei.
+- Verified: in Electron (real config copied into a separate data directory, screenshots over the debug port) the six pages, the elements page with elements, the help popup, the uninstall dialog, the toast, the gallery's selected state, dark / light, and the 820×560 minimum window (no horizontal scrollbar); when switching themes, a real screen capture showed the system button strip changing color too while the wallpaper window stayed dark, and follow-system read this machine's dark setting; the bundled serif font really loads. In the browser preview: placement mode, loading, debug panel, toast, with no console errors. `npm test`: all 180 pass (new test for the theme default).
+- Not tested: a machine without Noto fonts; actually dragging an element in Electron's placement window (only looked at it in the browser preview); the packaged installer (the fonts are under `ui/**/*`, so they should be included).
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

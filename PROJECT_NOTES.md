@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-10-31（设置页加卸载软件，卸载时可选删除数据，未提交，见 §9 阶段 9；之前是视差改用光线步进、边缘平滑默认 5，见阶段 8）
+> 最近更新：2026-10-31（界面改成战术终端风格、加界面主题、自带思源宋体，未提交，见 §9 阶段 10；同一天加了卸载软件，见阶段 9）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -33,6 +33,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | Python | 项目内 `venv/`（3.11.9），只装了 onnxruntime / numpy / pillow。应用本身不再用 Python，只给 `tools/` 下的素材脚本和 Python 测试用 |
 | ONNX 模型 | 根目录（`.gitignore` 忽略）：`_ir9.onnx` 100MB（选最大的，实际用这个）、`_int8.onnx` 28MB、2MB 的空壳。打包时 `_ir9.onnx` 复制成 `resources/models/depth_anything_v2_small.onnx` |
 | 打包 | electron-builder，只出 NSIS 安装包（`npm run build` → `dist/Interactive3DWallpaper-Setup-<版本>.exe`，约 334MB；装好约 560MB）。素材和模型在 `resources/` 下（asar 外），onnxruntime 的 dll 解包到 `app.asar.unpacked` |
+| 界面字体 | 自带在 `ui/fonts/`（SIL OFL，约 6.3MB）：思源宋体（中文大标题，按字切成 101 片按需加载）、Saira 宽体（英文小字）、JetBrains Mono（数字）。正文用系统的思源黑体 / 微软雅黑 |
 | 测试 | Node 内置 `node --test`（`npm test`）；预处理脚本用 Python `unittest` |
 | 平台 | 仅 Windows，仅主显示器 |
 
@@ -52,7 +53,8 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ├── index.html               壁纸页（也是摆放窗口，?mode=edit）
 ├── style.css                壁纸页样式（含摆放模式 UI）
 ├── ui/                      设置窗口和壁纸页共用的界面基础
-│   ├── tokens.css           颜色 / 字体 / 圆角变量 + 按钮、开关、分段按钮、滑块（含深度色带）、标签、键帽、毛玻璃
+│   ├── tokens.css           颜色（夜间 / 日间）/ 字体 / 切角变量 + 切角框 .cf、按钮、开关、分段按钮、滑块（含深度色带）、状态标签、键帽、磨砂浮层 .glass
+│   ├── fonts/               自带字体和 OFL 许可证（noto-serif-sc.css 由 tokens.css 引入）
 │   └── icons.js             Lucide 图标雪碧图（Icons.svg）+ 滑块填充（UIControls.paintRange）
 ├── settings.html            设置窗口：只有结构（左侧导航 + 六个页面 + 提示条）
 ├── settings/
@@ -186,6 +188,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // 视差强度 5 ~ 30（旧配置超过 30 读出 30）
   blurRadiusVersion: 2,   // 边缘平滑默认值从 8 改成 5 的标记：没有它的旧配置里 blurRadius 还是 8 的读成 5
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
+  theme: 'dark',          // 设置窗口的界面主题 'dark'|'light'|'system'（不认识的值读成 dark），主进程写进 nativeTheme.themeSource
   vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
                   playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
                 // 旧版本的 audioPath / audioName / loop 读配置时换成一首歌的歌单（shared/playlist.js 的 normalizeVinyl）
@@ -222,7 +225,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | **自定义元素系统** | ✅ | 图片 / GIF / 动态 webp / apng / mp4 / webm；默认两个爆炸；摆放模式（缩放、拉伸、旋转、翻转、自由变形）；深度遮挡；间隔播放；点击播放；抠绿幕；变色 |
 | 自定义贴纸 | ♻️ 已移除 | 被自定义元素取代，旧配置自动迁移 |
 | 默认壁纸图库（`wallpapers/`） | ✅ | |
-| 设置窗口 / 壁纸页界面 | ✅ 2026-10-26 改版 | 左侧导航分六页、统一控件和 Lucide 图标、实时视差预览；摆放模式、Toast、调试面板同一套样式 |
+| 设置窗口 / 壁纸页界面 | ✅ 2026-10-26 改版，10-31 换成战术终端风格 | 左侧导航分六页、统一控件和 Lucide 图标、实时视差预览；摆放模式、Toast、调试面板同一套样式。10-31：切角、宋体标题配英文小字、夜间 / 日间 / 跟随系统主题，见 §9 阶段 10 |
 | 打包后独立运行 | ✅ v1 | NSIS 安装包，见 §9 阶段 6 |
 | 卸载 | ✅ 2026-10-31 | 设置页"卸载软件…"或 Windows 设置 → 应用，两边都能选要不要删数据，见 §9 阶段 9 |
 | 多显示器 | ❌ 不支持 | |
@@ -393,7 +396,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   - 胡须被切断的问题这个办法解决不了（要做抠图，SLIDE 用的是 U2Net + FBA matting）。
 - 代价：生成时间从约 1 秒变成 10 秒（MI-GAN 不分档）到 70 秒（分档，这台机器 CPU）；安装包多 27MB 模型；每张壁纸多存一张背景颜色图和一张背景深度图；着色器在换背景层的地方多做一次光线步进；安卓版要在手机上跑 MI-GAN。
 
-### ✅ 阶段 9 — 卸载软件（2026-10-31，未提交）
+### ✅ 阶段 9 — 卸载软件（2026-10-31）
 用户要求：设置页加卸载选项，卸载时可以选要不要一起删除自己的数据（除了软件自带的都算）；从 Windows"设置 → 应用"卸载时也要问。
 - 设置页"设置"→"卸载"→"卸载软件…"：确认框里勾"同时删除我的数据"（默认不勾）→ 主进程找安装目录里的 `Uninstall 互动3D壁纸.exe`，带 `--delete-user-data` / `--keep-user-data` 打开（`src/uninstaller.js`），然后退出。开发版或找不到卸载程序时按钮变灰，说明里写原因。
 - 真正删东西的是卸载程序（`build/installer.nsh`，electron-builder 自动包含）：
@@ -415,6 +418,17 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   - 沙盒外也有一次静默安装停在检查"软件是否在运行"那一步（CPU 不动、没有子进程），结束后重装就好了。原因没查清，和这次改动无关（还没执行到卸载脚本）。
   - 屏幕缩放 150%，PowerShell 截窗口前要先调 `SetProcessDPIAware`，否则截偏；PowerShell 5.1 读不带 BOM 的 UTF-8 脚本会把中文读坏。
   - 本地的 `dist/Interactive3DWallpaper-Setup-1.1.0.exe` 现在是带卸载功能的测试包（版本号没改），和已发布的 v1.1.0 不是同一个文件。发版前先改版本号再打包。
+
+### ✅ 阶段 10 — 界面改成战术终端风格（2026-10-31，未提交）
+用户用自己写的个人 skill `ark-style-ui`（参考明日方舟 UI 的"战术终端 / 工业科幻"设计语言）让助手重做前端，看过截图后说"保留，继续完善"。设计：[docs/superpowers/specs/2026-10-31-tactical-ui-design.md](docs/superpowers/specs/2026-10-31-tactical-ui-design.md)。
+- 只换外观：页面结构、类名、各页面 JS 和 IPC 沿用 10-26 改版，`tokens.css` 的变量名也没变（值换了），所以 `style.css` 的写法不用跟着改。
+- 规则：卡片左上 + 右下切角、按钮只切右下角、不倒圆角（唱片和旋转手柄的圆点例外）；中文大标题用思源宋体，旁边配 Saira 宽体的英文大写小字（`.en`，只写模块名、天气名、眉题这类有意义的词）；数值和路径用等宽字；天蓝主色只给主要按钮、选中态、开关和数值；黄色只在卸载确认框顶边的警示条纹里；卡片和主按钮铺很淡的噪点底纹。
+- 设置窗口：侧栏中英两行、选中项左边一条主色竖条；分组标题后面一条细线延伸到右边，数量用带框的等宽数字；分段按钮选中项反色；滑块是竖条；状态标签左侧色条；进度条分段；预览四角加 L 形角标框，壁纸名用宋体大字；天气按钮选中时右上角一个主色三角；Toast 改成反色条；卸载确认框是切角磨砂玻璃。
+- 壁纸页浮层（摆放提示、工具条、Toast、加载提示、调试面板）：`.glass` 改成切角磨砂面板（模糊放在伪元素上，浮层本身不能加 filter / opacity / isolation，否则模糊读不到壁纸；也不加 box-shadow，方形阴影会在切角处露出亮三角）；加载改成转动的菱形；Toast 左侧一条主色竖条；缩放 / 拉伸手柄是方块，自由变形的点改成琥珀色菱形，旋转手柄保持圆点（提示文字里叫"圆点"）；工具条的"确认"是右下切角的主色按钮。唱片机组件、天气、元素本身的样子不变。
+- 界面主题（新功能）："设置"页第一行"界面主题"：夜间（默认）/ 日间 / 跟随系统，存 `theme`。主进程 `applyTheme` 写进 `nativeTheme.themeSource`，设置页跟着 `prefers-color-scheme` 变色；系统按钮那一条（`titleBarOverlay`）和窗口底色在 `nativeTheme` 的 `updated` 里跟着换（`updateSettingsChrome`）。壁纸页在 `<html>` 上写死 `data-theme="dark"`，摆放工具条一直是深色。
+- 字体：`ui/fonts/` 自带思源宋体（`@fontsource-variable/noto-serif-sc` 5.3.1，可变字重，101 片按需加载）、Saira 宽度轴版和 JetBrains Mono（Fontsource），共约 6.3MB，三份 OFL 许可证在同一目录。正文的思源黑体没打包（太大），没装的电脑用微软雅黑。
+- 验证：Electron（复制真实配置到单独的数据目录，开调试端口截图）看过六个页面、带元素的元素页、问号说明、卸载确认框、Toast、图库选中态、夜间 / 日间、820×560 最小窗口（没有横向滚动条）；主题切换时直接截屏幕看了系统按钮那一条也跟着变色、壁纸窗口仍是深色，跟随系统读到这台电脑的深色；内置宋体确实加载了。浏览器预览看了摆放模式、加载提示、调试面板、Toast，控制台没有报错。`npm test` 180 个全过（新增主题默认值的测试）。
+- 没测：没装思源字体的电脑；在 Electron 里真实拖动摆放元素（只在浏览器预览里看了样子）；打包后的安装版（字体在 `ui/**/*` 里，应该会带上）。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。

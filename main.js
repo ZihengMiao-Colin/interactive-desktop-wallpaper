@@ -29,6 +29,7 @@ const {
     ipcMain,
     dialog,
     nativeImage,
+    nativeTheme,
     powerMonitor,
     screen,
     shell,
@@ -309,6 +310,29 @@ function stopMousePolling() {
 
 // ==================== 设置窗口创建 ====================
 
+/** 设置窗口标题栏的颜色（和 ui/tokens.css 的 --ink / --text-2 / --bg 一致），按当前是深色还是浅色取 */
+function settingsChromeColors() {
+    return nativeTheme.shouldUseDarkColors
+        ? { color: '#0b0d0f', symbolColor: '#9099a1', background: '#0f1214' }
+        : { color: '#dde1e4', symbolColor: '#535d66', background: '#e6e9eb' };
+}
+
+/**
+ * 界面主题：写进 nativeTheme.themeSource，设置页的 prefers-color-scheme 跟着变（ui/tokens.css）。
+ * 系统按钮叠在页面标题栏上，颜色要跟着改；跟随系统时系统切换深浅色也会走到 nativeTheme 的 updated。
+ * @param {'dark'|'light'|'system'} theme
+ */
+function applyTheme(theme) {
+    nativeTheme.themeSource = theme;
+}
+
+function updateSettingsChrome() {
+    if (!settingsWindow || settingsWindow.isDestroyed()) return;
+    const { color, symbolColor, background } = settingsChromeColors();
+    settingsWindow.setTitleBarOverlay({ color, symbolColor, height: 36 });
+    settingsWindow.setBackgroundColor(background);
+}
+
 /**
  * 创建设置窗口（用户更换壁纸、调整参数时使用）。
  */
@@ -321,6 +345,7 @@ function createSettingsWindow() {
         return settingsWindow;
     }
 
+    const chrome = settingsChromeColors();
     settingsWindow = new BrowserWindow({
         width: 960,
         height: 660,
@@ -331,10 +356,10 @@ function createSettingsWindow() {
         // 任务栏图标（安装版的 exe 自带图标，开发时不设就是 Electron 的图标）
         icon: path.join(__dirname, 'assets', 'icon.png'),
         autoHideMenuBar: true,
-        // 深色标题栏：页面自己画标题栏，系统的最小化 / 最大化 / 关闭按钮叠在右上角
+        // 页面自己画标题栏，系统的最小化 / 最大化 / 关闭按钮叠在右上角，颜色跟着界面主题
         titleBarStyle: 'hidden',
-        titleBarOverlay: { color: '#0b0f15', symbolColor: '#97a3b4', height: 36 },
-        backgroundColor: '#10161e',
+        titleBarOverlay: { color: chrome.color, symbolColor: chrome.symbolColor, height: 36 },
+        backgroundColor: chrome.background,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -703,6 +728,7 @@ function registerIpcHandlers() {
     // ---- 保存应用配置 ----
     ipcMain.handle('config:save', async (_event, config) => {
         store.saveConfig(config);
+        if (config && config.theme) applyTheme(store.getConfig().theme);
         // 实时广播，让视差参数拖动时立刻生效
         broadcastConfig();
         return true;
@@ -989,6 +1015,10 @@ function startApp() {
     // 清理上次没删掉的素材副本（移除素材时视频可能正被占用）
     const orphans = cleanupOrphanFiles(store.getElementsDir(), store.getConfig().customElements.library);
     if (orphans.length) console.log('[Main] 已清理无用的素材文件:', orphans);
+
+    // 设置窗口的界面主题（要在建窗口之前，标题栏颜色按它取）
+    applyTheme(store.getConfig().theme);
+    nativeTheme.on('updated', updateSettingsChrome);
 
     // 2. 注册 IPC 处理器
     registerIpcHandlers();

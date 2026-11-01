@@ -85,7 +85,7 @@ function initElementsTab({ api, setStatus, setBadge }) {
 
     function renderAssetCard(asset) {
         const missing = !api.fileExists(asset.file);
-        const card = el('div', 'asset' + (missing ? ' missing' : ''));
+        const card = el('div', 'asset cf' + (missing ? ' missing' : ''));
         card.tabIndex = 0;
         card.setAttribute('role', 'button');
         card.title = missing ? '文件丢失：' + asset.file : '放到壁纸上';
@@ -128,7 +128,7 @@ function initElementsTab({ api, setStatus, setBadge }) {
     }
 
     function renderAddCard() {
-        const card = el('button', 'asset add');
+        const card = el('button', 'asset add cf');
         card.type = 'button';
         const inner = el('span');
         inner.append(Icons.svg('image-plus'), '添加素材');

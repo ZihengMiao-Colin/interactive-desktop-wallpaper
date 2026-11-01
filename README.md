@@ -30,6 +30,7 @@ npm start
 
 - `npm run dev`：同时打开 DevTools。
 - 启动后直接打开设置窗口：选择壁纸、生成深度图、调整参数、管理自定义元素。关掉设置窗口后程序留在托盘里，再次打开程序或点托盘图标（右键菜单 → "打开设置"）都能回来。开机自启时只显示壁纸，不弹设置窗口。
+- 设置窗口的"设置"页可以换界面主题：夜间（默认）、日间、跟随系统。
 - 日志在 `%APPDATA%/interactive-desktop-wallpaper/logs/main.log`。
 - 卸载：设置窗口的"设置"页 → "卸载软件…"，或者 Windows 设置 → 应用。两种方式都可以选要不要一起删除你的数据（各项设置、导入的元素、生成的深度图）；你电脑里原来的图片和音乐不会删。
 
@@ -74,6 +75,7 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 | `main.js`、`preload.js`、`src/` | Electron 主进程、IPC、WorkerW 注入、全屏检测、配置存储、深度图生成（`src/depth/`）、自定义元素素材库与摆放窗口 |
 | `index.html`、`renderer/` | 壁纸页面（也是摆放窗口）：Pixi 场景、着色器、自定义元素渲染层、摆放模式 |
 | `settings.html`、`settings/` | 设置窗口 |
+| `ui/` | 设置窗口和壁纸页共用的样式（颜色、字体、切角控件）、图标和自带字体（`ui/fonts/`） |
 | `shared/` | 主进程、渲染进程和测试共用的纯逻辑 |
 | `elements/` | 默认元素素材与 `manifest.json` |
 | `overlay/` | 全屏视频特效素材 |
@@ -88,4 +90,5 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 - **光线步进**：每个像素从最近一层往最远一层找第一个碰到的表面，近处物体挪动时盖住后面的背景，不会被拉扯出重影（思路参考 [depthy](https://github.com/panrafal/depthy)）。
 - **深度遮挡**：元素像素和"该像素上实际显示的背景内容"的深度比较，鼠标移动时遮挡边缘跟着前景物体走。
 - **动图**：用 Chromium 自带的 WebCodecs `ImageDecoder` 解码，不依赖第三方库。
+- **界面**：战术终端风格（切角面板、宋体标题配英文小字），样式全在 `ui/tokens.css` 的 CSS 变量里。字体自带，都是 SIL OFL 授权：思源宋体（Noto Serif SC）、Saira、JetBrains Mono，来自 [Fontsource](https://fontsource.org/)。
 - **数据**：配置在 `%APPDATA%/interactive-desktop-wallpaper/config.json`；导入的素材复制到同目录的 `custom_elements/`，原文件挪走也不影响。

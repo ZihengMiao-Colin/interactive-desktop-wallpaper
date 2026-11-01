@@ -30,6 +30,7 @@ npm start
 
 - `npm run dev`: also opens DevTools.
 - The settings window opens on launch: choose a wallpaper, generate depth maps, tweak parameters, manage custom elements. After you close it the app stays in the tray; launch the app again or click the tray icon (right-click → "打开设置", Open settings) to bring it back. When started at login it only shows the wallpaper, without the settings window.
+- The "设置" (settings) page of the settings window lets you switch the interface theme: dark (default), light, or follow system.
 - Logs are in `%APPDATA%/interactive-desktop-wallpaper/logs/main.log`.
 - Uninstalling: "设置" (Settings) page in the settings window → "卸载软件…" (Uninstall), or Windows Settings → Apps. Either way you can choose whether to also delete your data (settings, imported elements, generated depth maps); your own original images and music are never deleted.
 
@@ -74,6 +75,7 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 | `main.js`, `preload.js`, `src/` | Electron main process, IPC, WorkerW injection, full-screen detection, config storage, depth-map generation (`src/depth/`), custom element library and placement window |
 | `index.html`, `renderer/` | Wallpaper page (also the placement window): Pixi scene, shaders, custom element layer, placement mode |
 | `settings.html`, `settings/` | Settings window |
+| `ui/` | Styles shared by the settings window and the wallpaper page (colors, fonts, cut-corner controls), icons and bundled fonts (`ui/fonts/`) |
 | `shared/` | Pure logic shared by the main process, renderer and tests |
 | `elements/` | Default element assets and `manifest.json` |
 | `overlay/` | Full-screen video effect assets |
@@ -88,4 +90,5 @@ For architecture details, known issues and the development plan, see [PROJECT_NO
 - **Ray marching**: each pixel searches from the nearest layer to the farthest for the first surface it hits, so near objects cover the background behind them as they move instead of being stretched into ghost copies (approach based on [depthy](https://github.com/panrafal/depthy)).
 - **Depth occlusion**: each element pixel is compared against the depth of the background content actually shown at that pixel, so occlusion edges follow foreground objects as the mouse moves.
 - **Animated images**: decoded with Chromium's built-in WebCodecs `ImageDecoder`, no third-party library.
+- **UI**: tactical-terminal style (cut-corner panels, serif Chinese headings with small English labels); all styling lives in CSS variables in `ui/tokens.css`. Fonts are bundled, all under the SIL OFL: Noto Serif SC, Saira and JetBrains Mono, from [Fontsource](https://fontsource.org/).
 - **Data**: config lives in `%APPDATA%/interactive-desktop-wallpaper/config.json`; imported assets are copied into `custom_elements/` in the same folder, so moving the original files does not break anything.

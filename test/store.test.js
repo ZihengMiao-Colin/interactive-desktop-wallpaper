@@ -25,6 +25,13 @@ test('旧配置的视差强度超过 30 时读出 30', () => {
     assert.equal(store.getConfig().parallaxMultiplier, 30);
 });
 
+test('界面主题默认夜间，不认识的值读成夜间', () => {
+    assert.equal(storeWithConfig().store.getConfig().theme, 'dark');
+    assert.equal(storeWithConfig({ theme: 'light' }).store.getConfig().theme, 'light');
+    assert.equal(storeWithConfig({ theme: 'system' }).store.getConfig().theme, 'system');
+    assert.equal(storeWithConfig({ theme: 'purple' }).store.getConfig().theme, 'dark');
+});
+
 test('新用户的边缘平滑默认 5', () => {
     const { store } = storeWithConfig();
     assert.equal(store.getConfig().blurRadius, 5);
