@@ -57,6 +57,7 @@ const { isClickable: isVinylClickable, normalizeLayout: normalizeVinylLayout } =
 const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
+const myWallpapers = require('./shared/my-wallpapers');
 const { findDepthModel, generateDepthPng } = require('./src/depth/generator');
 const { DEFAULT_BLUR } = require('./src/depth/processing');
 const { findUninstaller, launchUninstaller } = require('./src/uninstaller');
@@ -493,30 +494,58 @@ async function showImageDialog() {
 }
 
 /**
- * 把图片应用为桌面壁纸：记住它（重启后还是这张），并通知壁纸窗口加载。
- * 调用前应确保这张图已有深度图缓存。
+ * 弹出选择壁纸图片或视频的对话框（设置页"从电脑选择…"）。
+ * @returns {Promise<{path: string, type: 'image'|'video'}|null>}
+ */
+async function showWallpaperDialog() {
+    const { IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, wallpaperType } = myWallpapers;
+    const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+        title: '选择壁纸图片或视频',
+        filters: [
+            { name: '图片和视频', extensions: [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS] },
+            { name: '图片', extensions: IMAGE_EXTENSIONS },
+            { name: '视频', extensions: VIDEO_EXTENSIONS },
+        ],
+        properties: ['openFile'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const filePath = result.filePaths[0];
+    const type = wallpaperType(filePath);
+    return type ? { path: filePath, type } : null;
+}
+
+/**
+ * 应用壁纸：记住它（重启后还是这个），并通知壁纸窗口加载。
+ * 图片调用前应确保已有深度图缓存；视频的 3D 视差同样要先有深度图。
+ * @param {{type: 'image', path: string} | {type: 'video', path: string, effect: string, sound: boolean} | string} descriptor
+ *   传字符串时当成图片
  * @returns {boolean}
  */
-function applyWallpaper(imagePath) {
+function applyWallpaper(descriptor) {
     if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return false;
-    store.saveConfig({ currentImage: imagePath });
-    wallpaperWindow.webContents.send('image:new', imagePath);
-    // 设置窗口的默认壁纸面板要知道"当前"换成了哪张
+    const target = typeof descriptor === 'string' ? { type: 'image', path: descriptor } : descriptor;
+    store.saveConfig(myWallpapers.applyPartial(store.getConfig(), target, Date.now()));
+    wallpaperWindow.webContents.send('wallpaper:show', target);
+    // 设置窗口的图库、我的壁纸要知道"当前"换成了哪个
     broadcastConfig();
-    console.log('[Main] Apply wallpaper:', imagePath);
+    console.log('[Main] Apply wallpaper:', target);
     return true;
 }
 
 /**
- * 托盘"更换壁纸..."：有深度图缓存就直接应用；
+ * 托盘"更换壁纸..."：选的图片放进「我的壁纸」；有深度图缓存就直接应用，
  * 没有就打开设置窗口，在那里生成深度图（带进度），生成成功后自动应用。
  */
 async function changeWallpaperFromTray() {
     const imagePath = await showImageDialog();
     if (!imagePath) return;
 
+    const { myWallpapers: list } = store.getConfig();
+    store.saveConfig({ myWallpapers: myWallpapers.addEntry(list, { path: imagePath, type: 'image' }, Date.now()) });
+    broadcastConfig();
+
     if (hasDepthMap(imagePath)) {
-        applyWallpaper(imagePath);
+        applyWallpaper({ type: 'image', path: imagePath });
         return;
     }
 
@@ -551,6 +580,42 @@ function registerIpcHandlers() {
 
     // ---- 选择新图片（只返回路径，应用要等用户点"应用壁纸"） ----
     ipcMain.handle('dialog:selectImage', () => showImageDialog());
+
+    // ---- 选择壁纸图片或视频（只返回路径和类型） ----
+    ipcMain.handle('dialog:selectWallpaper', () => showWallpaperDialog());
+
+    // ---- 我的壁纸：加入 / 移除 / 改视频设置 / 补缩略图，改完广播配置 ----
+    ipcMain.handle('myWallpapers:add', (_event, { path: filePath, type, thumbDataUrl, duration }) => {
+        if (myWallpapers.wallpaperType(filePath) !== type) throw new Error('不支持的文件类型');
+        const thumb = thumbDataUrl ? store.saveWallpaperThumb(filePath, thumbDataUrl) : '';
+        const list = myWallpapers.addEntry(store.getConfig().myWallpapers, { path: filePath, type, thumb, duration }, Date.now());
+        store.saveConfig({ myWallpapers: list });
+        broadcastConfig();
+        return myWallpapers.findEntry(list, filePath);
+    });
+    ipcMain.handle('myWallpapers:remove', (_event, filePath) => {
+        const { list, removed } = myWallpapers.removeEntry(store.getConfig().myWallpapers, filePath);
+        if (!removed) return false;
+        store.deleteWallpaperThumb(removed.thumb);
+        store.saveConfig({ myWallpapers: list });
+        broadcastConfig();
+        return true;
+    });
+    ipcMain.handle('myWallpapers:update', (_event, filePath, patch) => {
+        const { effect, sound } = patch || {};
+        const list = myWallpapers.updateEntry(store.getConfig().myWallpapers, filePath, { effect, sound });
+        store.saveConfig({ myWallpapers: list });
+        broadcastConfig();
+        return myWallpapers.findEntry(list, filePath);
+    });
+    ipcMain.handle('myWallpapers:setThumb', (_event, filePath, thumbDataUrl) => {
+        if (!myWallpapers.findEntry(store.getConfig().myWallpapers, filePath) || !thumbDataUrl) return null;
+        const thumb = store.saveWallpaperThumb(filePath, thumbDataUrl);
+        const list = myWallpapers.updateEntry(store.getConfig().myWallpapers, filePath, { thumb });
+        store.saveConfig({ myWallpapers: list });
+        broadcastConfig();
+        return myWallpapers.findEntry(list, filePath);
+    });
 
     // ---- 往歌单里添加本地音乐（可以一次选多首），只返回路径，歌名由歌单逻辑从文件名取 ----
     ipcMain.handle('dialog:selectAudioFiles', async () => {
@@ -820,8 +885,8 @@ function registerIpcHandlers() {
         }
     });
 
-    // ---- 应用壁纸（从设置窗口触发） ----
-    ipcMain.handle('wallpaper:apply', (_event, imagePath) => applyWallpaper(imagePath));
+    // ---- 应用壁纸（从设置窗口触发）：{ type, path, ... }，旧写法传图片路径字符串也行 ----
+    ipcMain.handle('wallpaper:apply', (_event, descriptor) => applyWallpaper(descriptor));
 
     // ---- 清除深度图缓存 ----
     ipcMain.handle('cache:clearAll', async () => {
@@ -1006,10 +1071,34 @@ function startApp() {
         store.saveConfig({ currentImage: migratedImage });
         console.log('[Main] 当前壁纸已换成图库里的同一张:', migratedImage);
     }
-    // 第一次运行还没选过壁纸：用图库第一张（自带深度图）
-    if (!store.getConfig().currentImage && gallery.length) {
+    // 当前视频记下的 imageAtTime 也要跟着换，否则和换过的 currentImage 对不上，视频会被当成"旧版本换过图片"
+    const { currentVideo } = store.getConfig();
+    if (currentVideo && currentVideo.imageAtTime) {
+        const migratedAtTime = migrateLegacyImagePath(currentVideo.imageAtTime, gallery);
+        if (migratedAtTime !== currentVideo.imageAtTime) {
+            store.saveConfig({ currentVideo: { ...currentVideo, imageAtTime: migratedAtTime } });
+        }
+    }
+    // 旧版本之后又换过图片（imageAtTime 对不上）：以 currentImage 为准，清掉当前视频
+    const resolved = myWallpapers.resolveCurrent(store.getConfig());
+    if (store.getConfig().currentVideo && (!resolved || resolved.type !== 'video')) {
+        store.saveConfig({ currentVideo: null });
+        console.log('[Main] 当前图片在别的版本里换过，不再用上次的视频壁纸');
+    }
+    // 第一次运行还没选过壁纸：用图库第一张（自带深度图）。
+    // 应用视频时 currentImage 可能是空的，这时不能补，否则 imageAtTime 就对不上了
+    if (!store.getConfig().currentImage && !store.getConfig().currentVideo && gallery.length) {
         store.saveConfig({ currentImage: gallery[0].file });
         console.log('[Main] 第一次运行，默认壁纸:', gallery[0].name);
+    }
+    // 升级到有「我的壁纸」的版本：当前是用户自己的图片就放进去（只做一次）
+    if (store.getConfig().myWallpapersVersion !== 1) {
+        const config = store.getConfig();
+        const list = myWallpapers.migrateFromCurrentImage(config.myWallpapers, config.currentImage, {
+            isGallery: (p) => !!findGalleryEntry(gallery, p),
+            exists: (p) => fs.existsSync(p),
+        }, Date.now());
+        store.saveConfig({ myWallpapers: list, myWallpapersVersion: 1 });
     }
 
     // 清理上次没删掉的素材副本（移除素材时视频可能正被占用）

@@ -264,7 +264,9 @@ function registerIpcListeners() {
         if (elementsLayer.handleClick(x, y)) wake();
     });
 
-    window.electronAPI.onNewImage(async (imagePath) => {
+    window.electronAPI.onShowWallpaper(async (descriptor) => {
+        if (!descriptor || descriptor.type !== 'image') return;
+        const imagePath = descriptor.path;
         UI.showLoading('正在加载新壁纸...');
         try {
             const cachedDepth = await window.electronAPI.getDepthCache(imagePath);

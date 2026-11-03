@@ -16,6 +16,12 @@ const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { toFileUrl } = require('./src/elements/library');
+const { wallpaperType } = require('./shared/my-wallpapers');
+
+/** 视频壁纸的 3D 视差取哪一帧生成深度图：时长的 30% 处（避开开头的黑场） */
+const VIDEO_DEPTH_FRAME_AT = 0.3;
+/** 读取视频画面的超时 */
+const VIDEO_DECODE_TIMEOUT_MS = 15000;
 
 /**
  * 读取图片并解码成 RGBA 像素，给主进程生成深度图用。
@@ -42,6 +48,42 @@ async function decodeImagePixels(filePath) {
 }
 
 /**
+ * 从视频里取一帧解码成 RGBA 像素，给视频壁纸的 3D 视差生成深度图用。
+ * @param {string} filePath
+ * @returns {Promise<{width: number, height: number, rgba: Uint8ClampedArray}>}
+ */
+function decodeVideoFramePixels(filePath) {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.muted = true;
+        video.preload = 'auto';
+        const finish = (fn) => {
+            clearTimeout(timer);
+            video.removeAttribute('src');
+            video.load();
+            fn();
+        };
+        const fail = () => finish(() => reject(new Error('无法读取视频画面')));
+        const timer = setTimeout(fail, VIDEO_DECODE_TIMEOUT_MS);
+        video.addEventListener('error', fail, { once: true });
+        video.addEventListener('loadedmetadata', () => {
+            const duration = Number.isFinite(video.duration) ? video.duration : 0;
+            video.currentTime = Math.min(duration * VIDEO_DEPTH_FRAME_AT, Math.max(0, duration - 0.1));
+        }, { once: true });
+        video.addEventListener('seeked', () => {
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            if (!width || !height) return fail();
+            const ctx = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(video, 0, 0);
+            const rgba = ctx.getImageData(0, 0, width, height).data;
+            finish(() => resolve({ width, height, rgba }));
+        }, { once: true });
+        video.src = toFileUrl(filePath);
+    });
+}
+
+/**
  * 暴露到渲染进程 window.electronAPI 的安全 API。
  */
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -50,6 +92,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /** 打开系统文件对话框，选择壁纸图片（只返回路径，不会应用） */
     selectImage: () => ipcRenderer.invoke('dialog:selectImage'),
+
+    /** 打开系统文件对话框，选择壁纸图片或视频 → { path, type: 'image'|'video' }，取消时为 null */
+    selectWallpaperFile: () => ipcRenderer.invoke('dialog:selectWallpaper'),
 
     /** 打开系统文件对话框，选择要加进歌单的本地音乐（可多选）→ 路径数组，取消时为 [] */
     selectAudioFiles: () => ipcRenderer.invoke('dialog:selectAudioFiles'),
@@ -79,13 +124,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // ==================== 深度图生成 ====================
 
     /**
-     * 生成深度图：这里解码图片，主进程用 ONNX 模型推理并存进缓存。
-     * @param {string} imagePath - 原始图片路径
+     * 生成深度图：这里解码图片（视频取其中一帧），主进程用 ONNX 模型推理并存进缓存。
+     * @param {string} imagePath - 原始图片或视频路径
      * @param {number} [blurRadius] - 边缘平滑高斯模糊半径（像素），0为不平滑，默认 5
      * @returns {Promise<{success: boolean, depthDataUrl?: string, error?: string}>}
      */
     generateDepthMap: async (imagePath, blurRadius) => {
-        const pixels = await decodeImagePixels(imagePath);
+        const pixels = wallpaperType(imagePath) === 'video'
+            ? await decodeVideoFramePixels(imagePath)
+            : await decodeImagePixels(imagePath);
         return ipcRenderer.invoke('depth:generate', { imagePath, blurRadius, ...pixels });
     },
 
@@ -128,10 +175,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // ==================== 壁纸应用 ====================
 
     /**
-     * 通知主进程应用壁纸（发送 image:new 到壁纸窗口）。
-     * @param {string} imagePath - 图片路径
+     * 通知主进程应用壁纸（发送 wallpaper:show 到壁纸窗口）。
+     * @param {{type: 'image', path: string} | {type: 'video', path: string, effect: string, sound: boolean}} descriptor
      */
-    applyWallpaper: (imagePath) => ipcRenderer.invoke('wallpaper:apply', imagePath),
+    applyWallpaper: (descriptor) => ipcRenderer.invoke('wallpaper:apply', descriptor),
+
+    // ==================== 我的壁纸 ====================
+
+    myWallpapers: {
+        /** 加入（已有的提到最前）：{ path, type, thumbDataUrl?, duration? } → 条目 */
+        add: (item) => ipcRenderer.invoke('myWallpapers:add', item),
+        /** 从列表移除（不删原文件，删它的缩略图）→ 是否删了 */
+        remove: (filePath) => ipcRenderer.invoke('myWallpapers:remove', filePath),
+        /** 改视频的效果 / 声音：{ effect?, sound? } → 条目 */
+        update: (filePath, patch) => ipcRenderer.invoke('myWallpapers:update', filePath, patch),
+        /** 补存缩略图（不改排序）→ 条目 */
+        setThumb: (filePath, thumbDataUrl) => ipcRenderer.invoke('myWallpapers:setThumb', filePath, thumbDataUrl),
+    },
 
     // ==================== 应用配置 ====================
 
@@ -169,7 +229,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * 用法：
      *   window.electronAPI.onPauseRender(callback)
      *   window.electronAPI.onResumeRender(callback)
-     *   window.electronAPI.onNewImage(callback)
+     *   window.electronAPI.onShowWallpaper(callback)
      *   window.electronAPI.onLoadConfig(callback)
      *
      * 返回 unsubscribe 函数用于取消监听。
@@ -186,10 +246,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => ipcRenderer.removeListener('renderer:resume', handler);
     },
 
-    onNewImage: (callback) => {
-        const handler = (_event, imagePath) => callback(imagePath);
-        ipcRenderer.on('image:new', handler);
-        return () => ipcRenderer.removeListener('image:new', handler);
+    /** 换壁纸：回调参数是 { type: 'image', path } 或 { type: 'video', path, effect, sound } */
+    onShowWallpaper: (callback) => {
+        const handler = (_event, descriptor) => callback(descriptor);
+        ipcRenderer.on('wallpaper:show', handler);
+        return () => ipcRenderer.removeListener('wallpaper:show', handler);
     },
 
     /**
