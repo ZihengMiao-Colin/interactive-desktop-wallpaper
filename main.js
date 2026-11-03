@@ -576,9 +576,6 @@ function hasDepthMap(imagePath) {
 
 function registerIpcHandlers() {
 
-    // ---- 选择新图片（只返回路径，应用要等用户点"应用壁纸"） ----
-    ipcMain.handle('dialog:selectImage', () => showImageDialog());
-
     // ---- 选择壁纸图片或视频（只返回路径和类型） ----
     ipcMain.handle('dialog:selectWallpaper', () => showWallpaperDialog());
 

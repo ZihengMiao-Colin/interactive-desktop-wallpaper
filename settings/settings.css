@@ -498,6 +498,23 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     padding-left: 18px;
     border-left: 1px solid var(--line);
 }
+/* 选中视频时：效果分段按钮 + 声音开关 */
+.video-ctrl {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-2);
+    font-size: 12.5px;
+    white-space: nowrap;
+}
+.video-ctrl[hidden] { display: none; }
+.video-ctrl label[for] { margin-left: 6px; cursor: default; }
+/* 视频的"不动""整体平移"用不到深度图：收起深度图状态、边缘平滑和生成按钮，"应用壁纸"仍然靠右 */
+.depth-bar.no-depth .depth-state,
+.depth-bar.no-depth .smooth,
+.depth-bar.no-depth #btn-generate-depth { display: none; }
+.depth-bar.no-depth .depth-actions { margin-left: auto; }
 
 /* ==================== 缩略图（图库、视频特效）：切角图 + 悬停 / 选中外框 ==================== */
 .gallery {
@@ -584,6 +601,7 @@ h1, h2, h3 { font-feature-settings: "palt"; }
 .wp .box::after { inset: 1px; z-index: -1; background: var(--bg-2); }
 .wp .box span { display: grid; justify-items: center; gap: 6px; font-size: 12px; }
 .wp .box svg.i { width: 20px; height: 20px; }
+.wp .box small { margin-top: -4px; color: var(--text-3); font-size: 11px; }
 .wp.add:hover .box { color: var(--accent-text); }
 .wp.add:hover .box::before { background: var(--accent-text); }
 .wp:disabled { cursor: not-allowed; opacity: 0.5; }

@@ -7,6 +7,12 @@
 
 'use strict';
 
+/** 桌面上正在用的壁纸路径（可能是视频，这时默认壁纸都不标"使用中"） */
+const currentPathOf = (config) => {
+    const current = Shared.myWallpapers.resolveCurrent(config);
+    return current ? current.path : '';
+};
+
 /** Windows 路径比较：不区分大小写和分隔符写法 */
 const normalizePath = (p) => (p || '').toLowerCase().replace(/\//g, '\\');
 const samePath = (a, b) => !!a && !!b && normalizePath(a) === normalizePath(b);
@@ -61,7 +67,7 @@ function initGalleryPanel({ api, onSelect, onPickFile }) {
         card.disabled = busy;
         const box = el('span', 'box');
         const inner = el('span');
-        inner.append(Icons.svg('image-plus'), '从电脑选择…');
+        inner.append(Icons.svg('image-plus'), '从电脑选择…', Controls.el('small', '', '图片或视频'));
         box.appendChild(inner);
         card.append(box, el('span', 'name', ' '));
         card.addEventListener('click', () => onPickFile());
@@ -74,7 +80,7 @@ function initGalleryPanel({ api, onSelect, onPickFile }) {
 
     // 应用了别的壁纸后，"使用中"标记跟着走
     api.onLoadConfig((config) => {
-        const next = (config && config.currentImage) || '';
+        const next = currentPathOf(config);
         if (next === currentPath) return;
         currentPath = next;
         render();
@@ -82,7 +88,7 @@ function initGalleryPanel({ api, onSelect, onPickFile }) {
 
     const ready = Promise.all([api.getGallery(), api.getConfig()]).then(([list, config]) => {
         entries = list || [];
-        currentPath = (config && config.currentImage) || '';
+        currentPath = currentPathOf(config);
         // 没有图库素材时只剩"从电脑选择"
         titleEl.textContent = entries.length ? '默认壁纸' : '选择壁纸';
         countEl.textContent = entries.length || '';

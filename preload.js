@@ -90,9 +90,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ==================== 图片与文件选择 ====================
 
-    /** 打开系统文件对话框，选择壁纸图片（只返回路径，不会应用） */
-    selectImage: () => ipcRenderer.invoke('dialog:selectImage'),
-
     /** 打开系统文件对话框，选择壁纸图片或视频 → { path, type: 'image'|'video' }，取消时为 null */
     selectWallpaperFile: () => ipcRenderer.invoke('dialog:selectWallpaper'),
 

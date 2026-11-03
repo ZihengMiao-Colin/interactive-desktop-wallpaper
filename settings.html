@@ -63,6 +63,17 @@
 
                 <!-- 深度图状态 + 生成 / 应用 -->
                 <div class="depth-bar cf">
+                    <!-- 选中视频时才显示：效果和声音（settings/wallpaper-page.js） -->
+                    <div class="video-ctrl" id="video-ctrl" hidden>
+                        <span class="label">效果</span>
+                        <div class="seg" id="video-motion">
+                            <button type="button" data-value="none">不动</button>
+                            <button type="button" data-value="depth">3D 视差</button>
+                            <button type="button" data-value="pan">整体平移</button>
+                        </div>
+                        <label for="video-sound">声音</label>
+                        <label class="switch" title="桌面上的视频壁纸出声（预览一直静音）"><input type="checkbox" id="video-sound"><span></span></label>
+                    </div>
                     <div class="depth-state" id="depth-state"></div>
                     <div class="smooth">
                         <label for="depth-blur">边缘平滑</label>

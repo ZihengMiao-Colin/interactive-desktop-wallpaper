@@ -1,12 +1,19 @@
 /**
- * wallpaper-page.js — 设置窗口"壁纸"页：选图、生成深度图、应用壁纸
+ * wallpaper-page.js — 设置窗口"壁纸"页：选图片或视频、生成深度图、应用壁纸
  *
- * 选中（图库或自己的图片）只是预览，要点"应用壁纸"才会换到桌面上。
+ * 选中（图库或自己的图片 / 视频）只是预览，要点"应用壁纸"才会换到桌面上。
  * 默认壁纸自带深度图；自己的图片先找缓存，没有就要"生成深度图"。
+ * 视频有三种效果（不动 / 3D 视差 / 整体平移）和声音开关，改了立刻存进「我的壁纸」里这个视频的记录，
+ * 同样要点"应用壁纸"才影响桌面；3D 视差和图片一样要先有深度图。
  * 托盘"更换壁纸"选的图片没有深度图时，主进程会把它转到这里：生成完直接应用。
  */
 
 'use strict';
+
+/** 选的视频读不出来时的提示 */
+const VIDEO_UNSUPPORTED_MSG = '这个视频格式不支持，换成 MP4 或 WebM 试试';
+/** 选的图片读不出来时的提示 */
+const IMAGE_UNREADABLE_MSG = '这张图片读不出来';
 
 /**
  * @param {{
@@ -19,20 +26,31 @@
  * @returns {{ load: (config: object) => Promise<void>, setBlur: (value: number) => void, markDepthStale: () => void }}
  */
 function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
-    const { el, setRange, bindRange } = Controls;
+    const { el, setRange, bindRange, segmented } = Controls;
+    const MW = Shared.myWallpapers;
+    const depthBar = document.querySelector('.depth-bar');
     const depthState = document.getElementById('depth-state');
     const blurSlider = document.getElementById('depth-blur');
     const blurValue = document.getElementById('blur-value');
     const btnGenerate = document.getElementById('btn-generate-depth');
     const btnApply = document.getElementById('btn-apply-wallpaper');
+    const videoCtrl = document.getElementById('video-ctrl');
+    const soundToggle = document.getElementById('video-sound');
 
-    let selectedImagePath = null;
-    let currentImage = '';
+    /** 选中的图片或视频的路径 */
+    let selectedPath = null;
+    /** 选中的是视频时，它在「我的壁纸」里的记录（效果、声音） */
+    let selectedVideo = null;
+    /** 桌面上正在用的壁纸 { type, path, ... }（Shared.myWallpapers.resolveCurrent） */
+    let current = null;
+    /** 最近一次的配置（正在使用卡片要找视频的缩略图） */
+    let latestConfig = {};
     let depthGenerated = false;
     let isGenerating = false;
 
-    const fileName = (p) => p.split('\\').pop();
+    const fileName = (p) => p.split(/[\\/]/).pop();
     const blurText = (v) => (v === 0 ? '关闭' : v + 'px');
+    const currentPath = () => (current ? current.path : '');
 
     // ---------- 深度图状态（操作栏左侧） ----------
 
@@ -76,15 +94,72 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
     // ---------- 正在使用 ----------
 
     function refreshNowUsing() {
-        preview.setUsing(!!selectedImagePath && samePath(selectedImagePath, currentImage));
-        if (!currentImage || !api.fileExists(currentImage)) {
+        preview.setUsing(!!selectedPath && samePath(selectedPath, currentPath()));
+        if (!current || !api.fileExists(current.path)) {
             setNowUsing(null);
             return;
         }
-        const entry = gallery.find(currentImage);
-        setNowUsing(entry
-            ? { name: entry.name, thumbUrl: api.toFileUrl(entry.thumb) }
-            : { name: fileName(currentImage), thumbUrl: api.toFileUrl(currentImage) });
+        const entry = gallery.find(current.path);
+        if (entry) {
+            setNowUsing({ name: entry.name, thumbUrl: api.toFileUrl(entry.thumb) });
+            return;
+        }
+        // 自己的图片 / 视频：有缩略图用缩略图，图片没有就用原图
+        const mine = MW.findEntry(latestConfig.myWallpapers, current.path);
+        const thumb = mine && mine.thumb && api.fileExists(mine.thumb) ? mine.thumb : (current.type === 'image' ? current.path : '');
+        setNowUsing({ name: fileName(current.path), thumbUrl: thumb ? api.toFileUrl(thumb) : '' });
+    }
+
+    // ---------- 视频的效果和声音 ----------
+
+    const motionSeg = segmented(document.getElementById('video-motion'), (effect) => {
+        if (!selectedVideo) return;
+        selectedVideo.effect = effect;
+        api.myWallpapers.update(selectedVideo.path, { effect });
+        refreshVideoMotion({ quiet: false });
+    });
+
+    soundToggle.addEventListener('change', () => {
+        if (!selectedVideo) return;
+        selectedVideo.sound = soundToggle.checked;
+        api.myWallpapers.update(selectedVideo.path, { sound: selectedVideo.sound });
+    });
+
+    /** 切换图片 / 视频时操作栏的样子：视频显示效果和声音；不动、整体平移时收起深度图那一套 */
+    function showVideoControls(video) {
+        videoCtrl.hidden = !video;
+        depthBar.classList.toggle('no-depth', !!video && video.effect !== 'depth');
+        if (!video) return;
+        motionSeg.set(video.effect);
+        soundToggle.checked = video.sound;
+    }
+
+    /**
+     * 按选中视频的效果更新预览、深度图状态和"应用壁纸"按钮。
+     * 不动、整体平移不需要深度图，直接能应用；3D 视差要先有深度图。
+     */
+    async function refreshVideoMotion({ quiet = true } = {}) {
+        const video = selectedVideo;
+        if (!video) return;
+        showVideoControls(video);
+        preview.setMotion(video.effect);
+        if (video.effect !== 'depth') {
+            depthGenerated = false;
+            btnGenerate.disabled = true;
+            btnApply.disabled = false;
+            return;
+        }
+        btnGenerate.disabled = isGenerating;
+        btnApply.disabled = true;
+        showDepthState('none');
+        const depth = await api.getDepthCache(video.path);
+        // 等深度图期间换了别的视频或效果，这次的结果就不用了
+        if (selectedVideo !== video || video.effect !== 'depth') return;
+        preview.setDepth(depth);
+        depthGenerated = !!depth;
+        btnApply.disabled = !depth;
+        showDepthState(depth ? 'ready' : 'missing');
+        if (!quiet && !depth) setStatus('3D 视差要先点"生成深度图"');
     }
 
     // ---------- 选择壁纸 ----------
@@ -98,7 +173,9 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
      */
     async function selectImagePath(imagePath, { quiet = false } = {}) {
         const galleryEntry = gallery.find(imagePath);
-        selectedImagePath = imagePath;
+        selectedPath = imagePath;
+        selectedVideo = null;
+        showVideoControls(null);
         depthGenerated = false;
         btnGenerate.disabled = !!galleryEntry;
         btnApply.disabled = true;
@@ -112,7 +189,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
 
         const depth = await api.getDepthCache(imagePath);
         // 等深度图期间又选了别的图片，这次的结果就不用了
-        if (selectedImagePath !== imagePath) return !!depth;
+        if (selectedPath !== imagePath) return !!depth;
         preview.setDepth(depth);
         if (depth) {
             depthGenerated = true;
@@ -130,25 +207,78 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
         return !!depth;
     }
 
+    /**
+     * 选中一个视频（「我的壁纸」里的记录）：预览开始播放，操作栏换成效果和声音。
+     * @param {{path: string, effect: string, sound: boolean}} entry
+     * @param {{quiet?: boolean}} [options]
+     * @returns {Promise<boolean>} 视频能不能放
+     */
+    async function selectVideo(entry, { quiet = false } = {}) {
+        const video = { path: entry.path, effect: entry.effect || 'none', sound: entry.sound === true };
+        selectedPath = video.path;
+        selectedVideo = video;
+        depthGenerated = false;
+        btnApply.disabled = true;
+        gallery.setSelected(video.path);
+        showVideoControls(video);
+        showDepthState('none');
+        refreshNowUsing();
+        try {
+            await preview.showVideo(api.toFileUrl(video.path), { name: fileName(video.path), tag: '你的视频' });
+        } catch (err) {
+            console.error('预览视频失败:', err);
+            if (selectedVideo === video) setStatus(VIDEO_UNSUPPORTED_MSG, 'error');
+            return false;
+        }
+        if (selectedVideo !== video) return false;
+        await refreshVideoMotion();
+        if (!quiet && selectedVideo === video) setStatus(`已选择 ${fileName(video.path)}，点"应用壁纸"换上`);
+        return true;
+    }
+
+    /** 选中「我的壁纸」里的一条（图片或视频） */
+    function selectEntry(entry, options) {
+        return entry.type === 'video' ? selectVideo(entry, options) : selectImagePath(entry.path, options);
+    }
+
+    /**
+     * "从电脑选择…"：选一张图片或一个视频，先确认能读（顺便生成缩略图），
+     * 能读就放进「我的壁纸」并选中；读不了只报错，不加进列表。
+     */
+    async function pickFromComputer() {
+        try {
+            const picked = await api.selectWallpaperFile();
+            if (!picked) return;
+            let info;
+            try {
+                info = await makeThumbnailInfo(api.toFileUrl(picked.path), picked.type);
+            } catch (err) {
+                console.error('读取所选文件失败:', err);
+                setStatus(picked.type === 'video' ? VIDEO_UNSUPPORTED_MSG : IMAGE_UNREADABLE_MSG, 'error');
+                return;
+            }
+            const entry = await api.myWallpapers.add({
+                path: picked.path, type: picked.type, thumbDataUrl: info.dataUrl, duration: info.duration,
+            });
+            await selectEntry(entry);
+        } catch (err) {
+            console.error('选择壁纸失败:', err);
+            setStatus('选择壁纸失败：' + err.message, 'error');
+        }
+    }
+
     const gallery = initGalleryPanel({
         api,
         onSelect: (entry) => selectImagePath(entry.file),
-        onPickFile: async () => {
-            try {
-                const imagePath = await api.selectImage();
-                if (imagePath) await selectImagePath(imagePath);
-            } catch (err) {
-                console.error('选择图片失败:', err);
-                setStatus('选择图片失败：' + err.message, 'error');
-            }
-        },
+        onPickFile: () => pickFromComputer(),
     });
 
     // ---------- 边缘平滑 ----------
 
     bindRange(blurSlider, blurValue, blurText, (v) => {
         saver.save({ blurRadius: v });
-        if (selectedImagePath && !gallery.find(selectedImagePath) && !isGenerating) {
+        const needsOwnDepth = selectedVideo ? selectedVideo.effect === 'depth' : (selectedPath && !gallery.find(selectedPath));
+        if (needsOwnDepth && !isGenerating) {
             depthGenerated = false;
             btnApply.disabled = true;
             showDepthState('stale');
@@ -158,25 +288,27 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
     // ---------- 生成深度图 ----------
 
     /**
-     * 为当前选中的图片生成深度图。
+     * 为当前选中的图片（或 3D 视差的视频，取其中一帧）生成深度图。
      * @returns {Promise<boolean>} 是否生成成功
      */
     async function generateDepth() {
-        if (!selectedImagePath || isGenerating) return false;
+        if (!selectedPath || isGenerating) return false;
+        const forPath = selectedPath;
 
         isGenerating = true;
-        depthState.parentElement.classList.add('generating');
+        depthBar.classList.add('generating');
         btnGenerate.disabled = true;
         btnApply.disabled = true;
         gallery.setBusy(true);
         depthGenerated = false;
-        showProgress('正在读取图片…');
+        showProgress(selectedVideo ? '正在读取视频画面…' : '正在读取图片…');
 
         const blurRadius = parseInt(blurSlider.value, 10);
         try {
-            const result = await api.generateDepthMap(selectedImagePath, blurRadius);
+            const result = await api.generateDepthMap(forPath, blurRadius);
             endProgress();
             if (result.success) {
+                // 生成期间不能换图（图库、我的壁纸都是灰的），这里一定还是同一个
                 depthGenerated = true;
                 preview.setDepth(result.depthDataUrl, { show: true });
                 btnApply.disabled = false;
@@ -195,7 +327,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
             return false;
         } finally {
             isGenerating = false;
-            depthState.parentElement.classList.remove('generating');
+            depthBar.classList.remove('generating');
             btnGenerate.disabled = false;
             gallery.setBusy(false);
         }
@@ -215,12 +347,19 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
 
     // ---------- 应用壁纸 ----------
 
-    /** 把当前选中的图片应用到桌面（需要已有深度图） */
+    /** 把当前选中的图片或视频应用到桌面（图片和 3D 视差的视频需要已有深度图） */
     async function applySelectedWallpaper() {
-        if (!selectedImagePath || !depthGenerated) return;
+        if (!selectedPath) return;
+        const video = selectedVideo;
+        if (video ? video.effect === 'depth' && !depthGenerated : !depthGenerated) return;
         try {
-            await api.applyWallpaper(selectedImagePath);
-            setStatus('壁纸已应用，移动鼠标看看效果', 'success');
+            if (video) {
+                await api.applyWallpaper({ type: 'video', path: video.path, effect: video.effect, sound: video.sound });
+                setStatus('视频壁纸已应用', 'success');
+            } else {
+                await api.applyWallpaper({ type: 'image', path: selectedPath });
+                setStatus('壁纸已应用，移动鼠标看看效果', 'success');
+            }
         } catch (err) {
             setStatus('应用壁纸失败：' + err.message, 'error');
         }
@@ -246,9 +385,10 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
     });
 
     api.onLoadConfig((config) => {
-        const next = (config && config.currentImage) || '';
-        if (next === currentImage) return;
-        currentImage = next;
+        latestConfig = config || {};
+        const next = MW.resolveCurrent(latestConfig);
+        if (JSON.stringify(next) === JSON.stringify(current)) return;
+        current = next;
         refreshNowUsing();
     });
 
@@ -256,16 +396,22 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
 
     return {
         async load(config) {
+            latestConfig = config || {};
             if (config.blurRadius !== undefined) {
                 setRange(blurSlider, config.blurRadius);
                 blurValue.textContent = blurText(config.blurRadius);
             }
-            currentImage = config.currentImage || '';
+            current = MW.resolveCurrent(config);
             await gallery.ready;
             refreshNowUsing();
             // 恢复当前壁纸（和手动选中走同一套逻辑，只是不弹提示）
-            if (currentImage && api.fileExists(currentImage)) {
-                await selectImagePath(currentImage, { quiet: true });
+            if (!current || !api.fileExists(current.path)) return;
+            if (current.type === 'video') {
+                // 显示「我的壁纸」里记的效果和声音（改了没应用的也算）；列表里没有就用桌面上的
+                const entry = MW.findEntry(config.myWallpapers, current.path) || { ...current };
+                await selectVideo(entry, { quiet: true });
+            } else {
+                await selectImagePath(current.path, { quiet: true });
             }
         },
 
@@ -275,9 +421,10 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
             blurValue.textContent = blurText(value);
         },
 
-        /** 清除缓存后：自己的图片的深度图没了，不能直接应用 */
+        /** 清除缓存后：自己的图片、3D 视差的视频的深度图没了，不能直接应用 */
         markDepthStale() {
-            if (!selectedImagePath || gallery.find(selectedImagePath)) return;
+            if (!selectedPath) return;
+            if (selectedVideo ? selectedVideo.effect !== 'depth' : gallery.find(selectedPath)) return;
             depthGenerated = false;
             btnApply.disabled = true;
             preview.setDepth(null);

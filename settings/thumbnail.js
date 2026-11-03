@@ -42,10 +42,22 @@ function loadThumbVideoFrame(url) {
  * @returns {Promise<string>} JPEG Data URL；文件读不了时 reject
  */
 async function makeThumbnail(fileUrl, type) {
+    return (await makeThumbnailInfo(fileUrl, type)).dataUrl;
+}
+
+/**
+ * 生成缩略图，顺带返回画面尺寸和时长（「我的壁纸」的视频格子要显示时长）。
+ * 没有画面的文件（纯音频、改了扩展名的其他文件）会 reject。
+ * @param {string} fileUrl - file:// URL
+ * @param {'image'|'animated'|'video'} type
+ * @returns {Promise<{dataUrl: string, width: number, height: number, duration: number}>} 图片的 duration 为 0
+ */
+async function makeThumbnailInfo(fileUrl, type) {
     // 动图用 <img> 加载时取到的就是第一帧
     const source = type === 'video' ? await loadThumbVideoFrame(fileUrl) : await loadThumbImage(fileUrl);
     const w = source.videoWidth || source.naturalWidth;
     const h = source.videoHeight || source.naturalHeight;
+    const duration = type === 'video' && Number.isFinite(source.duration) ? source.duration : 0;
     if (!w || !h) throw new Error('无法读取画面尺寸');
 
     const scale = Math.min(1, THUMB_MAX_SIDE / Math.max(w, h));
@@ -56,5 +68,10 @@ async function makeThumbnail(fileUrl, type) {
     ctx.fillStyle = '#2b2d38';   // 透明素材垫一层卡片底色，JPEG 没有透明通道
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.85);
+    if (type === 'video') {
+        // 取完这一帧就放掉视频，不留着占解码器
+        source.removeAttribute('src');
+        source.load();
+    }
+    return { dataUrl: canvas.toDataURL('image/jpeg', 0.85), width: w, height: h, duration };
 }
