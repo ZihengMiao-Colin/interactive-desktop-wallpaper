@@ -39,7 +39,7 @@
 
     const { setStatus } = shell;
     const wallpaperPage = initWallpaperPage({ api, saver, setStatus, setNowUsing: shell.setNowUsing, preview });
-    const parallaxPage = initParallaxPage({ saver, setStatus, preview, wallpaperPage });
+    const parallaxPage = initParallaxPage({ api, saver, setStatus, preview, wallpaperPage });
     const effectsPage = initEffectsPage({ api, saver, setStatus });
     const musicPage = initMusicPage({ api, saver, setStatus });
     const systemPage = initSystemPage({ api, saver, setStatus, onCacheCleared: () => wallpaperPage.markDepthStale() });

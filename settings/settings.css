@@ -185,6 +185,8 @@ h1, h2, h3 { font-feature-settings: "palt"; }
 }
 .page-head h1 .en { font-size: 10.5px; letter-spacing: 0.22em; }
 .page-head p { max-width: 580px; margin-top: 8px; color: var(--text-2); font-size: 12.5px; }
+.page-head .page-note { color: var(--warn); }
+.page-head .page-note[hidden] { display: none; }
 .page-head .actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 
 .group { margin-top: 34px; }
@@ -587,6 +589,64 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     color: #e8ecef;
 }
 .wp .using svg.i { color: #6fd892; }
+
+/* ==================== 我的壁纸：时长、移除、找不到文件 ==================== */
+.wp .thumb-empty {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: var(--surface);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+}
+/* 视频左下角：▶ 时长。外层是和缩略图一样大的透明层（名字那一行在图片下面，不能按卡片底边算） */
+.wp .dur {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    padding: 6px;
+    pointer-events: none;
+}
+.wp .dur span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px 1px 4px;
+    background: rgba(8, 10, 12, 0.78);
+    color: #e8ecef;
+    font-family: var(--f-mono);
+    font-size: 11px;
+}
+.wp .dur svg.i { width: 11px; height: 11px; }
+/* 悬停才出现的 ×：从列表移除（不删原文件） */
+.wp .rm {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    background: rgba(8, 10, 12, 0.78);
+    color: #e8ecef;
+    opacity: 0;
+    transition: opacity 0.12s;
+}
+.wp .rm svg.i { width: 14px; height: 14px; }
+.wp .rm:hover { background: var(--danger); color: var(--on-danger); }
+.wp:hover .rm,
+.wp .rm:focus-visible { opacity: 1; }
+.wp:disabled .rm { display: none; }
+/* 有 × 的时候"使用中"往左让一让 */
+.mine .wp:hover .using { right: 34px; }
+.wp .missing-chip { position: absolute; top: 6px; left: 6px; z-index: 1; }
+.wp.missing img { opacity: 0.35; }
 /* "从电脑选择"：自己画切角框（.wp 的外框不用） */
 .wp.add::before { display: none; }
 .wp .box { isolation: isolate; display: grid; place-items: center; color: var(--text-2); }

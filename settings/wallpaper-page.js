@@ -179,7 +179,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
         depthGenerated = false;
         btnGenerate.disabled = !!galleryEntry;
         btnApply.disabled = true;
-        gallery.setSelected(imagePath);
+        markSelected(imagePath);
 
         const name = galleryEntry ? galleryEntry.name : fileName(imagePath);
         const dataUrl = api.readFileAsDataURL(imagePath);
@@ -219,7 +219,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
         selectedVideo = video;
         depthGenerated = false;
         btnApply.disabled = true;
-        gallery.setSelected(video.path);
+        markSelected(video.path);
         showVideoControls(video);
         showDepthState('none');
         refreshNowUsing();
@@ -270,8 +270,25 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
     const gallery = initGalleryPanel({
         api,
         onSelect: (entry) => selectImagePath(entry.file),
-        onPickFile: () => pickFromComputer(),
     });
+    const mine = initMyWallpapersPanel({
+        api,
+        setStatus,
+        onSelect: (entry) => selectEntry(entry),
+        onPick: () => pickFromComputer(),
+    });
+
+    /** 选中标记：默认壁纸和我的壁纸里同一时间只有一个选中 */
+    function markSelected(filePath) {
+        gallery.setSelected(filePath);
+        mine.setSelected(filePath);
+    }
+
+    /** 生成深度图期间两边的格子都不能点（换了图，结果会记到别的图上） */
+    function setPanelsBusy(value) {
+        gallery.setBusy(value);
+        mine.setBusy(value);
+    }
 
     // ---------- 边缘平滑 ----------
 
@@ -299,7 +316,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
         depthBar.classList.add('generating');
         btnGenerate.disabled = true;
         btnApply.disabled = true;
-        gallery.setBusy(true);
+        setPanelsBusy(true);
         depthGenerated = false;
         showProgress(selectedVideo ? '正在读取视频画面…' : '正在读取图片…');
 
@@ -329,7 +346,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
             isGenerating = false;
             depthBar.classList.remove('generating');
             btnGenerate.disabled = false;
-            gallery.setBusy(false);
+            setPanelsBusy(false);
         }
     }
 
@@ -402,7 +419,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
                 blurValue.textContent = blurText(config.blurRadius);
             }
             current = MW.resolveCurrent(config);
-            await gallery.ready;
+            await Promise.all([gallery.ready, mine.ready]);
             refreshNowUsing();
             // 恢复当前壁纸（和手动选中走同一套逻辑，只是不弹提示）
             if (!current || !api.fileExists(current.path)) return;

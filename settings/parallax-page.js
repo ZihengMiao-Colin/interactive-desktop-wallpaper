@@ -14,8 +14,15 @@ const RECOMMENDED_PARALLAX = {
     blurRadius: 5,
 };
 
+/** 当前壁纸是视频时，视差设置哪些起作用 */
+const PARALLAX_VIDEO_NOTE = {
+    none: '当前视频壁纸设为不动，这些设置不起作用',
+    pan: '当前视频壁纸是整体平移：视差强度和跟手程度起作用，对焦深度不起作用',
+};
+
 /**
  * @param {{
+ *   api: object,
  *   saver: { save: (partial: object) => void },
  *   setStatus: (msg: string, cls?: string) => void,
  *   preview: ReturnType<typeof initDepthPreview>,
@@ -23,8 +30,18 @@ const RECOMMENDED_PARALLAX = {
  * }} deps
  * @returns {{ load: (config: object) => void }}
  */
-function initParallaxPage({ saver, setStatus, preview, wallpaperPage }) {
+function initParallaxPage({ api, saver, setStatus, preview, wallpaperPage }) {
     const { setRange, bindRange } = Controls;
+    const videoNote = document.getElementById('parallax-video-note');
+
+    /** 当前壁纸是"不动"或"整体平移"的视频时，提示哪些设置不起作用 */
+    function showVideoNote(config) {
+        const current = Shared.myWallpapers.resolveCurrent(config);
+        const text = current && current.type === 'video' ? PARALLAX_VIDEO_NOTE[current.effect] : '';
+        videoNote.textContent = text || '';
+        videoNote.hidden = !text;
+    }
+    api.onLoadConfig((config) => { if (config) showVideoNote(config); });
     const strength = document.getElementById('parallax-strength');
     const strengthValue = document.getElementById('parallax-value');
     const smoothness = document.getElementById('smoothness');
@@ -67,6 +84,7 @@ function initParallaxPage({ saver, setStatus, preview, wallpaperPage }) {
     return {
         load(config) {
             show(config);
+            showVideoNote(config);
             preview.setParams({
                 parallaxMultiplier: config.parallaxMultiplier ?? RECOMMENDED_PARALLAX.parallaxMultiplier,
                 smoothness: config.smoothness ?? RECOMMENDED_PARALLAX.smoothness,

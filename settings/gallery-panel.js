@@ -1,7 +1,7 @@
 /**
  * gallery-panel.js — 壁纸页下方的默认壁纸图库
  *
- * 平铺显示，第一格是"从电脑选择…"（放在最后的话不往下翻就看不到）。点某张壁纸只是选中（预览跟着变），
+ * 平铺显示（"从电脑选择…"在上面的「我的壁纸」里）。点某张壁纸只是选中（预览跟着变），
  * 和自己的图片一样要点"应用壁纸"才会换上。正在用的那张标"使用中"。
  */
 
@@ -18,7 +18,7 @@ const normalizePath = (p) => (p || '').toLowerCase().replace(/\//g, '\\');
 const samePath = (a, b) => !!a && !!b && normalizePath(a) === normalizePath(b);
 
 /**
- * @param {{ api: object, onSelect: (entry: object) => void, onPickFile: () => void }} deps
+ * @param {{ api: object, onSelect: (entry: object) => void }} deps
  * @returns {{
  *   ready: Promise<void>,
  *   find: (imagePath: string) => object|null,
@@ -26,12 +26,10 @@ const samePath = (a, b) => !!a && !!b && normalizePath(a) === normalizePath(b);
  *   setBusy: (busy: boolean) => void,
  * }}
  */
-function initGalleryPanel({ api, onSelect, onPickFile }) {
+function initGalleryPanel({ api, onSelect }) {
     const { el } = Controls;
     const grid = document.getElementById('gallery-grid');
-    const titleEl = document.getElementById('gallery-title');
     const countEl = document.getElementById('gallery-count');
-    const hintEl = document.getElementById('gallery-hint');
 
     let entries = [];
     let currentPath = '';
@@ -61,21 +59,8 @@ function initGalleryPanel({ api, onSelect, onPickFile }) {
         return card;
     }
 
-    function renderAddCard() {
-        const card = el('button', 'wp add');
-        card.type = 'button';
-        card.disabled = busy;
-        const box = el('span', 'box');
-        const inner = el('span');
-        inner.append(Icons.svg('image-plus'), '从电脑选择…', Controls.el('small', '', '图片或视频'));
-        box.appendChild(inner);
-        card.append(box, el('span', 'name', ' '));
-        card.addEventListener('click', () => onPickFile());
-        return card;
-    }
-
     function render() {
-        grid.replaceChildren(renderAddCard(), ...entries.map(renderCard));
+        grid.replaceChildren(...entries.map(renderCard));
     }
 
     // 应用了别的壁纸后，"使用中"标记跟着走
@@ -89,10 +74,9 @@ function initGalleryPanel({ api, onSelect, onPickFile }) {
     const ready = Promise.all([api.getGallery(), api.getConfig()]).then(([list, config]) => {
         entries = list || [];
         currentPath = currentPathOf(config);
-        // 没有图库素材时只剩"从电脑选择"
-        titleEl.textContent = entries.length ? '默认壁纸' : '选择壁纸';
+        // 没有图库素材时整组不显示（"从电脑选择"在「我的壁纸」里）
+        grid.closest('.group').hidden = entries.length === 0;
         countEl.textContent = entries.length || '';
-        hintEl.hidden = entries.length === 0;
         render();
     });
 

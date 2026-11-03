@@ -99,7 +99,17 @@
                     </div>
                 </div>
 
-                <!-- 默认壁纸图库 + 从电脑选择 -->
+                <!-- 我的壁纸：从电脑选择 + 自己选过的图片和视频（settings/my-wallpapers-panel.js） -->
+                <div class="group mine" id="mine-group">
+                    <div class="group-head">
+                        <h2>我的壁纸</h2><span class="en">Mine</span>
+                        <span class="count" id="mine-count"></span>
+                        <span class="hint" id="mine-hint">你自己的图片和视频</span>
+                    </div>
+                    <div class="gallery" id="mine-grid"></div>
+                </div>
+
+                <!-- 默认壁纸图库 -->
                 <div class="group">
                     <div class="group-head">
                         <h2 id="gallery-title">默认壁纸</h2><span class="en">Gallery</span>
@@ -116,6 +126,7 @@
                     <div>
                         <h1>视差<span class="en">Parallax</span></h1>
                         <p>画面跟着鼠标移动的幅度和手感。拖动滑块，上面的预览会立刻变化。</p>
+                        <p class="page-note" id="parallax-video-note" hidden></p>
                     </div>
                     <div class="actions">
                         <button type="button" class="btn sm ghost" id="btn-reset-default" title="视差强度 10、跟手程度 0.08、对焦深度 0.50、边缘平滑 5px"><svg class="i"><use href="#i-rotate-ccw"/></svg>恢复推荐值</button>
@@ -443,6 +454,7 @@
     <script src="settings/controls.js"></script>
     <script src="settings/shell.js"></script>
     <script src="settings/depth-preview.js"></script>
+    <script src="settings/my-wallpapers-panel.js"></script>
     <script src="settings/gallery-panel.js"></script>
     <script src="settings/thumbnail.js"></script>
     <script src="settings/wallpaper-page.js"></script>
