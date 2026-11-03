@@ -16,10 +16,16 @@
         wallpaper: document.getElementById('preview-slot-wallpaper'),
         parallax: document.getElementById('preview-slot-parallax'),
     };
-    // 预览只有一份：切到哪个有预览的页面就挪到哪里
+    // 预览只有一份：切到哪个有预览的页面就挪到哪里。
+    // 当前页没有预览、或者窗口最小化 / 被隐藏时，预览里的视频暂停，不在后台一直解码
+    let currentPage = 'wallpaper';
+    const syncPreviewActive = () => preview.setActive(!document.hidden && !!previewSlots[currentPage]);
     shell.onPageChange((page) => {
+        currentPage = page;
         if (previewSlots[page]) preview.mount(previewSlots[page]);
+        syncPreviewActive();
     });
+    document.addEventListener('visibilitychange', syncPreviewActive);
 
     if (!api) {
         shell.setStatus('只能在 Electron 里使用，这里只显示界面', 'error');
