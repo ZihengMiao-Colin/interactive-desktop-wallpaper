@@ -452,7 +452,7 @@ function createPlacementWindow() {
     if (isDev) win.webContents.openDevTools({ mode: 'detach' });
 
     if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-        wallpaperWindow.webContents.send('renderer:pause', { silent: true });
+        wallpaperWindow.webContents.send('renderer:pause', { silent: true, reason: 'placement' });
     }
     return win;
 }
@@ -470,9 +470,7 @@ function createPlacementController() {
             store.saveConfig({ customElements: upsertInstance(customElements, result) });
         },
         onEnd: () => {
-            if (wallpaperWindow && !wallpaperWindow.isDestroyed() && isRenderingActive) {
-                wallpaperWindow.webContents.send('renderer:resume', { silent: true });
-            }
+            resumeWallpaper({ silent: true });
             broadcastConfig();
         },
     });
@@ -949,15 +947,20 @@ function migrateAutoLaunch() {
 // ==================== 暂停 / 恢复 ====================
 
 /**
- * 系统事件（全屏应用退出、唤醒、解锁）之后恢复壁纸渲染。
- * 全屏应用还开着时不恢复（全屏检测只在状态变化时通知，恢复了就不会再暂停）；
- * 正在摆放元素时也不恢复，摆放结束时 PlacementController 会负责恢复。
+ * 系统事件（全屏应用退出、唤醒、解锁）和摆放结束之后恢复壁纸渲染。
+ * 正在摆放元素时不恢复，摆放结束时 PlacementController 会负责恢复。
+ * 全屏应用还开着时不恢复（全屏检测只在状态变化时通知，恢复了就不会再暂停），
+ * 改成按"被窗口挡住"重新暂停一次：开了声音的视频壁纸在锁屏后要接着出声。
+ * @param {{silent?: boolean}} [info]
  */
-function resumeWallpaper() {
-    if (!isRenderingActive || (placement && placement.active)) return;
-    if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-        wallpaperWindow.webContents.send('renderer:resume');
+function resumeWallpaper(info = {}) {
+    if (placement && placement.active) return;
+    if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return;
+    if (!isRenderingActive) {
+        wallpaperWindow.webContents.send('renderer:pause', { silent: true, reason: 'covered' });
+        return;
     }
+    wallpaperWindow.webContents.send('renderer:resume', info);
 }
 
 // ==================== 全屏检测 ====================
@@ -970,7 +973,7 @@ function startFullscreenDetection() {
             console.log('[Main] Fullscreen app detected, pausing render');
             isRenderingActive = false;
             if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-                wallpaperWindow.webContents.send('renderer:pause');
+                wallpaperWindow.webContents.send('renderer:pause', { reason: 'covered' });
             }
         },
         onFullscreenEnd: () => {
@@ -989,7 +992,7 @@ function setupPowerMonitor() {
     // 系统进入睡眠/锁定 → 暂停渲染
     powerMonitor.on('suspend', () => {
         if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-            wallpaperWindow.webContents.send('renderer:pause');
+            wallpaperWindow.webContents.send('renderer:pause', { reason: 'system' });
         }
     });
 
@@ -999,7 +1002,7 @@ function setupPowerMonitor() {
     // 锁屏
     powerMonitor.on('lock-screen', () => {
         if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-            wallpaperWindow.webContents.send('renderer:pause');
+            wallpaperWindow.webContents.send('renderer:pause', { reason: 'system' });
         }
     });
 

@@ -42,5 +42,13 @@
         }
     }
 
-    return { IdleTracker, isSettled, SETTLE_EPSILON };
+    /**
+     * 壁纸暂停时视频壁纸要不要接着播放：只是被窗口挡住（reason 'covered'）、并且开了声音时继续放，
+     * 让声音不断；锁屏、睡眠（'system'）、摆放元素（'placement'）时都停。
+     */
+    function keepVideoPlaying(reason, sound) {
+        return reason === 'covered' && sound === true;
+    }
+
+    return { IdleTracker, isSettled, SETTLE_EPSILON, keepVideoPlaying };
 });
