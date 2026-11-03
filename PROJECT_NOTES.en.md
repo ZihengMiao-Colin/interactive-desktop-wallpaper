@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-10-31 (UI restyled as a tactical terminal, interface theme setting, bundled Noto Serif SC, not committed, see §9 Phase 10; the uninstall option was added the same day, see Phase 9)
+> Last updated: 2026-11-03 (video wallpapers + My wallpapers, on the `feature/video-wallpaper` branch, see §9 Phase 11)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -16,6 +16,8 @@
 ## 1. One-line summary
 
 An Electron desktop app: the user picks an image → Depth Anything V2 (ONNX, run with `onnxruntime-node`) generates a grayscale depth map → the renderer draws it full-screen with a custom Pixi.js 2.5D parallax shader → the main process polls the global mouse position and the image shifts with pseudo-3D parallax. The window is injected into the Windows desktop WorkerW layer via PowerShell + C#, so it sits below the desktop icons.
+
+A local video can also be set as the wallpaper (2026-11-03), with three effects: still / 3D parallax (one depth map shared by the whole video) / whole-picture pan, and optional sound. Images and videos the user picked themselves stay in "My wallpapers" on the Wallpaper page.
 
 On top of that you can layer:
 - **Custom elements**: user-imported images / GIFs / videos (including green screen), plus bundled default elements (two explosions). Elements are rendered in the Pixi scene, follow the mouse parallax like the background, and are occluded by closer background objects.
@@ -63,20 +65,22 @@ On top of that you can layer:
 │   ├── main.js              Entry: assembles the shell and pages, reads config once and hands it to each page
 │   ├── shell.js             Page switching, bottom-right toast (setStatus), "In use" card, nav badges
 │   ├── controls.js          Small helpers shared by pages: node builders, sliders, segmented buttons, toggles, buttons, help popovers (open up / down)
-│   ├── depth-preview.js     Live parallax preview (WebGL, same formula as the wallpaper) + image / depth map toggle
-│   ├── wallpaper-page.js    "Wallpaper" page: pick image, generate depth map (progress in the action bar), apply, images sent from the tray
-│   ├── gallery-panel.js     Default wallpaper gallery below the "Wallpaper" page (tiled, "Choose from computer" as the first tile)
-│   ├── parallax-page.js     "Parallax" page: strength, responsiveness, focus depth, restore recommended values
+│   ├── depth-preview.js     Live parallax preview (WebGL, same formula as the wallpaper) + image / depth map toggle; can also play videos and show the three effects
+│   ├── wallpaper-page.js    "Wallpaper" page: pick an image or video, video effect and sound, generate depth map (progress in the action bar), apply, images sent from the tray
+│   ├── my-wallpapers-panel.js "My wallpapers" on the Wallpaper page: first tile "Choose from computer…" (image or video) + the user's own images and videos, remove, file-not-found, thumbnail backfill
+│   ├── gallery-panel.js     Default wallpaper gallery below the "Wallpaper" page (tiled)
+│   ├── parallax-page.js     "Parallax" page: strength, responsiveness, focus depth, restore recommended values; notes which settings apply when the current wallpaper is a video
 │   ├── elements-tab.js      "Elements" page: asset library + two columns (element list / adjustment panel)
 │   ├── effects-page.js      "Effects" page: weather + video effects
 │   ├── music-page.js        "Record player" page: playback controls, playlist (add / delete / drag to reorder / click to play), play order, appearance
 │   ├── system-page.js       "Settings" page: launch at startup, depth map cache, uninstall (the confirmation dialog asks whether to delete data)
-│   └── thumbnail.js         Generates thumbnails when importing assets
+│   └── thumbnail.js         Generates thumbnails when importing assets and picking wallpapers (also checks the file is readable and reads video duration)
 ├── renderer/                Wallpaper page scripts (plain global scripts, loaded in index.html order)
 │   ├── shaders.js           Background + element shaders, sharing the PARALLAX_GLSL parallax formula
 │   ├── ui.js                Loading overlay / Toast / error messages
 │   ├── host.js              Runtime abstraction: electronAPI under Electron, fake data from dev/ in the browser
-│   ├── parallax-scene.js    Scene: Pixi app, background parallax filter, wallpaper / depth map textures
+│   ├── parallax-scene.js    Scene: Pixi app, background parallax filter, wallpaper / depth map textures; video wallpapers and the three effects (still and pan use a 1×1 white depth map)
+│   ├── video-wallpaper.js   Video wallpaper: a hidden <video> as the texture; every new video frame updates the texture and wakes rendering (requestVideoFrameCallback)
 │   ├── weather.js           Weather manager: canvas, switches effects by config, computes wind and parallax per frame
 │   ├── weather/             Five weather types: kit.js (offscreen textures, texture matrices, particle base class) + rain / snow / sakura / leaves / sunlight
 │   ├── vinyl.js             Record player: tonearm lift / swing / lower, record spin-up and spin-down (Web Animations), music fade in/out, position and size
@@ -90,13 +94,14 @@ On top of that you can layer:
 │   ├── vinyl-edit-mode.js   Placing the record player (same placement window): drag, corner resize, reset
 │   └── main.js              Entry: config, mouse, animation loop, IPC
 ├── shared/                  Pure logic (UMD, shared by Node tests and the renderer, attached to window.Shared)
-│   ├── parallax-math.js     Cover mapping, parallax offset, ray marching (JS version of the shader, for tests), element screen offset
+│   ├── parallax-math.js     Cover mapping, parallax offset, ray marching (JS version of the shader, for tests), element screen offset, pan zoom (panCover) and per-effect parameters (motionParams)
 │   ├── elements-model.js    Custom element data structures and pure functions
 │   ├── playback.js          Animated frame lookup, interval playback scheduling, click playback state machine
-│   ├── frame-pacing.js      Idle frame-stop decision
-│   ├── config-sync.js       Throttled config saving, apply only changed config sections
+│   ├── frame-pacing.js      Idle frame-stop decision; whether a video wallpaper keeps playing while paused (keepVideoPlaying)
+│   ├── config-sync.js       Throttled config saving, apply only changed config sections, latest-only serial queue for wallpaper switches
 │   ├── vinyl-player.js      Record player logic: uniform spin-up/down, tonearm angle by progress, desktop click hit test, position and size (normalizeLayout / clampCenter)
 │   ├── playlist.js          Playlist logic: old-config migration, add / remove, reorder, previous / next, what plays after a track ends
+│   ├── my-wallpapers.js     My wallpapers list (add, dedupe, sort, remove, migrate) and whether the current wallpaper is an image or a video (resolveCurrent)
 │   └── placement-math.js    Placement geometry: box ↔ screen coords, drag, resize, stretch, rotate, free warp, perspective weights, hit testing, depth sampling
 ├── src/
 │   ├── elements/
@@ -113,7 +118,7 @@ On top of that you can layer:
 │   │   ├── inference-process.js Inference child process (utilityProcess): resize → ONNX → post-process → PNG
 │   │   ├── processing.js    Numeric processing (Pillow-compatible bicubic, dilation, triple box blur, quantization)
 │   │   └── png.js           8-bit grayscale PNG encoder
-│   ├── store.js             config.json / depth cache / custom_elements folder / uninstall list
+│   ├── store.js             config.json / depth cache / custom_elements folder / My wallpapers thumbnails (wallpaper_thumbs) / uninstall list
 │   ├── uninstaller.js       Uninstall from the settings page: find the uninstaller in the install folder and launch it with the delete-data choice
 │   ├── gallery.js           Default wallpaper gallery: read manifest, look up by path, migrate old paths
 │   └── tray-manager.js      Tray menu
@@ -137,10 +142,16 @@ On top of that you can layer:
 ### 4.1 Startup
 1. `app.whenReady` → `new AppStore()` → **migrate old sticker config** → register IPC → create wallpaper window → tray → full-screen detection → power listeners → open the settings window (not when started at login with `--autostart`).
 2. Wallpaper window `ready-to-show`: send `config:load`, start 30fps mouse polling, inject into WorkerW asynchronously.
-3. Renderer `start()`: read config → if there is a previous wallpaper, use it and its cached depth map (placeholder depth map if not cached) → `Scene.load` → load custom elements → start the ticker.
+3. Renderer `start()`: read config → if there is a previous wallpaper, use it (images use their cached depth map, placeholder if not cached; videos see 4.2.1; a missing file falls back to `background.png` with a notice) → `Scene.load` / `Scene.loadVideo` → load custom elements → start the ticker.
 
 ### 4.2 Changing the wallpaper (settings window)
-`Choose wallpaper` → `Generate depth map` (preload decodes to RGBA with Chromium → main process starts the inference child process → saved to the depth cache) → `Apply wallpaper` (saves `currentImage`, sends `image:new`) → the wallpaper window's `Scene.load` swaps textures and frees the old ones.
+`Choose wallpaper` (a default wallpaper, or an image / video in "My wallpapers"; "Choose from computer…" first builds a thumbnail to confirm the file is readable, then adds it to "My wallpapers") → `Generate depth map` (preload decodes to RGBA with Chromium, for videos one frame at 30% of the duration → main process starts the inference child process → saved to the depth cache) → `Apply wallpaper` (the main process stores the current wallpaper from `{ type, path, effect?, sound? }` and sends `wallpaper:show`) → the wallpaper window switches in order (latest request wins): images via `Scene.load`, videos via `createVideoWallpaper` + `Scene.loadVideo`; old textures / videos are freed.
+
+### 4.2.1 Video wallpapers
+- Three effects: still (strength 0), 3D parallax (one depth map for the whole video, ray marched like images), whole-picture pan (1×1 white depth map + focus 0, so the whole picture sits at depth 1 and moves by mouse × strength; the picture is zoomed with `panCover` so no edge shows at the extremes). The parameters come from `Shared.parallax.motionParams`, shared by the wallpaper and the settings preview.
+- Elements: still / pan have no depth map, so no occlusion (the element shader's `uOcclusion`) and auto ground placement does nothing; in pan mode elements also sit at depth 1 and move with the picture.
+- Frame pacing: Pixi does not update the video texture itself; `requestVideoFrameCallback` updates it on every new frame. While the ticker is stopped only that frame is drawn, so an idle video wallpaper redraws at the video's frame rate, and mouse movement still runs at 60 fps.
+- Pausing: `renderer:pause` carries a reason (`covered` by a window / `system` lock or sleep / `placement`). The video keeps playing only when covered and sound is on (so the sound continues); otherwise it stops. This split is needed because fullscreen detection also counts maximized windows. On unlock while still covered, the main process re-sends `covered`.
 
 ### 4.3 Parallax rendering
 - Shift formula: content at depth t moves by `−parallaxUV(t)`, `parallaxUV = mouse × (t − focus) × strength` (soft clamp).
@@ -163,17 +174,18 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 
 | Channel | Direction | Purpose |
 |---|---|---|
-| `dialog:selectImage` / `selectAudioFiles` (multi-select) / `selectCover` / `selectOverlayVideo` | R→M | File dialogs, return paths only |
+| `dialog:selectWallpaper` / `selectAudioFiles` (multi-select) / `selectCover` / `selectOverlayVideo` | R→M | File dialogs, return paths only (`selectWallpaper` returns `{ path, type: 'image'\|'video' }`; the old `selectImage` was removed, the tray opens its dialog in the main process) |
 | `settings:prepareImage` | M→R | The tray picked an image with no depth map: the settings window generates it and then applies automatically |
 | `overlay:getPresets` | R→M | Full-screen video effect list |
 | `gallery:list` | R→M | Default wallpaper gallery list |
 | `depth:generate` / `depth:progress` | R→M / M→R | Generate depth map (with `{ imagePath, blurRadius, width, height, rgba }`) / progress |
 | `cache:*`, `depth:*CacheDir` | R→M | Depth map cache and folder (`cache:getDepthMap` returns the bundled depth map for default wallpapers) |
 | `config:save` / `config:get` / `config:load` | R→M / M→R | Config read/write + broadcast (wallpaper and settings windows) |
-| `wallpaper:apply` / `image:new` | R→M / M→R | Apply wallpaper |
+| `wallpaper:apply` / `wallpaper:show` | R→M / M→R | Apply wallpaper: `{ type: 'image', path }` or `{ type: 'video', path, effect, sound }` (`apply` treats a string as an image). The old `image:new` became `wallpaper:show` |
+| `myWallpapers:add` / `remove` / `update` / `setThumb` | R→M | My wallpapers: add (with thumbnail Data URL and duration) / remove (deletes the thumbnail, not the original file) / change a video's effect and sound / backfill a thumbnail; each broadcasts the config |
 | `mouse:move` | M→R | Global mouse coordinates |
 | `desktop:click` | M→R | The desktop was clicked (coords relative to the primary monitor): hitting the record player toggles play / pause, otherwise triggers "click to play" elements; not sent while the wallpaper is paused or placing |
-| `renderer:pause` / `renderer:resume` | M→R | Pause / resume; with `{ silent: true }` no toast is shown |
+| `renderer:pause` / `renderer:resume` | M→R | Pause / resume; with `{ silent: true }` no toast is shown. Pause carries a `reason`: `covered` by a window / `system` lock or sleep / `placement` (decides whether a video wallpaper stops) |
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | Custom elements |
 | `placement:getDraft` / `commit` / `cancel` | R→M | Placement window (the draft is an element `{ instance, asset }` or the record player `{ kind: 'vinyl', vinyl }`) |
 | `vinyl:startPlacement` | R→M | Open the placement window to drag the record player |
@@ -189,6 +201,13 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
   parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // parallax strength 5 ~ 30 (older configs above 30 read as 30)
   blurRadiusVersion: 2,   // marks the edge smoothing default change from 8 to 5: older configs without it read blurRadius 8 as 5
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
+  // currentImage only holds images (v1.1.0 reads the file it points to into base64; a video would hang it). The current video is separate:
+  currentVideo: { path, effect: 'none'|'depth'|'pan', sound, imageAtTime } | null,
+                // imageAtTime: currentImage when the video was applied. If it no longer matches currentImage, an older version changed
+                // the image since, so the image wins (currentVideo is cleared at startup). Rule: resolveCurrent in shared/my-wallpapers.js
+  myWallpapers: [{ path, type: 'image'|'video', addedAt, lastUsedAt, thumb, duration, effect?, sound? }],
+                // My wallpapers, newest lastUsedAt first; paths only; thumb lives in wallpaper_thumbs/; effect / sound only for videos
+  myWallpapersVersion: 1, // migration marker (no default): when missing, the current user image is added to My wallpapers, once
   theme: 'dark',          // settings window theme 'dark'|'light'|'system' (unknown values read as dark); main process writes it to nativeTheme.themeSource
   vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
                   playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
@@ -207,7 +226,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
   },
 }
 ```
-- Storage location: `%APPDATA%/interactive-desktop-wallpaper/` (`config.json`, `cache_index.json`, `depth_cache/`, `custom_elements/`; when depth maps are moved to another folder there is also an uninstall list `uninstall_extra_files.txt`, see §9 Phase 9).
+- Storage location: `%APPDATA%/interactive-desktop-wallpaper/` (`config.json`, `cache_index.json`, `depth_cache/`, `custom_elements/`, `wallpaper_thumbs/` (My wallpapers thumbnails); when depth maps are moved to another folder there is also an uninstall list `uninstall_extra_files.txt`, see §9 Phase 9).
 - Default elements are not in the config; they come from `elements/manifest.json` with id `builtin:<id>`.
 
 ---
@@ -226,6 +245,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | **Custom element system** | ✅ | Image / GIF / animated webp / apng / mp4 / webm; two default explosions; placement mode (resize, stretch, rotate, flip, free warp); depth occlusion; interval playback; click playback; green-screen keying; recolor |
 | Custom stickers | ♻️ Removed | Replaced by custom elements; old config migrates automatically |
 | Default wallpaper gallery (`wallpapers/`) | ✅ | |
+| Video wallpapers + My wallpapers | ✅ 2026-11-03 | Still / 3D parallax / whole-picture pan, optional sound; My wallpapers keeps the user's own images and videos, see §9 Phase 11 |
 | Settings window / wallpaper page UI | ✅ redesigned 2026-10-26, restyled as a tactical terminal 10-31 | Six pages in a left nav, unified controls and Lucide icons, live parallax preview; placement mode, Toast and debug panel share the same style. 10-31: cut corners, serif Chinese headings with small English labels, dark / light / follow-system theme, see §9 Phase 10 |
 | Standalone packaged build | ✅ v1 | NSIS installer, see §9 Phase 6 |
 | Uninstall | ✅ 2026-10-31 | Settings page "卸载软件…" or Windows Settings → Apps; both let you choose whether to delete data, see §9 Phase 9 |
@@ -262,6 +282,9 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 22. Depth map post-processing now has two implementations: the app's `src/depth/processing.js` and `generate_depth_map.py` (used by `tools/prepare_wallpapers.py` to generate default wallpaper depth maps). Algorithm changes must be made in both; `test/depth-processing.test.js` has reference data generated by Pillow.
 20. Custom elements: placement mode only handles the primary monitor; animated images decode at most 600 frames; no warning when the number of elements grows large.
 21. Weather particles are drawn on a separate Canvas 2D layer on top of the whole wallpaper, so they are not occluded by near objects (for "snow falling behind the tree", weather would have to move into the Pixi scene with depth occlusion). The sunlight effect's light source is fixed at the top left and may not match the actual light direction in the wallpaper.
+23. The 3D parallax of a video wallpaper uses a single depth map for the whole video (the frame at 30% of the duration): camera moves and large moving objects won't match it and warp a little when moving. Best for fixed-camera videos; whole-picture pan suits other videos.
+24. "My wallpapers" does not collapse when it grows past one row, so with many entries the default gallery gets pushed far down (the design left this to implementation; not done in this version).
+25. A video wallpaper keeps decoding (also when covered with sound on), so it uses more power than an image wallpaper; more so with 4K video, and there is no transcoding.
 
 ---
 
@@ -420,7 +443,7 @@ User request: add an uninstall option to the settings page; when uninstalling, l
   - With 150% display scaling, PowerShell must call `SetProcessDPIAware` before capturing a window or the capture is offset; PowerShell 5.1 garbles Chinese in UTF-8 scripts without a BOM.
   - The local `dist/Interactive3DWallpaper-Setup-1.1.0.exe` is now a test build with the uninstall feature (version unchanged), not the same file as the released v1.1.0. Bump the version before building a release.
 
-### ✅ Phase 10 — UI restyled as a tactical terminal (2026-10-31, not committed)
+### ✅ Phase 10 — UI restyled as a tactical terminal (2026-10-31)
 The user asked the assistant to redo the frontend with their own personal skill `ark-style-ui` (based on the "tactical terminal / industrial sci-fi" design language of the Arknights UI). After seeing the screenshots they said "keep it, keep polishing". Design: [docs/superpowers/specs/2026-10-31-tactical-ui-design.md](docs/superpowers/specs/2026-10-31-tactical-ui-design.md).
 - Appearance only: page structure, class names, page scripts and IPC are the same as the 10-26 redesign, and the variable names in `tokens.css` did not change (only their values), so `style.css` did not need rewriting.
 - Rules: cards cut at the top-left and bottom-right corners, buttons cut only at the bottom-right, no rounded corners (except the record itself and the round rotate handle); Chinese headings in Noto Serif SC next to small uppercase English labels in wide Saira (`.en`, only meaningful words: module names, weather names, eyebrows); numbers and paths in a monospace font; the sky-blue accent only for primary buttons, selected states, toggles and values; yellow only in the hazard stripe at the top of the uninstall dialog; a very faint noise texture on cards and primary buttons.
@@ -430,6 +453,17 @@ The user asked the assistant to redo the frontend with their own personal skill 
 - Fonts: `ui/fonts/` bundles Noto Serif SC (`@fontsource-variable/noto-serif-sc` 5.3.1, variable weight, 101 slices loaded on demand), the width-axis Saira and JetBrains Mono (Fontsource), about 6.3MB in total, with three OFL licenses in the same folder. Noto Sans SC for body text is not bundled (too large); machines without it use Microsoft YaHei.
 - Verified: in Electron (real config copied into a separate data directory, screenshots over the debug port) the six pages, the elements page with elements, the help popup, the uninstall dialog, the toast, the gallery's selected state, dark / light, and the 820×560 minimum window (no horizontal scrollbar); when switching themes, a real screen capture showed the system button strip changing color too while the wallpaper window stayed dark, and follow-system read this machine's dark setting; the bundled serif font really loads. In the browser preview: placement mode, loading, debug panel, toast, with no console errors. `npm test`: all 180 pass (new test for the theme default).
 - Not tested: a machine without Noto fonts; actually dragging an element in Electron's placement window (only looked at it in the browser preview); the packaged installer (the fonts are under `ui/**/*`, so they should be included).
+
+### ✅ Phase 11 — Video wallpapers + My wallpapers (2026-11-03, `feature/video-wallpaper` branch)
+The user wanted to set a video directly as the wallpaper (previously videos could only be added as "elements"). Design: [docs/superpowers/specs/2026-11-02-video-wallpaper-design.md](docs/superpowers/specs/2026-11-02-video-wallpaper-design.md); plan: [docs/superpowers/plans/2026-11-03-video-wallpaper.md](docs/superpowers/plans/2026-11-03-video-wallpaper.md).
+- Positioning: a standalone addition whose point is "use a video as the wallpaper"; the mouse-following effects are an extra experiment. Each video has three effects: still (default), 3D parallax, whole-picture pan; the sound switch defaults to off. Effect and sound are saved to the video's record immediately but only reach the desktop after "Apply wallpaper".
+- Entry point (chosen by the user after five mockups): "My wallpapers" on the Wallpaper page is always shown, its first tile is "Choose from computer… / image or video", followed by the user's own images and videos (most recently used first, videos show ▶ duration, hover × removes from the list without deleting the file; missing files show "file not found"). The default gallery no longer has an add tile.
+- Sound continues while covered by a window (the user's call): the existing fullscreen detection also counts maximized windows, so pauses carry a reason and the video keeps playing only when "covered + sound on"; lock, sleep and placement stop it. Same as the vinyl player.
+- Config shared with older versions: `currentImage` only holds images, the video goes in `currentVideo` (with `imageAtTime`); if an older version changed the image since, the image wins. Dev and installed builds have different gallery paths, so `imageAtTime` is migrated together with `currentImage`. The first-run default wallpaper is only set when there is no current video either.
+- Decided during implementation (left open by the design): 3D parallax uses the frame at 30% of the duration (no multi-frame composite); the maximum pan offset equals the parallax strength, with the picture zoomed by `panCover`; My wallpapers does not collapse; with still / pan the placement window hides "auto" and leaves depth alone; a 3D-parallax video without a depth map (e.g. after clearing the cache) plays as still.
+- Found and fixed during testing: when switching videos quickly, a slow older request finished last and overrode the newer one (added the latest-only serial queue `createLatestQueue`); destroying a video cleared `src`, which fired an error and logged a spurious "playback error"; the My wallpapers add tile sat 15px lower than the other tiles.
+- Verification: `npm test` 200 passing (new: 9 for My wallpapers logic, 3 for pan, 5 for storage, 1 for the pause rule, 2 for the serial queue). Electron tests (separate data directory + debug port; the file dialog was temporarily replaced in the main process to return a chosen file): screenshots of the three effects; an idle video wallpaper redraws at the video frame rate (30/s) while the ticker stays stopped; a video with sound keeps playing while covered and stops during placement; 10 quick switches leave one video alive and the last one wins; switching back to an image frees the video and image frame-stopping still works; element movement and occlusion under the three effects; weather / video overlay / vinyl on top; mp4, webm, a path with Chinese, spaces, # and %; an audio-only mp4 and a renamed text file are rejected; a 3D-parallax video plays as still after clearing the cache; a deleted file shows a notice on restart; the preview video pauses on page switch and minimize; My wallpapers add / remove / file not found / kept across restarts / old-config migration; parallax page notes; no horizontal scroll at 820×560; browser preview without errors.
+- Not tested: a real "window restored, wallpaper resumes" (the user's own maximized window was on screen the whole time, so the wallpaper stayed covered and resume was simulated in the page); real audible sound (the test videos had no audio track, only checked unmuted and playing); the tray "Change wallpaper" (needs the native dialog); the packaged installer; power use on integrated graphics.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

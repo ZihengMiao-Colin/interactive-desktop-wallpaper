@@ -9,6 +9,8 @@ The Android version is at [interactive-phone-wallpaper](https://github.com/Zihen
 ## Features
 
 - **Depth parallax wallpaper**: Depth Anything V2 generates the depth map and a custom shader offsets the image by depth; parallax strength, smoothing and focus depth are adjustable.
+- **Video wallpapers**: set a local video (MP4 / WebM, etc.) as the wallpaper, looping; play it as is, with 3D parallax (one depth map for the whole video, best for fixed-camera footage) or panning as a whole with the mouse, with optional sound.
+- **My wallpapers**: images and videos you picked yourself stay on the Wallpaper page, one click to switch back.
 - **Custom elements**: import images / GIF / animated WebP / APNG / MP4 / WebM, or use the bundled default elements (explosions).
   - Click an element to enter placement mode: drag to move, drag a corner to resize, adjust depth; Enter to confirm, Esc to cancel.
   - Elements move with the mouse together with background at the same depth and are hidden behind closer objects; new elements "stick to the ground" for their depth by default.

@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-10-31（界面改成战术终端风格、加界面主题、自带思源宋体，未提交，见 §9 阶段 10；同一天加了卸载软件，见阶段 9）
+> 最近更新：2026-11-03（视频壁纸 + 我的壁纸，在 `feature/video-wallpaper` 分支，见 §9 阶段 11）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -15,6 +15,8 @@
 ## 1. 一句话概括
 
 Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX，`onnxruntime-node` 推理）生成灰度深度图 → 渲染进程用 Pixi.js 自定义 2.5D 视差着色器全屏绘制 → 主进程轮询全局鼠标位置，画面随鼠标产生伪 3D 视差。窗口通过 PowerShell + C# 注入到 Windows 桌面 WorkerW 层，显示在桌面图标下方。
+
+也可以把本地视频设成壁纸（2026-11-03）：不动 / 3D 视差（整段视频共用一张深度图）/ 整体平移三种效果，可以开声音。用户自己选过的图片和视频都留在壁纸页的「我的壁纸」里。
 
 在此之上可以叠加：
 - **自定义元素**：用户导入的图片 / GIF / 视频（含绿幕），以及自带的默认元素（两个爆炸）。元素在 Pixi 场景里渲染，和背景一样随鼠标视差，并被更近的背景物体遮挡。
@@ -62,20 +64,22 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── main.js              入口：组装外壳和各页面，读一次配置分给各页面
 │   ├── shell.js             导航切页、右下角提示条（setStatus）、"正在使用"卡片、导航角标
 │   ├── controls.js          各页面共用的小工具：建节点、滑块、分段按钮、开关、按钮、问号说明（往上 / 往下弹）
-│   ├── depth-preview.js     实时视差预览（WebGL，和壁纸同一个公式）+ 原图 / 深度图切换
-│   ├── wallpaper-page.js    "壁纸"页：选图、生成深度图（进度在操作栏）、应用、托盘转来的图片
-│   ├── gallery-panel.js     "壁纸"页下方的默认壁纸图库（平铺，第一格"从电脑选择"）
-│   ├── parallax-page.js     "视差"页：强度、跟手程度、对焦深度、恢复推荐值
+│   ├── depth-preview.js     实时视差预览（WebGL，和壁纸同一个公式）+ 原图 / 深度图切换；也能播放视频、显示三种效果
+│   ├── wallpaper-page.js    "壁纸"页：选图片或视频、视频的效果和声音、生成深度图（进度在操作栏）、应用、托盘转来的图片
+│   ├── my-wallpapers-panel.js "壁纸"页的「我的壁纸」：第一格"从电脑选择…"（图片或视频）+ 自己选过的图片和视频、移除、找不到文件、补缩略图
+│   ├── gallery-panel.js     "壁纸"页下方的默认壁纸图库（平铺）
+│   ├── parallax-page.js     "视差"页：强度、跟手程度、对焦深度、恢复推荐值；当前是视频时提示哪些设置不起作用
 │   ├── elements-tab.js      "元素"页：素材库 + 左右两栏（元素列表 / 调整面板）
 │   ├── effects-page.js      "特效"页：天气 + 视频特效
 │   ├── music-page.js        "唱片机"页：播放控制、歌单（添加 / 删除 / 拖动排序 / 点一首播放）、播放顺序、外观
 │   ├── system-page.js       "设置"页：开机自启、深度图缓存、卸载软件（确认框里选要不要删数据）
-│   └── thumbnail.js         导入素材时生成缩略图
+│   └── thumbnail.js         导入素材、选壁纸时生成缩略图（顺带检查能不能读、取视频时长）
 ├── renderer/                壁纸页脚本（普通全局脚本，按 index.html 里的顺序加载）
 │   ├── shaders.js           背景着色器 + 元素着色器，共用 PARALLAX_GLSL 视差公式
 │   ├── ui.js                加载遮罩 / Toast / 错误提示
 │   ├── host.js              运行环境抽象：Electron 走 electronAPI，浏览器走 dev/ 下的假数据
-│   ├── parallax-scene.js    Scene：Pixi 应用、背景视差滤镜、壁纸 / 深度图纹理
+│   ├── parallax-scene.js    Scene：Pixi 应用、背景视差滤镜、壁纸 / 深度图纹理；视频壁纸和三种效果（不动、整体平移用 1×1 白色深度图）
+│   ├── video-wallpaper.js   视频壁纸：隐藏的 <video> 做纹理，每个新视频帧更新纹理并叫醒画面（requestVideoFrameCallback）
 │   ├── weather.js           天气管理器：画布、按配置切换特效、每帧算风和视差
 │   ├── weather/             五种天气：kit.js（离屏贴图、贴图矩阵、粒子基类）+ rain / snow / sakura / leaves / sunlight
 │   ├── vinyl.js             唱片机：唱臂抬起 / 摆入 / 放下、唱片加减速（Web Animations）、音乐淡入淡出、位置和大小
@@ -89,13 +93,14 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── vinyl-edit-mode.js   摆放唱片机（同一个摆放窗口）：拖动、角点缩放、复原
 │   └── main.js              入口：配置、鼠标、动画循环、IPC
 ├── shared/                  纯逻辑（UMD，Node 测试和渲染进程共用，挂在 window.Shared）
-│   ├── parallax-math.js     Cover 映射、视差位移、光线步进（着色器的 JS 版，测试用）、元素屏幕位移
+│   ├── parallax-math.js     Cover 映射、视差位移、光线步进（着色器的 JS 版，测试用）、元素屏幕位移、整体平移的放大（panCover）和三种效果的参数换算（motionParams）
 │   ├── elements-model.js    自定义元素数据结构与纯函数
 │   ├── playback.js          动图取帧、间隔播放调度、点击播放状态机
-│   ├── frame-pacing.js      空闲停帧判断
-│   ├── config-sync.js       配置节流保存、只应用变化的配置段
+│   ├── frame-pacing.js      空闲停帧判断；暂停时视频壁纸要不要接着放（keepVideoPlaying）
+│   ├── config-sync.js       配置节流保存、只应用变化的配置段、换壁纸用的只认最后一次的串行队列
 │   ├── vinyl-player.js      唱片机纯逻辑：唱片匀加减速、唱臂随进度的角度、桌面点击判断、位置和大小（normalizeLayout / clampCenter）
 │   ├── playlist.js          歌单纯逻辑：旧配置迁移、增删、排序、上一首 / 下一首、播完接哪首
+│   ├── my-wallpapers.js     我的壁纸列表（加入、去重、排序、移除、迁移）、当前壁纸是图片还是视频（resolveCurrent）
 │   └── placement-math.js    摆放几何：框坐标 ↔ 屏幕、拖动、缩放、拉伸、旋转、自由变形、透视权重、点击命中、深度取样
 ├── src/
 │   ├── elements/
@@ -112,7 +117,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   │   ├── inference-process.js 推理子进程（utilityProcess）：缩放 → ONNX → 后处理 → PNG
 │   │   ├── processing.js    数值处理（Pillow 兼容的 bicubic、外扩、三次均值模糊、量化）
 │   │   └── png.js           8 位灰度 PNG 编码
-│   ├── store.js             config.json / 深度缓存 / custom_elements 目录 / 卸载清单
+│   ├── store.js             config.json / 深度缓存 / custom_elements 目录 / 我的壁纸缩略图（wallpaper_thumbs）/ 卸载清单
 │   ├── uninstaller.js       设置页卸载：找安装目录里的卸载程序，带上删不删数据的参数打开它
 │   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移
 │   └── tray-manager.js      托盘菜单
@@ -136,10 +141,16 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ### 4.1 启动
 1. `app.whenReady` → `new AppStore()` → **迁移旧贴纸配置** → 注册 IPC → 创建壁纸窗口 → 托盘 → 全屏检测 → 电源监听 → 打开设置窗口（开机自启带 `--autostart`，不打开）。
 2. 壁纸窗口 `ready-to-show`：发 `config:load`，开始 30fps 鼠标轮询，异步注入 WorkerW。
-3. 渲染进程 `start()`：读配置 → 有上次的壁纸就用它和它的深度缓存（没有缓存时用占位深度图）→ `Scene.load` → 加载自定义元素 → 启动 ticker。
+3. 渲染进程 `start()`：读配置 → 有上次的壁纸就用它（图片用它的深度缓存，没有缓存时用占位深度图；视频见 4.2.1；文件找不到时退回 `background.png` 并提示）→ `Scene.load` / `Scene.loadVideo` → 加载自定义元素 → 启动 ticker。
 
 ### 4.2 换壁纸（设置窗口）
-`选择壁纸` → `生成深度图`（preload 用 Chromium 解码成 RGBA → 主进程开推理子进程 → 存进深度缓存）→ `应用壁纸`（保存 `currentImage`，发 `image:new`）→ 壁纸窗口 `Scene.load` 换纹理并释放旧纹理。
+`选择壁纸`（默认壁纸，或者「我的壁纸」里的图片 / 视频；"从电脑选择…"选完先生成缩略图确认能读，再放进「我的壁纸」）→ `生成深度图`（preload 用 Chromium 解码成 RGBA，视频取时长 30% 处的一帧 → 主进程开推理子进程 → 存进深度缓存）→ `应用壁纸`（主进程按 `{ type, path, effect?, sound? }` 存当前壁纸，发 `wallpaper:show`）→ 壁纸窗口按顺序换（只认最后一次）：图片 `Scene.load`，视频 `createVideoWallpaper` + `Scene.loadVideo`，旧的纹理 / 视频都释放。
+
+### 4.2.1 视频壁纸
+- 三种效果：不动（强度 0）、3D 视差（整段视频共用一张深度图，和图片一样做光线步进）、整体平移（1×1 白色深度图 + 对焦 0，整张画面在深度 1，位移 = 鼠标 × 强度；画面按 `panCover` 放大，移到最边上也不露边）。参数换算都在 `Shared.parallax.motionParams`，壁纸和设置页预览共用。
+- 元素：不动 / 整体平移时没有深度图，不遮挡（元素着色器的 `uOcclusion`），自动贴地不起作用；整体平移时元素也放到深度 1，和画面一起动。
+- 停帧：视频纹理不让 Pixi 自己更新，`requestVideoFrameCallback` 每个新帧更新纹理；ticker 停着时只画这一帧，所以静止时按视频帧率重画，鼠标一动照常 60 帧。
+- 暂停：`renderer:pause` 带原因（`covered` 被窗口挡住 / `system` 锁屏睡眠 / `placement` 摆放）。只有被挡住并且开了声音时视频继续放（声音不断），其余都停。全屏检测把最大化窗口也算全屏，所以要这样分开。解锁时如果还被挡着，主进程补发一次 `covered`。
 
 ### 4.3 视差渲染
 - 位移公式：深度 t 的内容挪 `−parallaxUV(t)`，`parallaxUV = mouse × (t − focus) × strength`（软截断）。
@@ -162,17 +173,18 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 
 | 通道 | 方向 | 作用 |
 |---|---|---|
-| `dialog:selectImage` / `selectAudioFiles`（可多选）/ `selectCover` / `selectOverlayVideo` | R→M | 文件对话框，只返回路径 |
+| `dialog:selectWallpaper` / `selectAudioFiles`（可多选）/ `selectCover` / `selectOverlayVideo` | R→M | 文件对话框，只返回路径（`selectWallpaper` 是 `{ path, type: 'image'|'video' }`；旧的 `selectImage` 已删，托盘直接在主进程里开对话框） |
 | `settings:prepareImage` | M→R | 托盘选了一张没有深度图的图片：设置窗口生成深度图后自动应用 |
 | `overlay:getPresets` | R→M | 全屏视频特效列表 |
 | `gallery:list` | R→M | 默认壁纸图库列表 |
 | `depth:generate` / `depth:progress` | R→M / M→R | 生成深度图（带 `{ imagePath, blurRadius, width, height, rgba }`）/ 进度 |
 | `cache:*`、`depth:*CacheDir` | R→M | 深度图缓存与目录（`cache:getDepthMap` 对默认壁纸返回自带的深度图） |
 | `config:save` / `config:get` / `config:load` | R→M / M→R | 配置读写 + 广播（壁纸窗口和设置窗口） |
-| `wallpaper:apply` / `image:new` | R→M / M→R | 应用壁纸 |
+| `wallpaper:apply` / `wallpaper:show` | R→M / M→R | 应用壁纸：`{ type: 'image', path }` 或 `{ type: 'video', path, effect, sound }`（`apply` 收到字符串当图片）。原来的 `image:new` 换成了 `wallpaper:show` |
+| `myWallpapers:add` / `remove` / `update` / `setThumb` | R→M | 我的壁纸：加入（带缩略图 Data URL 和时长）/ 移除（删缩略图，不删原文件）/ 改视频的效果和声音 / 补缩略图；改完广播配置 |
 | `mouse:move` | M→R | 全局鼠标坐标 |
 | `desktop:click` | M→R | 桌面被单击（坐标相对主显示器）：点中唱片机就播放 / 暂停，否则触发"点击播放"的元素；壁纸暂停或摆放中不发 |
-| `renderer:pause` / `renderer:resume` | M→R | 暂停 / 恢复；带 `{ silent: true }` 时不弹提示 |
+| `renderer:pause` / `renderer:resume` | M→R | 暂停 / 恢复；带 `{ silent: true }` 时不弹提示。暂停带 `reason`：`covered` 被窗口挡住 / `system` 锁屏睡眠 / `placement` 摆放（决定视频壁纸停不停） |
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | 自定义元素 |
 | `placement:getDraft` / `commit` / `cancel` | R→M | 摆放窗口（草稿是元素 `{ instance, asset }` 或唱片机 `{ kind: 'vinyl', vinyl }`） |
 | `vinyl:startPlacement` | R→M | 打开摆放窗口拖动唱片机 |
@@ -188,6 +200,13 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // 视差强度 5 ~ 30（旧配置超过 30 读出 30）
   blurRadiusVersion: 2,   // 边缘平滑默认值从 8 改成 5 的标记：没有它的旧配置里 blurRadius 还是 8 的读成 5
   autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
+  // currentImage 只放图片（旧版本 1.1.0 会把它指向的文件整个读成 base64，指向视频会卡住）。当前视频另放：
+  currentVideo: { path, effect: 'none'|'depth'|'pan', sound, imageAtTime } | null,
+                // imageAtTime：应用视频时的 currentImage。和现在的 currentImage 对不上，说明旧版本之后换过图片，
+                // 以图片为准（启动时清掉 currentVideo）。规则在 shared/my-wallpapers.js 的 resolveCurrent
+  myWallpapers: [{ path, type: 'image'|'video', addedAt, lastUsedAt, thumb, duration, effect?, sound? }],
+                // 我的壁纸，按 lastUsedAt 从新到旧；只记路径；thumb 是 wallpaper_thumbs/ 里的缩略图；effect / sound 只有视频有
+  myWallpapersVersion: 1, // 迁移标记（不写默认值）：没有它时把当前的用户图片放进我的壁纸，只做一次
   theme: 'dark',          // 设置窗口的界面主题 'dark'|'light'|'system'（不认识的值读成 dark），主进程写进 nativeTheme.themeSource
   vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
                   playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
@@ -206,7 +225,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   },
 }
 ```
-- 存储位置：`%APPDATA%/interactive-desktop-wallpaper/`（`config.json`、`cache_index.json`、`depth_cache/`、`custom_elements/`；深度图换到别的文件夹时还有卸载清单 `uninstall_extra_files.txt`，见 §9 阶段 9）。
+- 存储位置：`%APPDATA%/interactive-desktop-wallpaper/`（`config.json`、`cache_index.json`、`depth_cache/`、`custom_elements/`、`wallpaper_thumbs/`（我的壁纸的缩略图）；深度图换到别的文件夹时还有卸载清单 `uninstall_extra_files.txt`，见 §9 阶段 9）。
 - 默认元素不在配置里，来自 `elements/manifest.json`，id 为 `builtin:<id>`。
 
 ---
@@ -225,6 +244,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | **自定义元素系统** | ✅ | 图片 / GIF / 动态 webp / apng / mp4 / webm；默认两个爆炸；摆放模式（缩放、拉伸、旋转、翻转、自由变形）；深度遮挡；间隔播放；点击播放；抠绿幕；变色 |
 | 自定义贴纸 | ♻️ 已移除 | 被自定义元素取代，旧配置自动迁移 |
 | 默认壁纸图库（`wallpapers/`） | ✅ | |
+| 视频壁纸 + 我的壁纸 | ✅ 2026-11-03 | 不动 / 3D 视差 / 整体平移，可开声音；我的壁纸放自己选过的图片和视频，见 §9 阶段 11 |
 | 设置窗口 / 壁纸页界面 | ✅ 2026-10-26 改版，10-31 换成战术终端风格 | 左侧导航分六页、统一控件和 Lucide 图标、实时视差预览；摆放模式、Toast、调试面板同一套样式。10-31：切角、宋体标题配英文小字、夜间 / 日间 / 跟随系统主题，见 §9 阶段 10 |
 | 打包后独立运行 | ✅ v1 | NSIS 安装包，见 §9 阶段 6 |
 | 卸载 | ✅ 2026-10-31 | 设置页"卸载软件…"或 Windows 设置 → 应用，两边都能选要不要删数据，见 §9 阶段 9 |
@@ -261,6 +281,9 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 22. 深度图后处理现在有两份实现：应用里的 `src/depth/processing.js` 和 `generate_depth_map.py`（`tools/prepare_wallpapers.py` 生成默认壁纸深度图时用）。改算法要两边一起改，`test/depth-processing.test.js` 里有 Pillow 生成的对照数据。
 20. 自定义元素：摆放模式只处理主显示器；动图最多解码 600 帧；元素多了以后没有数量上限提示。
 21. 天气粒子画在单独的 Canvas 2D 图层上，盖在整张壁纸上面，不会被近处的物体挡住（想要"雪落在树后面"得把天气挪进 Pixi 场景做深度遮挡）。光斑的光源固定在左上角，可能和壁纸里实际的光线方向不一致。
+23. 视频壁纸的 3D 视差整段只用一张深度图（时长 30% 处那一帧）：镜头移动、画面里大幅移动的东西会和深度图对不上，挪动时有点变形。适合固定机位的视频，其他视频建议用整体平移。
+24. 「我的壁纸」多行时没有折叠，条目很多时默认壁纸会被挤得很远（设计里留给实现时看，这一版没做）。
+25. 视频壁纸一直在解码（开了声音、被窗口挡住时也是），比图片壁纸费电；4K 视频更明显，没有转码。
 
 ---
 
@@ -419,7 +442,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   - 屏幕缩放 150%，PowerShell 截窗口前要先调 `SetProcessDPIAware`，否则截偏；PowerShell 5.1 读不带 BOM 的 UTF-8 脚本会把中文读坏。
   - 本地的 `dist/Interactive3DWallpaper-Setup-1.1.0.exe` 现在是带卸载功能的测试包（版本号没改），和已发布的 v1.1.0 不是同一个文件。发版前先改版本号再打包。
 
-### ✅ 阶段 10 — 界面改成战术终端风格（2026-10-31，未提交）
+### ✅ 阶段 10 — 界面改成战术终端风格（2026-10-31）
 用户用自己写的个人 skill `ark-style-ui`（参考明日方舟 UI 的"战术终端 / 工业科幻"设计语言）让助手重做前端，看过截图后说"保留，继续完善"。设计：[docs/superpowers/specs/2026-10-31-tactical-ui-design.md](docs/superpowers/specs/2026-10-31-tactical-ui-design.md)。
 - 只换外观：页面结构、类名、各页面 JS 和 IPC 沿用 10-26 改版，`tokens.css` 的变量名也没变（值换了），所以 `style.css` 的写法不用跟着改。
 - 规则：卡片左上 + 右下切角、按钮只切右下角、不倒圆角（唱片和旋转手柄的圆点例外）；中文大标题用思源宋体，旁边配 Saira 宽体的英文大写小字（`.en`，只写模块名、天气名、眉题这类有意义的词）；数值和路径用等宽字；天蓝主色只给主要按钮、选中态、开关和数值；黄色只在卸载确认框顶边的警示条纹里；卡片和主按钮铺很淡的噪点底纹。
@@ -429,6 +452,17 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 字体：`ui/fonts/` 自带思源宋体（`@fontsource-variable/noto-serif-sc` 5.3.1，可变字重，101 片按需加载）、Saira 宽度轴版和 JetBrains Mono（Fontsource），共约 6.3MB，三份 OFL 许可证在同一目录。正文的思源黑体没打包（太大），没装的电脑用微软雅黑。
 - 验证：Electron（复制真实配置到单独的数据目录，开调试端口截图）看过六个页面、带元素的元素页、问号说明、卸载确认框、Toast、图库选中态、夜间 / 日间、820×560 最小窗口（没有横向滚动条）；主题切换时直接截屏幕看了系统按钮那一条也跟着变色、壁纸窗口仍是深色，跟随系统读到这台电脑的深色；内置宋体确实加载了。浏览器预览看了摆放模式、加载提示、调试面板、Toast，控制台没有报错。`npm test` 180 个全过（新增主题默认值的测试）。
 - 没测：没装思源字体的电脑；在 Electron 里真实拖动摆放元素（只在浏览器预览里看了样子）；打包后的安装版（字体在 `ui/**/*` 里，应该会带上）。
+
+### ✅ 阶段 11 — 视频壁纸 + 我的壁纸（2026-11-03，`feature/video-wallpaper` 分支）
+用户想把视频直接设成壁纸（原来只能在"元素"里加视频）。设计：[docs/superpowers/specs/2026-11-02-video-wallpaper-design.md](docs/superpowers/specs/2026-11-02-video-wallpaper-design.md)；计划：[docs/superpowers/plans/2026-11-03-video-wallpaper.md](docs/superpowers/plans/2026-11-03-video-wallpaper.md)。
+- 定位：单独加的功能，重点是"能用视频当壁纸"；跟鼠标的效果是附带的尝试。每个视频三种效果：不动（默认）、3D 视差、整体平移；声音开关默认关。效果和声音改了立刻存进这个视频的记录，点"应用壁纸"才影响桌面。
+- 入口（看过五版示意图后用户定的）：壁纸页「我的壁纸」一直显示，第一格"从电脑选择… / 图片或视频"，后面是自己选过的图片和视频（最近用过的在前，视频带 ▶ 时长，悬停 × 移除，不删原文件；文件找不到显示"找不到文件"）。默认壁纸里不再有添加格。
+- 被窗口挡住时声音继续放（用户定的）：现有全屏检测把最大化窗口也算全屏，所以暂停带原因，只有"被挡住 + 开了声音"时视频继续放；锁屏、睡眠、摆放时都停。和唱片机一致。
+- 和旧版本共用配置：`currentImage` 只放图片，视频放 `currentVideo`（带 `imageAtTime`），旧版本换过图片时以图片为准。开发版和安装版图库路径不同，`imageAtTime` 和 `currentImage` 一起迁移。第一次运行补默认壁纸的条件加了"没有当前视频"。
+- 实现时定的（设计里留给实现）：3D 视差取时长 30% 处的一帧（没做多帧合成）；整体平移的最大位移就是视差强度，画面按 `panCover` 放大；我的壁纸多行不折叠；不动 / 整体平移时摆放窗口里不显示"自动"、不改深度；视频的 3D 视差没有深度图（比如清了缓存）时按不动播放。
+- 实测时发现并修掉的：连着换几次视频，加载慢的旧请求最后完成、盖掉新的（加了只认最后一次的串行队列 `createLatestQueue`）；销毁视频时清 `src` 触发 error，日志里多出"播放出错"；我的壁纸的添加格比别的格子低 15px。
+- 验证：`npm test` 200 个全过（新增我的壁纸逻辑 9 个、整体平移 3 个、存储 5 个、暂停规则 1 个、串行队列 2 个）。Electron 实测（单独的数据目录 + 调试端口；文件对话框在主进程里临时替换成返回指定文件）：三种效果截图、静止时按视频帧率（30/s）重画而 ticker 停着、有声视频被挡住时继续放、摆放时停、10 次连续切换只留一个视频且最后一个生效、换回图片后视频释放、图片停帧正常；元素在三种效果下的移动和遮挡；天气 / 视频特效 / 唱片机叠加；mp4、webm、中文 + 空格 + # + % 路径；纯音频 mp4 和改名的文本文件被拒绝；清缓存后 3D 视差视频按不动播放；文件被删后重启有提示；预览视频切页面、最小化时暂停；我的壁纸的加入 / 移除 / 找不到文件 / 重启保留 / 旧配置迁移；视差页提示；820×560 无横向滚动；浏览器预览无报错。
+- 没测：真实的"窗口还原后恢复"（测试时屏幕上一直有用户自己的最大化窗口，壁纸一直处于被挡住状态，只能在页面里模拟恢复）；真实出声（测试视频没有音轨，只检查了没静音、在播放）；托盘"更换壁纸"（要点原生对话框）；打包后的安装版；集成显卡上的耗电。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。
