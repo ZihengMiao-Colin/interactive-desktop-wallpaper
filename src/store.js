@@ -391,7 +391,6 @@ class AppStore {
             currentVideo: null,
             myWallpapers: [],          // 我的壁纸：用户自己选过的图片和视频
             depthCacheDir: '',
-            hideDebugPanel: true,      // 打包后默认隐藏调试面板
             theme: 'dark',             // 设置窗口的界面主题：'dark' | 'light' | 'system'
             // 1. 黑胶唱片机组件
             vinyl: {

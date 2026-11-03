@@ -21,50 +21,7 @@ const CONFIG = {
     smoothness: 0.08,
     /** 对焦深度 0~1：该深度的物体保持静止 */
     focusDepth: 0.50,
-    /** 隐藏右上角调试面板 */
-    hideDebugPanel: false,
 };
-
-// ==================== 调试面板 ====================
-
-const debugPanel = document.getElementById('debug-panel');
-const debugToggle = document.getElementById('debug-toggle');
-const parallaxSlider = document.getElementById('parallax-strength');
-const parallaxValueEl = document.getElementById('parallax-value');
-const smoothnessSlider = document.getElementById('smoothness');
-const smoothnessValueEl = document.getElementById('smoothness-value');
-const focusSlider = document.getElementById('focus-depth');
-const focusValueEl = document.getElementById('focus-value');
-
-/** 把 CONFIG 同步到调试面板，并按配置显示/隐藏面板 */
-function syncDebugPanel() {
-    if (parallaxSlider) parallaxSlider.value = CONFIG.parallaxMultiplier;
-    if (parallaxValueEl) parallaxValueEl.textContent = CONFIG.parallaxMultiplier;
-    if (smoothnessSlider) smoothnessSlider.value = Math.round(CONFIG.smoothness * 100);
-    if (smoothnessValueEl) smoothnessValueEl.textContent = CONFIG.smoothness.toFixed(2);
-    if (focusSlider) focusSlider.value = Math.round(CONFIG.focusDepth * 100);
-    if (focusValueEl) focusValueEl.textContent = Number(CONFIG.focusDepth).toFixed(2);
-    for (const slider of [parallaxSlider, smoothnessSlider, focusSlider]) {
-        if (slider) UIControls.paintRange(slider);
-    }
-    if (debugPanel) debugPanel.style.display = CONFIG.hideDebugPanel ? 'none' : '';
-}
-
-/** 调试面板拖动时节流保存：第一次立即发送，之后每 100ms 最多一次 */
-const parallaxSaver = isElectron
-    ? Shared.configSync.createConfigSaver((partial) => window.electronAPI.saveConfig(partial), 100)
-    : null;
-
-/** 调试面板改动后保存到主进程 */
-function saveParallaxConfig() {
-    wake();
-    if (!parallaxSaver) return;
-    parallaxSaver.save({
-        parallaxMultiplier: CONFIG.parallaxMultiplier,
-        smoothness: CONFIG.smoothness,
-        focusDepth: CONFIG.focusDepth,
-    });
-}
 
 // ==================== 自定义元素管理器 ====================
 
@@ -146,34 +103,6 @@ function bindEvents() {
     }
     // 窗口尺寸变了 Pixi 会重建画布内容，必须重新出帧
     window.addEventListener('resize', wake);
-
-    if (parallaxSlider) {
-        parallaxSlider.addEventListener('input', () => {
-            CONFIG.parallaxMultiplier = parseInt(parallaxSlider.value, 10);
-            if (parallaxValueEl) parallaxValueEl.textContent = CONFIG.parallaxMultiplier;
-            saveParallaxConfig();
-        });
-    }
-    if (smoothnessSlider) {
-        smoothnessSlider.addEventListener('input', () => {
-            CONFIG.smoothness = parseFloat(smoothnessSlider.value) / 100;
-            if (smoothnessValueEl) smoothnessValueEl.textContent = CONFIG.smoothness.toFixed(2);
-            saveParallaxConfig();
-        });
-    }
-    if (focusSlider) {
-        focusSlider.addEventListener('input', () => {
-            CONFIG.focusDepth = parseInt(focusSlider.value, 10) / 100;
-            if (focusValueEl) focusValueEl.textContent = CONFIG.focusDepth.toFixed(2);
-            saveParallaxConfig();
-        });
-    }
-    if (debugToggle && debugPanel) {
-        debugToggle.addEventListener('click', () => {
-            // 箭头图标的方向由 .collapsed 控制（style.css）
-            debugPanel.classList.toggle('collapsed');
-        });
-    }
 }
 
 // ==================== 空闲停帧 ====================
@@ -359,9 +288,6 @@ function registerIpcListeners() {
         if (config.focusDepth !== undefined) CONFIG.focusDepth = config.focusDepth;
         // 视差参数变了，静止的画面也要按新参数重画
         if ([CONFIG.parallaxMultiplier, CONFIG.smoothness, CONFIG.focusDepth].join() !== before) wake();
-        // 配置里没写时默认隐藏（壁纸常驻桌面，不该露出调试面板）
-        CONFIG.hideDebugPanel = config.hideDebugPanel !== false;
-        syncDebugPanel();
         applyCustomElementsConfig(config);
     });
 }
@@ -396,8 +322,6 @@ async function resolveInitialSources() {
 
 async function start() {
     UI.showLoading('正在加载壁纸素材...');
-    if (isEditMode) CONFIG.hideDebugPanel = true;
-    syncDebugPanel();
     if (isElectron && !isEditMode) registerIpcListeners();
 
     // 上次的壁纸文件找不到、视频读不出来时退回自带的 background.png，加载完再提示

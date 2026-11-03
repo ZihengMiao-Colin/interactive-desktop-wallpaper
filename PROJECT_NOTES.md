@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-03（视频壁纸 + 我的壁纸，在 `feature/video-wallpaper` 分支，见 §9 阶段 11）
+> 最近更新：2026-11-03（视频壁纸 + 我的壁纸，在 `feature/video-wallpaper` 分支，见 §9 阶段 11；同一天删掉了壁纸页右上角的调试面板，见 §8 第 15 条）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -199,7 +199,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 {
   parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // 视差强度 5 ~ 30（旧配置超过 30 读出 30）
   blurRadiusVersion: 2,   // 边缘平滑默认值从 8 改成 5 的标记：没有它的旧配置里 blurRadius 还是 8 的读成 5
-  autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
+  autoLaunch, currentImage, depthCacheDir,   // hideDebugPanel 已随调试面板删除，旧配置里留着也不读
   // currentImage 只放图片（旧版本 1.1.0 会把它指向的文件整个读成 base64，指向视频会卡住）。当前视频另放：
   currentVideo: { path, effect: 'none'|'depth'|'pan', sound, imageAtTime } | null,
                 // imageAtTime：应用视频时的 currentImage。和现在的 currentImage 对不上，说明旧版本之后换过图片，
@@ -273,7 +273,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ### 🟡 P2
 13. ~~死代码~~ ✅ 拆分 `app.js` 时已清理
 14. ~~README 过时~~ ✅ 已重写
-15. `hideDebugPanel` 没配置时默认隐藏（Electron 下符合预期；浏览器预览不受影响）。
+15. ~~`hideDebugPanel` 没配置时默认隐藏~~ ✅ 2026-11-03 调试面板整个删了（`index.html`、`style.css`、`renderer/main.js`、默认配置）。原因：壁纸页里它默认是显示的，要等主进程发来配置才隐藏，刚打开软件时会在桌面右上角闪出来。视差参数在设置页"视差"页调；浏览器预览也不再有这个面板。
 16. ~~天气 canvas 没按 DPR 缩放~~ ✅
 17. ~~mediump 精度~~ ✅ 改为 highp
 18. 视频素材都进了 git：`overlay/` 139MB（`old1.mp4` 53.7MB 推到 GitHub 会有警告）。素材继续增多的话考虑 Git LFS。

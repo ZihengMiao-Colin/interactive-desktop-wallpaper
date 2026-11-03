@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-03 (video wallpapers + My wallpapers, on the `feature/video-wallpaper` branch, see §9 Phase 11)
+> Last updated: 2026-11-03 (video wallpapers + My wallpapers, on the `feature/video-wallpaper` branch, see §9 Phase 11; the same day the debug panel in the top-right of the wallpaper page was removed, see §8 item 15)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -200,7 +200,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 {
   parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // parallax strength 5 ~ 30 (older configs above 30 read as 30)
   blurRadiusVersion: 2,   // marks the edge smoothing default change from 8 to 5: older configs without it read blurRadius 8 as 5
-  autoLaunch, currentImage, depthCacheDir, hideDebugPanel: true,
+  autoLaunch, currentImage, depthCacheDir,   // hideDebugPanel was removed with the debug panel; older configs may still contain it, it is ignored
   // currentImage only holds images (v1.1.0 reads the file it points to into base64; a video would hang it). The current video is separate:
   currentVideo: { path, effect: 'none'|'depth'|'pan', sound, imageAtTime } | null,
                 // imageAtTime: currentImage when the video was applied. If it no longer matches currentImage, an older version changed
@@ -274,7 +274,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 ### 🟡 P2
 13. ~~Dead code~~ ✅ Cleaned up when `app.js` was split
 14. ~~README out of date~~ ✅ Rewritten
-15. `hideDebugPanel` defaults to hidden when unset (as expected under Electron; browser preview unaffected).
+15. ~~`hideDebugPanel` defaults to hidden when unset~~ ✅ 2026-11-03 the debug panel was removed entirely (`index.html`, `style.css`, `renderer/main.js`, default config). Reason: on the wallpaper page it was shown by default and only hidden once the main process sent the config, so it flashed in the top-right of the desktop right after launch. Parallax settings are on the settings window's "Parallax" page; the browser preview no longer has the panel either.
 16. ~~Weather canvas not scaled for DPR~~ ✅
 17. ~~mediump precision~~ ✅ Switched to highp
 18. All video assets are in git: `overlay/` is 139MB (`old1.mp4` at 53.7MB triggers a warning when pushed to GitHub). Consider Git LFS if assets keep growing.

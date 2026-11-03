@@ -24,35 +24,6 @@
         </div>
     </div>
 
-    <!-- ==================== 调试面板 ==================== -->
-    <!--
-        右上角浮层，用于开发阶段调试视差参数。
-        在 Electron 生产模式下自动隐藏。
-        浏览器模式下默认显示。
-    -->
-    <div id="debug-panel" class="glass">
-        <div id="debug-panel-header">
-            <span>调试面板</span>
-            <button id="debug-toggle" class="btn sm icon ghost" title="收起 / 展开"><svg class="i"><use href="#i-chevron-down"/></svg></button>
-        </div>
-        <div id="debug-panel-body">
-            <div class="debug-row">
-                <label for="parallax-strength">视差强度 <span id="parallax-value">10</span></label>
-                <input type="range" id="parallax-strength" min="5" max="30" value="10" step="1">
-            </div>
-            <div class="debug-row">
-                <label for="smoothness">跟手程度 <span id="smoothness-value">0.08</span></label>
-                <!-- 实际值为 slider/100，即 0.01 ~ 0.30 -->
-                <input type="range" id="smoothness" min="1" max="30" value="8" step="0.5">
-            </div>
-            <div class="debug-row">
-                <label for="focus-depth" title="这个深度上的东西完全不动，通常对准画面主体">对焦深度 <span id="focus-value">0.50</span></label>
-                <input type="range" class="depth" id="focus-depth" min="0" max="100" value="50" step="1">
-            </div>
-            <div class="debug-hint">移动鼠标查看视差效果</div>
-        </div>
-    </div>
-
     <!-- ==================== 状态提示（Electron 环境） ==================== -->
     <div id="status-toast" class="glass"></div>
 
