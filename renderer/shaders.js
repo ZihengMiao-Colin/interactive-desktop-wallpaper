@@ -150,6 +150,7 @@ uniform vec2 uMouse;
 uniform float uStrength;
 uniform float uFocus;
 uniform float uElemDepth;
+uniform float uOcclusion;
 uniform float uOpacity;
 uniform float uChromaEnabled;
 uniform float uChromaStrength;
@@ -189,6 +190,8 @@ void main(void) {
     vec2 shownUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), vec2(0.001), vec2(0.999));
     float sceneDepth = texture2D(uDepth, shownUV).r;
     float vis = smoothstep(-0.03, 0.03, (uElemDepth + 0.02) - sceneDepth);
+    // 视频壁纸"不动""整体平移"时没有深度图，不做遮挡
+    vis = mix(1.0, vis, uOcclusion);
 
     vec2 uv = vUvs.xy / vUvs.z;
     uv = mix(uv, 1.0 - uv, uFlip);

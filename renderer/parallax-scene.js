@@ -50,6 +50,12 @@ const Scene = (() => {
     let bgWidth = 0;
     let bgHeight = 0;
     let cover = { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
+    /** 背景是视频时的视频壁纸对象（renderer/video-wallpaper.js），图片时为 null */
+    let bgVideo = null;
+    /** 壁纸效果：'depth' 按深度图视差（图片总是这个）| 'none' 不动 | 'pan' 整体平移 */
+    let motion = 'depth';
+    /** 整体平移时的最大位移（= 视差强度），cover 按它放大 */
+    let panStrength = 0;
 
     /**
      * 加载图片。Windows 绝对路径在 Electron 里经 preload 读成 Data URL，
@@ -97,6 +103,17 @@ const Scene = (() => {
         return canvas;
     }
 
+    /** 1×1 全白深度图：视频壁纸"不动""整体平移"用，整张画面都在深度 1（配合 Shared.parallax.motionParams） */
+    function createFlatDepth() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 1, 1);
+        return canvas;
+    }
+
     /** 计算原图以 Cover 方式铺满窗口时的 UV 缩放与偏移，并写入滤镜 */
     function updateCover() {
         // 用 window 尺寸而不是 app.screen：Pixi 的 resizeTo 会推迟到下一帧才更新 app.screen，
@@ -105,6 +122,8 @@ const Scene = (() => {
         const screenH = window.innerHeight;
         if (!screenW || !screenH) return;
         cover = Shared.parallax.coverTransform(screenW, screenH, bgWidth || screenW, bgHeight || screenH);
+        // 整体平移：画面放大一点，移到最边上也不露出边缘被拉伸的像素
+        if (motion === 'pan') cover = Shared.parallax.panCover(cover, panStrength);
 
         if (filter) {
             // 必须整体赋值数组，才能触发 Pixi UniformGroup 的脏标记
@@ -137,16 +156,63 @@ const Scene = (() => {
         }
         if (!depthSrc) depthSrc = createFallbackDepth(bgImg.naturalWidth, bgImg.naturalHeight);
 
+        applySources({
+            texture: makeTexture(bgImg),
+            video: null,
+            width: bgImg.naturalWidth,
+            height: bgImg.naturalHeight,
+            depthSrc,
+            motion: 'depth',
+        });
+    }
+
+    /**
+     * 加载（或更换）视频壁纸。旧的背景（图片或视频）会被释放。
+     * @param {Awaited<ReturnType<typeof createVideoWallpaper>>} videoWallpaper
+     * @param {{motion: 'depth'|'none'|'pan', depthSource: string|null}} options
+     *   motion 为 'depth' 但没有深度图（比如缓存被清了）时按 'none' 播放
+     */
+    async function loadVideo(videoWallpaper, { motion: wanted, depthSource }) {
+        let nextMotion = wanted === 'depth' || wanted === 'pan' ? wanted : 'none';
+        let depthSrc = null;
+        if (nextMotion === 'depth') {
+            try {
+                depthSrc = depthSource ? await loadImage(depthSource) : null;
+            } catch (err) {
+                console.warn('[Scene] 视频壁纸的深度图加载失败:', err.message);
+            }
+            if (!depthSrc) {
+                console.warn('[Scene] 视频壁纸没有深度图，按"不动"播放');
+                nextMotion = 'none';
+            }
+        }
+        const texture = videoWallpaper.texture;
+        texture.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
+        applySources({
+            texture,
+            video: videoWallpaper,
+            width: videoWallpaper.width,
+            height: videoWallpaper.height,
+            depthSrc: depthSrc || createFlatDepth(),
+            motion: nextMotion,
+        });
+    }
+
+    /** 换上新的背景纹理和深度图，释放旧的（视频要整个销毁，图片纹理连同 GPU 资源一起释放） */
+    function applySources({ texture, video, width, height, depthSrc, motion: nextMotion }) {
         const oldBg = bgTexture;
+        const oldVideo = bgVideo;
         const oldDepth = depthTexture;
 
-        bgTexture = makeTexture(bgImg);
+        bgTexture = texture;
+        bgVideo = video;
+        motion = nextMotion;
         depthTexture = makeTexture(depthSrc);
         // 光线步进在分支和循环里读深度图，读的时候算不出该用哪级 mipmap，所以深度图不要 mipmap
         depthTexture.baseTexture.mipmap = PIXI.MIPMAP_MODES.OFF;
         depthImage = depthSrc;
-        bgWidth = bgImg.naturalWidth;
-        bgHeight = bgImg.naturalHeight;
+        bgWidth = width;
+        bgHeight = height;
 
         if (!filter) {
             screenSprite = new PIXI.Sprite(PIXI.Texture.WHITE);
@@ -163,12 +229,13 @@ const Scene = (() => {
         updateCover();
 
         // 新纹理已经挂上滤镜，旧纹理可以连同 GPU 资源一起释放
-        if (oldBg) oldBg.destroy(true);
+        if (oldVideo) oldVideo.destroy();
+        else if (oldBg) oldBg.destroy(true);
         if (oldDepth) oldDepth.destroy(true);
 
         // 立刻出一帧：主进程可能紧接着发来暂停信号停掉 ticker，保证画面不留空白
         app.renderer.render(app.stage);
-        console.log(`[Scene] 已加载壁纸 ${bgWidth}×${bgHeight}，窗口 ${app.screen.width}×${app.screen.height}`);
+        console.log(`[Scene] 已加载${video ? '视频' : ''}壁纸 ${bgWidth}×${bgHeight}（${motion}），窗口 ${app.screen.width}×${app.screen.height}`);
     }
 
     /**
@@ -180,6 +247,11 @@ const Scene = (() => {
      */
     function setParallax(mouseX, mouseY, strength, focus) {
         if (!filter) return;
+        // 整体平移的放大比例跟着视差强度走
+        if (motion === 'pan' && strength !== panStrength) {
+            panStrength = strength;
+            updateCover();
+        }
         // 整体赋值数组，触发 Proxy setter
         filter.uniforms.uMouse = [mouseX, mouseY];
         filter.uniforms.uStrength = strength;
@@ -208,7 +280,14 @@ const Scene = (() => {
     return {
         app,
         load,
+        loadVideo,
         setParallax,
+        /** 当前壁纸效果：'depth' | 'none' | 'pan' */
+        getMotion: () => motion,
+        /** 背景有没有真正的深度图（没有时元素不遮挡、不自动贴地） */
+        hasDepth: () => motion === 'depth',
+        /** 只画一帧（ticker 停着时视频出了新帧） */
+        renderOnce: () => app.renderer.render(app.stage),
         addLayer,
         getCover: () => ({ ...cover }),
         getDepthTexture: () => depthTexture,

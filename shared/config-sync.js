@@ -84,5 +84,24 @@
         return { changed, snapshot: next };
     }
 
-    return { createConfigSaver, changedSections };
+    /**
+     * 只认最后一次的串行队列：一次只跑一个任务；跑的时候又排进来好几个，只接着跑最后排进来的那个，
+     * 中间的直接跳过（它们的 run 返回 undefined）。换壁纸用：连着换几次，加载慢的旧请求不会最后才完成、盖掉新的。
+     * @returns {{ run: <T>(task: () => Promise<T>) => Promise<T|undefined> }}
+     */
+    function createLatestQueue() {
+        let latest = 0;
+        let chain = Promise.resolve();
+        return {
+            run(task) {
+                const token = ++latest;
+                const result = chain.then(() => (token === latest ? task() : undefined));
+                // 链条本身不能因为某个任务出错断掉
+                chain = result.catch(() => {});
+                return result;
+            },
+        };
+    }
+
+    return { createConfigSaver, changedSections, createLatestQueue };
 });

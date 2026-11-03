@@ -76,7 +76,8 @@ async function startEditMode({ scene, layer, host, vinyl }) {
 
     /** 自动贴地：深度取元素底边中点处的壁纸深度 */
     function applyAutoDepth() {
-        if (!instance.depthAuto) return;
+        // 视频壁纸"不动""整体平移"时没有深度图可取，保持原来的深度
+        if (!instance.depthAuto || !scene.hasDepth()) return;
         const [u, v] = P.bottomCenter(instance.transform, aspect(), ...screen());
         const [iu, iv] = Shared.parallax.screenToImageUV(u, v, scene.getCover());
         instance.depth = sampler.sample(iu, iv);
@@ -120,7 +121,7 @@ async function startEditMode({ scene, layer, host, vinyl }) {
         depthSlider.value = Math.round(instance.depth * 100);
         UIControls.paintRange(depthSlider);
         depthValue.textContent = instance.depth.toFixed(2);
-        depthAuto.hidden = !instance.depthAuto;
+        depthAuto.hidden = !instance.depthAuto || !scene.hasDepth();
         rotationValue.textContent = `${Math.round(t.rotation)}°`;
         flipXBtn.classList.toggle('active', t.flipX);
         flipYBtn.classList.toggle('active', t.flipY);

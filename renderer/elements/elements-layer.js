@@ -69,8 +69,10 @@ class ElementsLayer {
      * @param {number} mouseY
      * @param {number} strength
      * @param {number} focus
+     * @param {{elementDepth: number|null, occlusion: boolean}} [motion] - 视频壁纸的效果（Shared.parallax.motionParams）：
+     *   elementDepth 不为 null 时所有元素都按这个深度移动（整体平移时贴着画面动）；occlusion 为 false 时不被背景遮挡
      */
-    update(nowMs, mouseX, mouseY, strength, focus) {
+    update(nowMs, mouseX, mouseY, strength, focus, motion = { elementDepth: null, occlusion: true }) {
         if (this.entries.size === 0) return;
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
@@ -111,6 +113,7 @@ class ElementsLayer {
                 transform.y = entry.clickAt.y;
                 depth = entry.clickAt.depth;
             }
+            if (motion.elementDepth !== null && motion.elementDepth !== undefined) depth = motion.elementDepth;
             const size = elementSize(transform, entry.aspect, screenW);
             const [dx, dy] = elementScreenShift(mouseX, mouseY, depth, focus, strength, cover);
             entry.shown = { ...transform, x: transform.x + dx, y: transform.y + dy };
@@ -129,6 +132,7 @@ class ElementsLayer {
             u.uStrength = strength;
             u.uFocus = focus;
             u.uElemDepth = depth;
+            u.uOcclusion = motion.occlusion === false ? 0 : 1;
             u.uOpacity = instance.opacity;
             u.uChromaEnabled = instance.chroma && instance.chroma.enabled ? 1 : 0;
             u.uChromaStrength = instance.chroma ? instance.chroma.strength : 0.5;
@@ -158,7 +162,7 @@ class ElementsLayer {
             if (scheduler.hideWhenIdle) {
                 const x = px / screenW;
                 const y = py / screenH;
-                entry.clickAt = { x, y, depth: instance.depthAuto ? this._depthAt(x, y) : instance.depth };
+                entry.clickAt = { x, y, depth: instance.depthAuto && this.scene.hasDepth() ? this._depthAt(x, y) : instance.depth };
             } else if (!entry.shown || !Shared.placement.pointInElement(entry.shown, entry.aspect, px, py, screenW, screenH)) {
                 continue;
             }

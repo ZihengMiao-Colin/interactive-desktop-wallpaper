@@ -91,3 +91,29 @@ test('changedSections：缺失的段不算变化，快照保留旧值且不修�
     assert.equal(r.snapshot.weather, prev.weather);
     assert.equal(JSON.stringify(prev), frozen);
 });
+
+test('createLatestQueue：一次只跑一个，跑的时候又来了好几个，只接着跑最后一个', async () => {
+    const { createLatestQueue } = require('../shared/config-sync');
+    const queue = createLatestQueue();
+    const ran = [];
+    let release;
+    const first = queue.run(() => new Promise((r) => { ran.push('a:start'); release = () => { ran.push('a:end'); r(); }; }));
+    // 换壁纸的请求是一条条 IPC 消息，后面的到达前第一个已经开始跑了
+    await new Promise((r) => setTimeout(r, 0));
+    const skipped = queue.run(async () => { ran.push('b'); });
+    const last = queue.run(async () => { ran.push('c'); return 'C'; });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(ran, ['a:start']);
+    release();
+    await first;
+    assert.equal(await skipped, undefined);
+    assert.equal(await last, 'C');
+    assert.deepEqual(ran, ['a:start', 'a:end', 'c']);
+});
+
+test('createLatestQueue：上一个出错不影响后面的', async () => {
+    const { createLatestQueue } = require('../shared/config-sync');
+    const queue = createLatestQueue();
+    await assert.rejects(queue.run(async () => { throw new Error('boom'); }), /boom/);
+    assert.equal(await queue.run(async () => 'ok'), 'ok');
+});

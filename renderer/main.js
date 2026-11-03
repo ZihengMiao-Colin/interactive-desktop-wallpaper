@@ -219,11 +219,11 @@ function updateLoop(delta) {
     currentX += (targetX - currentX) * k;
     currentY += (targetY - currentY) * k;
 
-    // 鼠标右移时近景向左偏，所以传入取反后的值
+    // 鼠标右移时近景向左偏，所以传入取反后的值。视频壁纸按效果换算（不动：强度 0；整体平移：全画面在深度 1）
     const strength = Shared.parallax.strengthFromMultiplier(CONFIG.parallaxMultiplier);
-    const focus = Number(CONFIG.focusDepth);
-    Scene.setParallax(-currentX, -currentY, strength, focus);
-    elementsLayer.update(now, -currentX, -currentY, strength, focus);
+    const m = Shared.parallax.motionParams(Scene.getMotion(), strength, Number(CONFIG.focusDepth));
+    Scene.setParallax(-currentX, -currentY, m.strength, m.focus);
+    elementsLayer.update(now, -currentX, -currentY, m.strength, m.focus, m);
 
     weatherManager.update(delta, currentX, currentY);
     vinylManager.update(currentX, currentY);
@@ -231,23 +231,80 @@ function updateLoop(delta) {
     sleepIfIdle(now);
 }
 
+// ==================== 视频壁纸 ====================
+
+/** 当前桌面上的壁纸 { type, path, effect?, sound? }（Shared.myWallpapers.resolveCurrent 的格式） */
+let currentWallpaper = null;
+/** 背景是视频时的视频壁纸对象（renderer/video-wallpaper.js） */
+let currentVideo = null;
+/** 主进程暂停壁纸的原因（'covered' 被窗口挡住 | 'system' 锁屏睡眠 | 'placement' 摆放）；运行中为 null */
+let pauseReason = null;
+/** 换壁纸一个一个来，连着换几次只认最后一次：加载慢的旧请求不能最后才完成、盖掉新的 */
+const wallpaperQueue = Shared.configSync.createLatestQueue();
+
+/** 视频出了新帧：ticker 停着（空闲停帧）时只画这一帧，ticker 在跑时下一帧自然会画 */
+function onVideoFrame() {
+    if (!renderPaused && !Scene.app.ticker.started) Scene.renderOnce();
+}
+
+/** 按暂停状态决定视频放不放：被窗口挡住、并且开了声音时继续放（声音不断），其余暂停时都停 */
+function syncVideoPlayback() {
+    if (!currentVideo) return;
+    const sound = !!(currentWallpaper && currentWallpaper.sound);
+    if (!renderPaused || Shared.framePacing.keepVideoPlaying(pauseReason, sound)) currentVideo.play();
+    else currentVideo.pause();
+}
+
+/**
+ * 换上一个视频壁纸。读不出来时抛错，桌面保持原来的壁纸。
+ * @param {{path: string, effect: string, sound: boolean}} descriptor
+ */
+async function showVideoWallpaper(descriptor) {
+    const depth = descriptor.effect === 'depth' ? await window.electronAPI.getDepthCache(descriptor.path) : null;
+    // 摆放窗口里一直静音（桌面上的壁纸还在出声）
+    const video = await createVideoWallpaper(descriptor.path, { sound: !isEditMode && descriptor.sound });
+    try {
+        await Scene.loadVideo(video, { motion: descriptor.effect, depthSource: depth });
+    } catch (err) {
+        video.destroy();
+        throw err;
+    }
+    currentVideo = video;
+    currentWallpaper = { ...descriptor, type: 'video' };
+    video.onFrame(onVideoFrame);
+    syncVideoPlayback();
+    wake();
+}
+
+/** 换上一张图片壁纸（之前是视频的话 Scene.load 会释放它） */
+async function showImageWallpaper(imagePath, depth) {
+    await Scene.load(imagePath, depth);
+    currentVideo = null;
+    currentWallpaper = { type: 'image', path: imagePath };
+    wake();
+}
+
 // ==================== 与主进程的通信 ====================
 
 function registerIpcListeners() {
-    // info.silent：摆放模式等内部暂停，不弹提示
+    // info.silent：摆放模式等内部暂停，不弹提示；info.reason 决定视频壁纸停不停
     window.electronAPI.onPauseRender((info) => {
         renderPaused = true;
+        pauseReason = info.reason || 'system';
         clearTimeout(wakeTimer);
         Scene.app.ticker.stop();
         videoOverlayManager.pause();
         elementsLayer.pause(performance.now());
+        syncVideoPlayback();
         if (!info.silent) UI.showToast('壁纸已暂停（检测到全屏应用）', 2000);
     });
 
     window.electronAPI.onResumeRender((info) => {
         renderPaused = false;
+        pauseReason = null;
         videoOverlayManager.resume();
         elementsLayer.resume(performance.now());
+        syncVideoPlayback();
         wake();
         if (!info.silent) UI.showToast('壁纸已恢复', 1500);
     });
@@ -264,15 +321,25 @@ function registerIpcListeners() {
         if (elementsLayer.handleClick(x, y)) wake();
     });
 
-    window.electronAPI.onShowWallpaper(async (descriptor) => {
-        if (!descriptor || descriptor.type !== 'image') return;
-        const imagePath = descriptor.path;
+    window.electronAPI.onShowWallpaper((descriptor) => wallpaperQueue.run(async () => {
+        if (!descriptor) return;
         UI.showLoading('正在加载新壁纸...');
+        if (descriptor.type === 'video') {
+            try {
+                await showVideoWallpaper(descriptor);
+                UI.showToast('壁纸已更换', 2000);
+            } catch (err) {
+                console.error('[App] 切换视频壁纸失败:', err);
+                UI.showToast('切换壁纸失败: ' + err.message, 3000);
+            }
+            UI.hideLoading();
+            return;
+        }
+        const imagePath = descriptor.path;
         try {
             const cachedDepth = await window.electronAPI.getDepthCache(imagePath);
             if (cachedDepth) {
-                await Scene.load(imagePath, cachedDepth);
-                wake();
+                await showImageWallpaper(imagePath, cachedDepth);
                 UI.showToast('壁纸已更换', 2000);
             } else {
                 UI.showToast('请先在设置窗口中生成深度图（托盘菜单 → 打开设置）', 4000);
@@ -282,7 +349,7 @@ function registerIpcListeners() {
             UI.showToast('切换壁纸失败: ' + err.message, 3000);
         }
         UI.hideLoading();
-    });
+    }));
 
     window.electronAPI.onLoadConfig((config) => {
         if (!config) return;
@@ -314,11 +381,13 @@ async function resolveInitialSources() {
     try {
         const config = await window.electronAPI.getConfig();
         if (!isEditMode) applyCustomElementsConfig(config);
-        const current = config && config.currentImage;
-        if (current && window.electronAPI.fileExists(current)) {
-            const cachedDepth = await window.electronAPI.getDepthCache(current);
-            return { bg: current, depth: cachedDepth || null };
-        }
+        // 当前壁纸可能是图片（currentImage）或视频（currentVideo），规则见 shared/my-wallpapers.js
+        const current = Shared.myWallpapers.resolveCurrent(config);
+        if (!current) return fallback;
+        if (!window.electronAPI.fileExists(current.path)) return { ...fallback, missing: current.path };
+        if (current.type === 'video') return { ...fallback, video: current };
+        const cachedDepth = await window.electronAPI.getDepthCache(current.path);
+        return { bg: current.path, depth: cachedDepth || null };
     } catch (err) {
         console.warn('[App] 读取上次的壁纸配置失败:', err);
     }
@@ -331,17 +400,33 @@ async function start() {
     syncDebugPanel();
     if (isElectron && !isEditMode) registerIpcListeners();
 
-    const sources = await resolveInitialSources();
-    try {
-        await Scene.load(sources.bg, sources.depth);
-    } catch (err) {
-        console.error('[App] 壁纸加载失败，改用项目自带的 background.png:', err);
+    // 上次的壁纸文件找不到、视频读不出来时退回自带的 background.png，加载完再提示
+    let notice = '';
+    // 和换壁纸走同一个队列（读配置也放在里面）：启动加载期间设置页又换了壁纸，要等这次加载完再换
+    await wallpaperQueue.run(async () => {
+        const sources = await resolveInitialSources();
+        if (sources.missing) notice = '找不到上次的壁纸：' + sources.missing.split(/[\\/]/).pop();
         try {
-            await Scene.load('background.png', 'depth_map.png');
-        } catch (err2) {
-            UI.showError('没有找到可用的壁纸图片。\n' + err2.message);
+            if (sources.video) {
+                try {
+                    await showVideoWallpaper(sources.video);
+                } catch (err) {
+                    console.error('[App] 视频壁纸加载失败，改用 background.png:', err);
+                    notice = '视频壁纸加载失败：' + err.message;
+                    await showImageWallpaper(sources.bg, sources.depth);
+                }
+            } else {
+                await showImageWallpaper(sources.bg, sources.depth);
+            }
+        } catch (err) {
+            console.error('[App] 壁纸加载失败，改用项目自带的 background.png:', err);
+            try {
+                await Scene.load('background.png', 'depth_map.png');
+            } catch (err2) {
+                UI.showError('没有找到可用的壁纸图片。\n' + err2.message);
+            }
         }
-    }
+    });
 
     try {
         await loadCustomElements();
@@ -353,6 +438,7 @@ async function start() {
     bindEvents();
     Scene.app.ticker.add(updateLoop);
     UI.hideLoading();
+    if (notice) UI.showToast(notice, 4000);
 
     if (isEditMode) {
         await startEditMode({ scene: Scene, layer: elementsLayer, host: Host, vinyl: vinylManager });

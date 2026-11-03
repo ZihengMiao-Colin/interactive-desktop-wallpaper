@@ -21,6 +21,7 @@ function createElementShader(texture, depthTexture) {
         uStrength: 0,
         uFocus: 0.5,
         uElemDepth: 0.5,
+        uOcclusion: 1,
         uOpacity: 1,
         uChromaEnabled: 0,
         uChromaStrength: 0.5,
