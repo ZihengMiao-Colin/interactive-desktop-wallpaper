@@ -264,3 +264,44 @@ test('更改位置只搬深度图：用户自己的图片留在原来的文件�
     assert.deepEqual(fs.readdirSync(shared).sort(), ['notes.txt', '子文件夹', '旅行照片.png'].sort());
     assert.deepEqual(fs.readdirSync(next).map(f => /^depth_[0-9a-f]+\.png$/.test(f)), [true]);
 });
+
+test('新用户：我的壁纸为空，没有当前视频', () => {
+    const config = storeWithConfig().store.getConfig();
+    assert.deepEqual(config.myWallpapers, []);
+    assert.equal(config.currentVideo, null);
+});
+
+test('读配置时整理我的壁纸；坏的 currentVideo 读成 null', () => {
+    const { store } = storeWithConfig({ myWallpapers: [null, { path: 'C:/p/a.jpg' }, { path: 'C:/x.gif' }], currentVideo: 'oops' });
+    const config = store.getConfig();
+    assert.deepEqual(config.myWallpapers.map((e) => e.path), ['C:/p/a.jpg']);
+    assert.equal(config.currentVideo, null);
+});
+
+test('currentVideo 整体替换，重新打开后原样读回', () => {
+    const { store, dir } = storeWithConfig();
+    store.saveConfig({ currentVideo: { path: 'C:/v/x.mp4', effect: 'pan', sound: true, imageAtTime: '' } });
+    store.saveConfig({ currentVideo: { path: 'C:/v/y.mp4', effect: 'none', sound: false, imageAtTime: 'C:/p/a.jpg' } });
+    const reopened = new AppStore({ userDataPath: dir });
+    assert.deepEqual(reopened.getConfig().currentVideo, { path: 'C:/v/y.mp4', effect: 'none', sound: false, imageAtTime: 'C:/p/a.jpg' });
+});
+
+test('saveWallpaperThumb：存进 wallpaper_thumbs，同一个文件（不分大小写和斜杠）写到同一张', () => {
+    const { store, dir } = storeWithConfig();
+    const dataUrl = 'data:image/jpeg;base64,' + Buffer.from('abc').toString('base64');
+    const p1 = store.saveWallpaperThumb('C:/v/x.mp4', dataUrl);
+    assert.equal(path.dirname(p1), path.join(dir, 'wallpaper_thumbs'));
+    assert.match(path.basename(p1), /^thumb_[0-9a-f]+\.jpg$/);
+    assert.equal(fs.readFileSync(p1, 'utf8'), 'abc');
+    assert.equal(store.saveWallpaperThumb('c:\\v\\X.mp4', dataUrl), p1);
+});
+
+test('deleteWallpaperThumb：只删 wallpaper_thumbs 里的文件', () => {
+    const { store, dir } = storeWithConfig({ parallaxMultiplier: 10 });
+    const p1 = store.saveWallpaperThumb('C:/v/x.mp4', 'data:image/jpeg;base64,YWJj');
+    assert.equal(store.deleteWallpaperThumb(path.join(dir, 'config.json')), false);
+    assert.ok(fs.existsSync(path.join(dir, 'config.json')));
+    assert.equal(store.deleteWallpaperThumb(p1), true);
+    assert.equal(fs.existsSync(p1), false);
+    assert.equal(store.deleteWallpaperThumb(p1), false);
+});

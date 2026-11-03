@@ -22,6 +22,12 @@ const fs = require('fs');
 const { app } = require('electron');
 const { emptyCustomElements, normalizeCustomElements } = require('../shared/elements-model');
 const { normalizeVinyl } = require('../shared/playlist');
+const { normalizeList } = require('../shared/my-wallpapers');
+
+/** currentVideo 要是带 path 字符串的对象，否则读成 null */
+function validCurrentVideo(value) {
+    return value && typeof value === 'object' && typeof value.path === 'string' && value.path ? value : null;
+}
 
 /** 需要按字段合并保存的嵌套配置项 */
 const NESTED_KEYS = ['vinyl', 'weather', 'videoOverlay'];
@@ -181,6 +187,8 @@ class AppStore {
             weather: { ...defaults.weather, ...(this._config.weather || {}) },
             videoOverlay: { ...defaults.videoOverlay, ...(this._config.videoOverlay || {}) },
             customElements: normalizeCustomElements(this._config.customElements),
+            myWallpapers: normalizeList(this._config.myWallpapers),
+            currentVideo: validCurrentVideo(this._config.currentVideo),
         };
         if (config.parallaxMultiplier > PARALLAX_MAX) config.parallaxMultiplier = PARALLAX_MAX;
         if (!THEMES.includes(config.theme)) config.theme = defaults.theme;
@@ -223,6 +231,40 @@ class AppStore {
         const dir = path.join(this._userDataPath, 'custom_elements');
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         return dir;
+    }
+
+    // ==================== 「我的壁纸」缩略图 ====================
+
+    /** 我的壁纸的缩略图目录：userData/wallpaper_thumbs（不存在就创建） */
+    getWallpaperThumbsDir() {
+        const dir = path.join(this._userDataPath, 'wallpaper_thumbs');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        return dir;
+    }
+
+    /**
+     * 保存某个壁纸文件的缩略图（JPEG Data URL），同一个文件总是写到同一张 thumb_<hash>.jpg。
+     * @returns {string} 缩略图路径
+     */
+    saveWallpaperThumb(filePath, dataUrl) {
+        const thumbPath = path.join(this.getWallpaperThumbsDir(), `thumb_${this._pathHash(filePath)}.jpg`);
+        fs.writeFileSync(thumbPath, Buffer.from(String(dataUrl).replace(/^data:[^;]+;base64,/, ''), 'base64'));
+        return thumbPath;
+    }
+
+    /** 删除缩略图：只删 wallpaper_thumbs 里确实存在的文件，返回是否删了 */
+    deleteWallpaperThumb(thumbPath) {
+        if (!thumbPath) return false;
+        const dir = path.resolve(this._userDataPath, 'wallpaper_thumbs').toLowerCase() + path.sep;
+        const target = path.resolve(thumbPath);
+        if (!target.toLowerCase().startsWith(dir) || !fs.existsSync(target)) return false;
+        try {
+            fs.unlinkSync(target);
+            return true;
+        } catch (err) {
+            console.warn('[Store] 删除壁纸缩略图失败:', err.message);
+            return false;
+        }
     }
 
     // ==================== 深度图缓存 ====================
@@ -343,7 +385,11 @@ class AppStore {
             blurRadius: 5,
             blurRadiusVersion: BLUR_RADIUS_VERSION,
             autoLaunch: false,
-            currentImage: '',
+            currentImage: '',          // 当前的图片壁纸（只放图片，旧版本会把它指向的文件整个读进内存）
+            // 当前的视频壁纸 { path, effect, sound, imageAtTime }，规则见 shared/my-wallpapers.js 的 resolveCurrent。
+            // 它和 myWallpapers 都整体替换，不放进 NESTED_KEYS；迁移标记 myWallpapersVersion 不写默认值（没有它才迁移）
+            currentVideo: null,
+            myWallpapers: [],          // 我的壁纸：用户自己选过的图片和视频
             depthCacheDir: '',
             hideDebugPanel: true,      // 打包后默认隐藏调试面板
             theme: 'dark',             // 设置窗口的界面主题：'dark' | 'light' | 'system'
@@ -433,6 +479,11 @@ class AppStore {
      * 将文件路径 hash 为安全的缓存 key。
      */
     _hashPath(filePath) {
+        return 'depth_' + this._pathHash(filePath);
+    }
+
+    /** 路径 → 十六进制哈希（不分大小写和斜杠写法），深度图和壁纸缩略图的文件名都用它 */
+    _pathHash(filePath) {
         let hash = 0;
         const str = path.resolve(filePath).toLowerCase();
         for (let i = 0; i < str.length; i++) {
@@ -440,7 +491,7 @@ class AppStore {
             hash = ((hash << 5) - hash) + char;
             hash |= 0; // 32-bit int
         }
-        return 'depth_' + Math.abs(hash).toString(16);
+        return Math.abs(hash).toString(16);
     }
 
     /**
