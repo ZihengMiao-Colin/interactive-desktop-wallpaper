@@ -131,5 +131,38 @@
         return [u * cover.scaleX + cover.offsetX, v * cover.scaleY + cover.offsetY];
     }
 
-    return { coverTransform, strengthFromMultiplier, parallaxUV, rayMarchUV, elementScreenShift, screenToImageUV };
+    /**
+     * 视频壁纸"整体平移"用的 cover：整张画面放大一点，保证移到最边上（位移 maxShift，图片 UV 单位）
+     * 也不会采样到图片外面、露出边缘被拉伸的像素。中心不变，两个方向等比放大。
+     */
+    function panCover(cover, maxShift) {
+        const room = 1 - 2 * maxShift;
+        const z = Math.min(1, room / cover.scaleX, room / cover.scaleY);
+        const scaleX = cover.scaleX * z;
+        const scaleY = cover.scaleY * z;
+        return {
+            scaleX,
+            scaleY,
+            offsetX: cover.offsetX + (cover.scaleX - scaleX) / 2,
+            offsetY: cover.offsetY + (cover.scaleY - scaleY) / 2,
+        };
+    }
+
+    /**
+     * 壁纸效果换算成着色器参数（视频壁纸的三种效果；图片壁纸总是 'depth'）。
+     * - depth：照常按深度图做视差，元素被更近的东西遮挡
+     * - none：完全不动（强度 0），没有深度图所以不遮挡
+     * - pan：配合全白深度图，整张画面都在深度 1、对焦 0，位移 = 鼠标 × 强度；元素也放到深度 1，和画面一起动
+     * @returns {{ strength: number, focus: number, elementDepth: number|null, occlusion: boolean }}
+     */
+    function motionParams(motion, strength, focus) {
+        if (motion === 'none') return { strength: 0, focus, elementDepth: null, occlusion: false };
+        if (motion === 'pan') return { strength, focus: 0, elementDepth: 1, occlusion: false };
+        return { strength, focus, elementDepth: null, occlusion: true };
+    }
+
+    return {
+        coverTransform, strengthFromMultiplier, parallaxUV, rayMarchUV, elementScreenShift, screenToImageUV,
+        panCover, motionParams,
+    };
 });

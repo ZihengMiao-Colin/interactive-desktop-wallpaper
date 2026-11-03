@@ -103,3 +103,38 @@ test('rayMarchUV：斜坡上得到精确解', () => {
     // 深度 = u：要找 u = p + 0.1u，p = 0.45 时 u = 0.5（单次取样得 0.495）
     near(march((u) => u, 0.45, 1)[0], 0.5, 1e-3);
 });
+
+// ---- 视频壁纸：整体平移 ----
+const P = require('../shared/parallax-math');
+const close = approx;
+
+test('panCover：整体平移时放大画面，四周至少留出 maxShift 的余量', () => {
+    const c = P.panCover({ scaleX: 1, scaleY: 0.8, offsetX: 0, offsetY: 0.1 }, 0.05);
+    close(c.scaleX, 0.9); close(c.scaleY, 0.72); close(c.offsetX, 0.05); close(c.offsetY, 0.14);
+    assert.deepEqual(P.panCover({ scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 }, 0), { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 });
+});
+
+test('motionParams：三种效果换算出的强度、对焦、元素深度和遮挡', () => {
+    assert.deepEqual(P.motionParams('depth', 0.02, 0.5), { strength: 0.02, focus: 0.5, elementDepth: null, occlusion: true });
+    assert.deepEqual(P.motionParams('none', 0.02, 0.5), { strength: 0, focus: 0.5, elementDepth: null, occlusion: false });
+    assert.deepEqual(P.motionParams('pan', 0.02, 0.5), { strength: 0.02, focus: 0, elementDepth: 1, occlusion: false });
+    assert.deepEqual(P.motionParams('zoom', 0.02, 0.5), P.motionParams('depth', 0.02, 0.5));
+});
+
+test('整体平移：元素的屏幕位移和背景一样，移到最边上也不出图片范围', () => {
+    const s = P.strengthFromMultiplier(30);
+    const cover = P.panCover(P.coverTransform(1920, 1080, 1920, 1080), s);
+    const m = P.motionParams('pan', s, 0.5);
+    for (const [mx, my] of [[1, 1], [-1, -1], [0.6, -0.4]]) {
+        const [u, v] = P.rayMarchUV(() => 1, 0.5, 0.5, mx, my, m.focus, m.strength, 1, 1);
+        const [dx, dy] = P.elementScreenShift(mx, my, m.elementDepth, m.focus, m.strength, cover);
+        close(dx, -(u - 0.5) / cover.scaleX);
+        close(dy, -(v - 0.5) / cover.scaleY);
+        // 屏幕四角对应的图片 UV 加上位移后仍在 [0, 1] 里
+        for (const [sx, sy] of [[0, 0], [1, 1]]) {
+            const [iu, iv] = P.screenToImageUV(sx, sy, cover);
+            const [ru, rv] = P.rayMarchUV(() => 1, iu, iv, mx, my, m.focus, m.strength, 1, 1);
+            assert.ok(ru >= -1e-9 && ru <= 1 + 1e-9 && rv >= -1e-9 && rv <= 1 + 1e-9);
+        }
+    }
+});
