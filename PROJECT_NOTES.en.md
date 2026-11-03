@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-03 (video wallpapers + My wallpapers, on the `feature/video-wallpaper` branch, see §9 Phase 11; the same day the debug panel in the top-right of the wallpaper page was removed, see §8 item 15)
+> Last updated: 2026-11-03 (video wallpapers + My wallpapers, merged into main, not pushed yet, see §9 Phase 11; the same day the debug panel in the top-right of the wallpaper page was removed, see §8 item 15)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -454,7 +454,7 @@ The user asked the assistant to redo the frontend with their own personal skill 
 - Verified: in Electron (real config copied into a separate data directory, screenshots over the debug port) the six pages, the elements page with elements, the help popup, the uninstall dialog, the toast, the gallery's selected state, dark / light, and the 820×560 minimum window (no horizontal scrollbar); when switching themes, a real screen capture showed the system button strip changing color too while the wallpaper window stayed dark, and follow-system read this machine's dark setting; the bundled serif font really loads. In the browser preview: placement mode, loading, debug panel, toast, with no console errors. `npm test`: all 180 pass (new test for the theme default).
 - Not tested: a machine without Noto fonts; actually dragging an element in Electron's placement window (only looked at it in the browser preview); the packaged installer (the fonts are under `ui/**/*`, so they should be included).
 
-### ✅ Phase 11 — Video wallpapers + My wallpapers (2026-11-03, `feature/video-wallpaper` branch)
+### ✅ Phase 11 — Video wallpapers + My wallpapers (2026-11-03, built on the `feature/video-wallpaper` branch, then merged into main)
 The user wanted to set a video directly as the wallpaper (previously videos could only be added as "elements"). Design: [docs/superpowers/specs/2026-11-02-video-wallpaper-design.md](docs/superpowers/specs/2026-11-02-video-wallpaper-design.md); plan: [docs/superpowers/plans/2026-11-03-video-wallpaper.md](docs/superpowers/plans/2026-11-03-video-wallpaper.md).
 - Positioning: a standalone addition whose point is "use a video as the wallpaper"; the mouse-following effects are an extra experiment. Each video has three effects: still (default), 3D parallax, whole-picture pan; the sound switch defaults to off. Effect and sound are saved to the video's record immediately but only reach the desktop after "Apply wallpaper".
 - Entry point (chosen by the user after five mockups): "My wallpapers" on the Wallpaper page is always shown, its first tile is "Choose from computer… / image or video", followed by the user's own images and videos (most recently used first, videos show ▶ duration, hover × removes from the list without deleting the file; missing files show "file not found"). The default gallery no longer has an add tile.
