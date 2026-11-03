@@ -50,5 +50,23 @@
         return reason === 'covered' && sound === true;
     }
 
-    return { IdleTracker, isSettled, SETTLE_EPSILON, keepVideoPlaying };
+    /**
+     * 主进程该给壁纸窗口发什么：几种状态分开记，按优先级合成一个暂停原因，变了才发。
+     * 摆放元素 > 锁屏 / 睡眠 > 被窗口挡住（全屏检测）> 正常。锁屏期间全屏检测照常在跑，
+     * 不分开记的话 covered 会盖掉锁屏，开了声音的视频会在锁屏界面出声。
+     * @param {{type: 'pause', reason: string} | {type: 'resume'} | null} prev - 上一次发出的消息（还没发过为 null，当成正常）
+     * @param {{placement: boolean, system: boolean, covered: boolean}} state
+     * @returns {{type: 'pause', reason: 'placement'|'system'|'covered', silent: boolean} | {type: 'resume', silent: boolean} | null}
+     *   null 表示不用发。已经暂停时只是换原因、摆放的进出都不弹提示
+     */
+    function nextWallpaperSignal(prev, { placement, system, covered }) {
+        const reason = placement ? 'placement' : system ? 'system' : covered ? 'covered' : null;
+        const wasPaused = !!prev && prev.type === 'pause';
+        const prevReason = wasPaused ? prev.reason : null;
+        if (reason === prevReason) return null;
+        if (reason) return { type: 'pause', reason, silent: reason === 'placement' || wasPaused };
+        return { type: 'resume', silent: prevReason === 'placement' };
+    }
+
+    return { IdleTracker, isSettled, SETTLE_EPSILON, keepVideoPlaying, nextWallpaperSignal };
 });

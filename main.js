@@ -58,6 +58,7 @@ const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
 const myWallpapers = require('./shared/my-wallpapers');
+const { nextWallpaperSignal } = require('./shared/frame-pacing');
 const { findDepthModel, generateDepthPng } = require('./src/depth/generator');
 const { DEFAULT_BLUR } = require('./src/depth/processing');
 const { findUninstaller, launchUninstaller } = require('./src/uninstaller');
@@ -451,9 +452,8 @@ function createPlacementWindow() {
     });
     if (isDev) win.webContents.openDevTools({ mode: 'detach' });
 
-    if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-        wallpaperWindow.webContents.send('renderer:pause', { silent: true, reason: 'placement' });
-    }
+    isPlacing = true;
+    syncWallpaperSignal();
     return win;
 }
 
@@ -470,7 +470,8 @@ function createPlacementController() {
             store.saveConfig({ customElements: upsertInstance(customElements, result) });
         },
         onEnd: () => {
-            resumeWallpaper({ silent: true });
+            isPlacing = false;
+            syncWallpaperSignal();
             broadcastConfig();
         },
     });
@@ -806,6 +807,9 @@ function registerIpcHandlers() {
         if (fullscreenDetector) {
             fullscreenDetector.setRendererReady(true);
         }
+        // 新加载的壁纸页是运行状态：当前该暂停的话重新发一次
+        lastWallpaperSignal = null;
+        syncWallpaperSignal();
     });
 
     ipcMain.on('renderer:depthGenerated', (_event, { imagePath, depthDataUrl }) => {
@@ -943,21 +947,34 @@ function migrateAutoLaunch() {
 
 // ==================== 暂停 / 恢复 ====================
 
+/** 锁屏中（lock-screen 到 unlock-screen） */
+let isScreenLocked = false;
+/** 睡眠中（suspend 到 resume） */
+let isSuspended = false;
+/** 摆放窗口开着（createPlacementWindow 到摆放结束） */
+let isPlacing = false;
+/** 上一次发给壁纸窗口的暂停 / 恢复消息 */
+let lastWallpaperSignal = null;
+
 /**
- * 系统事件（全屏应用退出、唤醒、解锁）和摆放结束之后恢复壁纸渲染。
- * 正在摆放元素时不恢复，摆放结束时 PlacementController 会负责恢复。
- * 全屏应用还开着时不恢复（全屏检测只在状态变化时通知，恢复了就不会再暂停），
- * 改成按"被窗口挡住"重新暂停一次：开了声音的视频壁纸在锁屏后要接着出声。
- * @param {{silent?: boolean}} [info]
+ * 按摆放、锁屏 / 睡眠、被窗口挡住几种状态，给壁纸窗口发暂停（带原因）或恢复，状态没变不发。
+ * 规则在 shared/frame-pacing.js 的 nextWallpaperSignal：锁屏期间全屏检测怎么变都不会恢复，
+ * 解锁时还被挡着就换成 covered（开了声音的视频壁纸接着出声）。
  */
-function resumeWallpaper(info = {}) {
-    if (placement && placement.active) return;
+function syncWallpaperSignal() {
     if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return;
-    if (!isRenderingActive) {
-        wallpaperWindow.webContents.send('renderer:pause', { silent: true, reason: 'covered' });
-        return;
+    const next = nextWallpaperSignal(lastWallpaperSignal, {
+        placement: isPlacing,
+        system: isScreenLocked || isSuspended,
+        covered: !isRenderingActive,
+    });
+    if (!next) return;
+    lastWallpaperSignal = next;
+    if (next.type === 'pause') {
+        wallpaperWindow.webContents.send('renderer:pause', { reason: next.reason, silent: next.silent });
+    } else {
+        wallpaperWindow.webContents.send('renderer:resume', { silent: next.silent });
     }
-    wallpaperWindow.webContents.send('renderer:resume', info);
 }
 
 // ==================== 全屏检测 ====================
@@ -969,14 +986,12 @@ function startFullscreenDetection() {
         onFullscreenStart: () => {
             console.log('[Main] Fullscreen app detected, pausing render');
             isRenderingActive = false;
-            if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-                wallpaperWindow.webContents.send('renderer:pause', { reason: 'covered' });
-            }
+            syncWallpaperSignal();
         },
         onFullscreenEnd: () => {
             console.log('[Main] Fullscreen app exited, resuming render');
             isRenderingActive = true;
-            resumeWallpaper();
+            syncWallpaperSignal();
         },
     });
 
@@ -986,25 +1001,24 @@ function startFullscreenDetection() {
 // ==================== 电源状态监听 ====================
 
 function setupPowerMonitor() {
-    // 系统进入睡眠/锁定 → 暂停渲染
+    // 睡眠 / 锁屏单独记，唤醒时还锁着屏就不恢复（睡眠前通常会先锁屏）。
+    // 监听器第一个参数是 Electron 的事件对象，不要直接传给发 IPC 的函数（序列化不了）
     powerMonitor.on('suspend', () => {
-        if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-            wallpaperWindow.webContents.send('renderer:pause', { reason: 'system' });
-        }
+        isSuspended = true;
+        syncWallpaperSignal();
     });
-
-    // 系统唤醒 → 恢复渲染（全屏应用还开着时不恢复）
-    powerMonitor.on('resume', resumeWallpaper);
-
-    // 锁屏
+    powerMonitor.on('resume', () => {
+        isSuspended = false;
+        syncWallpaperSignal();
+    });
     powerMonitor.on('lock-screen', () => {
-        if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-            wallpaperWindow.webContents.send('renderer:pause', { reason: 'system' });
-        }
+        isScreenLocked = true;
+        syncWallpaperSignal();
     });
-
-    // 解锁
-    powerMonitor.on('unlock-screen', resumeWallpaper);
+    powerMonitor.on('unlock-screen', () => {
+        isScreenLocked = false;
+        syncWallpaperSignal();
+    });
 }
 
 // ==================== 清理和退出 ====================

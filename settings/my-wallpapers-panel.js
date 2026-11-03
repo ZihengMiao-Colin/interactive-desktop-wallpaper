@@ -128,11 +128,19 @@ function initMyWallpapersPanel({ api, onSelect, onPick, setStatus }) {
         hintEl.textContent = list.length ? '只记住位置，原文件挪走后会失效' : '你自己的图片和视频';
     }
 
+    /** 上一次画的时候的列表和当前壁纸（拖滑块时每秒广播好几次配置，没变就不重画，免得反复查文件在不在） */
+    let renderedKey = '';
+
     function refresh(config) {
         if (!config) return;
-        list = MW.normalizeList(config.myWallpapers);
+        const nextList = MW.normalizeList(config.myWallpapers);
         const current = MW.resolveCurrent(config);
-        currentPath = current ? current.path : '';
+        const nextPath = current ? current.path : '';
+        const key = JSON.stringify([nextList, nextPath]);
+        if (key === renderedKey) return;
+        renderedKey = key;
+        list = nextList;
+        currentPath = nextPath;
         render();
     }
 
