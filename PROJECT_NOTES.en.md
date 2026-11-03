@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-03 (video wallpapers + My wallpapers, merged into main, not pushed yet, see §9 Phase 11; the same day the debug panel in the top-right of the wallpaper page was removed, see §8 item 15)
+> Last updated: 2026-11-03 (video wallpapers + My wallpapers, merged into main and pushed to GitHub (no new release), see §9 Phase 11; the same day the debug panel in the top-right of the wallpaper page was removed, see §8 item 15)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
