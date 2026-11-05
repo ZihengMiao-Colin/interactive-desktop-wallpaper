@@ -254,6 +254,9 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     aspect-ratio: 16 / 7.4;
 }
 .preview-slot.compact { aspect-ratio: 16 / 6; margin-bottom: 4px; }
+/* 窗口矮时预览让出高度，不用滚动就能看到第一排默认壁纸（400 = 窗口里预览以外的部分到第一排底部的总高）。
+   width 要写死：不然 aspect-ratio 会按 max-height 把宽度也缩小 */
+#preview-slot-wallpaper { width: 100%; max-height: max(180px, calc(100vh - 400px)); }
 .preview {
     position: absolute;
     inset: 0;
@@ -386,8 +389,8 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     display: flex;
     align-items: center;
     gap: 10px 18px;
-    margin-top: 18px;
-    padding: 12px 14px 12px 20px;
+    margin-top: 12px;
+    padding: 8px 14px 8px 20px;
 }
 /* 状态区占剩下的宽度，进度文字太长就省略 */
 .depth-state { display: flex; flex: 1 1 160px; align-items: center; gap: 12px; min-width: 0; }
@@ -517,6 +520,9 @@ h1, h2, h3 { font-feature-settings: "palt"; }
 .depth-bar.no-depth .smooth,
 .depth-bar.no-depth #btn-generate-depth { display: none; }
 .depth-bar.no-depth .depth-actions { margin-left: auto; }
+/* 视频的 3D 视差：效果按钮加上深度图那一套，窗口不够宽时一行放不下，换到第二行，按钮靠右 */
+.depth-bar.video-depth { flex-wrap: wrap; }
+.depth-bar.video-depth .depth-actions { margin-left: auto; padding-left: 0; border-left: 0; }
 
 /* ==================== 缩略图（图库、视频特效）：切角图 + 悬停 / 选中外框 ==================== */
 .gallery {
@@ -524,6 +530,11 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
     gap: 16px 12px;
 }
+/* 壁纸页要在默认窗口（960×660）里一屏放下预览、我的壁纸和第一排默认壁纸：缩略图小一号，间距收紧 */
+#page-wallpaper { padding-top: 18px; }
+#page-wallpaper .group { margin-top: 18px; }
+#page-wallpaper .group-head { margin-bottom: 10px; }
+#page-wallpaper .gallery { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 14px 10px; }
 .wp,
 .preset {
     --cut: 10px;
@@ -644,7 +655,7 @@ h1, h2, h3 { font-feature-settings: "palt"; }
 .wp .rm:focus-visible { opacity: 1; }
 .wp:disabled .rm { display: none; }
 /* 有 × 的时候"使用中"往左让一让 */
-.mine .wp:hover .using { right: 34px; }
+.mine .wp:hover .using { right: 30px; }
 .wp .missing-chip { position: absolute; top: 6px; left: 6px; z-index: 1; }
 .wp.missing img { opacity: 0.35; }
 /* "从电脑选择"：自己画切角框（.wp 的外框不用） */
@@ -659,9 +670,9 @@ h1, h2, h3 { font-feature-settings: "palt"; }
 }
 .wp .box::before { inset: 0; z-index: -2; background: var(--line-strong); transition: background-color 0.12s; }
 .wp .box::after { inset: 1px; z-index: -1; background: var(--bg-2); }
-.wp .box span { display: grid; justify-items: center; gap: 6px; font-size: 12px; }
-.wp .box svg.i { width: 20px; height: 20px; }
-.wp .box small { margin-top: -4px; color: var(--text-3); font-size: 11px; }
+.wp .box span { display: grid; justify-items: center; gap: 3px; font-size: 12px; line-height: 1.3; }
+.wp .box svg.i { width: 18px; height: 18px; }
+.wp .box small { margin-top: -2px; color: var(--text-3); font-size: 11px; }
 .wp.add:hover .box { color: var(--accent-text); }
 .wp.add:hover .box::before { background: var(--accent-text); }
 .wp:disabled { cursor: not-allowed; opacity: 0.5; }

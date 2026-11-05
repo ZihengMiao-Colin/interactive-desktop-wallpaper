@@ -272,6 +272,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 10. ~~Single-instance lock taken after `whenReady`~~ ✅ If the lock is not obtained, the startup flow is not registered
 11. ~~Depth cache keyed only on file size~~ ✅ Now size + modification time (old index entries without a modification time still compare size only)
 12. Only the small model is used (user decision). The `modelSize` parameter was removed from `generateDepthMap`.
+26. ~~With a 3D parallax video selected, the action bar does not fit the default 960-wide window and "应用壁纸" (Apply wallpaper) ends up outside the window~~ ✅ 2026-11-04 it now wraps to a second row when it does not fit (see Phase 13)
 
 ### 🟡 P2
 13. ~~Dead code~~ ✅ Cleaned up when `app.js` was split
@@ -492,6 +493,23 @@ The user installed the test installer `Interactive3DWallpaper-Setup-1.1.1-test.e
 Limitation: if injection really fails (say Windows changes the desktop structure again) it still falls back to the mode where the wallpaper covers the icons.
 
 Phases 8 to 12 together become the **v1.2.0** release (2026-11-04): the `package.json` version is now 1.2.0 (it has new features such as video wallpapers, so it is not 1.1.1), `npm test` all 230 passing; after packaging, `app.asar` was extracted and compared with the source with no differences, and compared with the test build the user tried on the affected computer only `package.json` differs; `dist/win-unpacked` was run with a fresh data folder: injection succeeded, no child processes other than the app's own.
+
+### ✅ Phase 13 — Default wallpapers visible without scrolling (2026-11-04)
+
+User feedback: when the settings window opens, the "默认壁纸" (Default wallpapers) title sits just below the bottom edge (at 960×660 it starts at 661px), so you cannot tell the default wallpapers exist without scrolling. Making the window taller (960×840) was tried first, but the user found the proportions ugly, so the window went back to 960×660 and the proportions inside the page changed instead.
+
+- Preview: still 16:7.4, but capped at `100vh - 400px` (at least 180px), so in the default window it goes from 318 to 260. The preview grows with the window, and the first row always stays in view. `#preview-slot-wallpaper` needs `width: 100%`, otherwise `aspect-ratio` shrinks the width along with `max-height`.
+- Thumbnails (Wallpaper page only): minimum width 124 → 100px, so the default window shows 6 per row instead of 5, and cards go from 106 to 92 high. "从电脑选择…" (Choose from computer) stays in the first slot (the user's decision in Phase 11); its icon and spacing are slightly smaller.
+- Spacing (Wallpaper page only): page top 26 → 18, action bar vertical padding 12 → 8 and top margin 18 → 12, between groups 34 → 18, under group titles 14 → 10.
+- In "我的壁纸" (My wallpapers) the "使用中" (In use) chip moves 30px instead of 34px on hover to clear the ×, otherwise it sticks out past the left edge of the smaller card.
+
+Verification: measured in Electron (separate data folder + debug port) at 960×660: the title is at 531–550 and the first row of 6 at 560–653, the same with a fresh config and with 4 entries in My wallpapers, and no horizontal scroll. Other sizes (viewport emulation): the first row is complete at 1100×760 (7 per row) and 1707×1019 (13 per row); at the 820×560 minimum the preview is 180 high, most of the first row's thumbnails show, and there is no horizontal scroll. The Parallax page preview is still 16:6. `npm test`: all 230 pass.
+
+Limitation: once My wallpapers wraps to a second row (more than 5 entries), the default wallpapers are pushed out of view (see §8 item 24).
+
+An older problem found during testing (present since video wallpapers were added): with a video set to 3D parallax selected, the action bar does not fit on one row, and it used to wrap only below 900px, so in the default 960-wide window "生成深度图" (Generate depth map) was cut off, "应用壁纸" (Apply wallpaper) ended up outside the window, and the status text overlapped "边缘平滑" (Edge smoothing). That state now has a `video-depth` class (`settings/wallpaper-page.js`) and wraps when it does not fit: effect, sound and depth map status on the first row, edge smoothing and the buttons on the second, with the buttons on the right. Images and the "不动" (Still) and "整体平移" (Pan) effects stay on one row.
+
+Verification: in Electron, went through selecting a video → switching the three effects → clicking "生成深度图" → clicking "应用壁纸" (the toast confirmed it and `currentVideo` was written to `config.json`) → switching back to an image. The center points of both buttons are clickable, nothing extends past the action bar, and the status text no longer overlaps. The bar is 85 high on two rows, and in the default window 62 of the 66px of the first row's thumbnails show. It wraps at 820×560, 1100×760 and 1300×760, and stays on one row at 1707×1019 where there is enough width, with no horizontal scroll at any size. No errors in the main process log. `npm test`: all 230 pass.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

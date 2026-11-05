@@ -129,6 +129,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
     function showVideoControls(video) {
         videoCtrl.hidden = !video;
         depthBar.classList.toggle('no-depth', !!video && video.effect !== 'depth');
+        depthBar.classList.toggle('video-depth', !!video && video.effect === 'depth');
         if (!video) return;
         motionSeg.set(video.effect);
         soundToggle.checked = video.sound;
