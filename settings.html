@@ -382,6 +382,7 @@
                         <div class="row-label"><div class="t" id="unlock-video-name">还没有选择视频</div><div class="d" id="unlock-video-duration">选一段视频，解锁后全屏播放</div></div>
                         <div class="row-ctrl">
                             <button type="button" class="btn sm" id="btn-unlock-select"><svg class="i"><use href="#i-folder-open"/></svg>选择视频…</button>
+                            <button type="button" class="btn sm ghost" id="btn-unlock-crop" disabled><svg class="i"><use href="#i-crop"/></svg>重新裁剪</button>
                             <button type="button" class="btn sm ghost" id="btn-unlock-remove" disabled><svg class="i"><use href="#i-trash-2"/></svg>移除</button>
                         </div>
                     </div>
@@ -484,6 +485,35 @@
         </div>
     </dialog>
 
+    <!-- 裁剪框（settings/crop-dialog.js）：导入壁纸、解锁视频时弹出 -->
+    <dialog class="confirm crop-dialog" id="crop-dialog" aria-labelledby="crop-title">
+        <div class="crop-head">
+            <h2 id="crop-title">裁剪画面</h2>
+            <span class="crop-name" id="crop-name"></span>
+        </div>
+        <div class="crop-stage" id="crop-stage">
+            <div class="crop-box" id="crop-box">
+                <i class="crop-handle nw" data-corner="nw"></i>
+                <i class="crop-handle ne" data-corner="ne"></i>
+                <i class="crop-handle sw" data-corner="sw"></i>
+                <i class="crop-handle se" data-corner="se"></i>
+            </div>
+        </div>
+        <label class="crop-time" id="crop-time" hidden>
+            <span>换一帧看</span>
+            <input type="range" id="crop-time-slider" min="0" max="1" step="0.01" value="0">
+            <span class="value" id="crop-time-value">0:00</span>
+        </label>
+        <div class="crop-foot">
+            <span class="chip accent" id="crop-ratio"></span>
+            <span class="chip warn" id="crop-lowres" hidden><svg class="i"><use href="#i-info"/></svg>比屏幕分辨率小，可能会模糊</span>
+            <span class="crop-spacer"></span>
+            <button type="button" class="btn sm ghost" id="crop-reset">恢复默认</button>
+            <button type="button" class="btn sm ghost" id="crop-cancel">取消</button>
+            <button type="button" class="btn sm primary" id="crop-confirm" autofocus>确定</button>
+        </div>
+    </dialog>
+
     <!-- 操作结果提示 -->
     <div class="toast" id="toast" role="status" aria-live="polite">
         <svg class="i"><use id="toast-icon" href="#i-info"/></svg><span id="toast-text"></span>
@@ -495,6 +525,7 @@
     <script src="shared/frame-pacing.js"></script>
     <script src="shared/elements-model.js"></script>
     <script src="shared/playlist.js"></script>
+    <script src="shared/crop.js"></script>
     <script src="shared/my-wallpapers.js"></script>
     <script src="shared/unlock-animation.js"></script>
     <script src="renderer/shaders.js"></script>
@@ -504,6 +535,7 @@
     <script src="settings/my-wallpapers-panel.js"></script>
     <script src="settings/gallery-panel.js"></script>
     <script src="settings/thumbnail.js"></script>
+    <script src="settings/crop-dialog.js"></script>
     <script src="settings/wallpaper-page.js"></script>
     <script src="settings/parallax-page.js"></script>
     <script src="settings/elements-tab.js"></script>

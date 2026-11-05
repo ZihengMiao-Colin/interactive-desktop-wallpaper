@@ -5,6 +5,8 @@
  * 默认壁纸自带深度图；自己的图片先找缓存，没有就要"生成深度图"。
  * 视频有三种效果（不动 / 3D 视差 / 整体平移）和声音开关，改了立刻存进「我的壁纸」里这个视频的记录，
  * 同样要点"应用壁纸"才影响桌面；3D 视差和图片一样要先有深度图。
+ * 导入时先弹裁剪框（点取消等于没导入），之后可以在「我的壁纸」里重新裁。
+ * 裁剪是例外：改的是桌面上正在用的壁纸时马上更新，不用再点"应用壁纸"，否则用户看到水印还在，会以为没成功。
  * 托盘"更换壁纸"选的图片没有深度图时，主进程会把它转到这里：生成完直接应用。
  */
 
@@ -22,10 +24,11 @@ const IMAGE_UNREADABLE_MSG = '这张图片读不出来';
  *   setStatus: (msg: string, cls?: string) => void,
  *   setNowUsing: (info: { name: string, thumbUrl: string } | null) => void,
  *   preview: ReturnType<typeof initDepthPreview>,
+ *   cropDialog: ReturnType<typeof initCropDialog>,
  * }} deps
  * @returns {{ load: (config: object) => Promise<void>, setBlur: (value: number) => void, markDepthStale: () => void }}
  */
-function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
+function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview, cropDialog }) {
     const { el, setRange, bindRange, segmented } = Controls;
     const MW = Shared.myWallpapers;
     const depthBar = document.querySelector('.depth-bar');
@@ -169,10 +172,11 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
      * 选中一张图片：显示预览并检查深度图（只选中，不应用到桌面）。
      * 默认壁纸自带深度图，"生成深度图"按钮保持灰色。
      * @param {string} imagePath
-     * @param {{quiet?: boolean}} [options] - quiet 为 true 时不弹提示（打开设置窗口时恢复当前壁纸用）
+     * @param {{quiet?: boolean, crop?: object}} [options] - quiet 为 true 时不弹提示（打开设置窗口时恢复当前壁纸用）；
+     *   crop 不传时按「我的壁纸」里记的
      * @returns {Promise<boolean>} 是否已有可用的深度图
      */
-    async function selectImagePath(imagePath, { quiet = false } = {}) {
+    async function selectImagePath(imagePath, { quiet = false, crop } = {}) {
         const galleryEntry = gallery.find(imagePath);
         selectedPath = imagePath;
         selectedVideo = null;
@@ -184,7 +188,14 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
 
         const name = galleryEntry ? galleryEntry.name : fileName(imagePath);
         const dataUrl = api.readFileAsDataURL(imagePath);
-        if (dataUrl) preview.showImage(dataUrl, { name, tag: galleryEntry ? '默认壁纸' : '你的图片' });
+        const entry = MW.findEntry(latestConfig.myWallpapers, imagePath);
+        if (dataUrl) {
+            preview.showImage(dataUrl, {
+                name,
+                tag: galleryEntry ? '默认壁纸' : '你的图片',
+                crop: crop || (entry && entry.crop),
+            });
+        }
         refreshNowUsing();
         showDepthState('none');
 
@@ -210,7 +221,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
 
     /**
      * 选中一个视频（「我的壁纸」里的记录）：预览开始播放，操作栏换成效果和声音。
-     * @param {{path: string, effect: string, sound: boolean}} entry
+     * @param {{path: string, effect: string, sound: boolean, crop?: object}} entry
      * @param {{quiet?: boolean}} [options]
      * @returns {Promise<boolean>} 视频能不能放
      */
@@ -225,7 +236,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
         showDepthState('none');
         refreshNowUsing();
         try {
-            await preview.showVideo(api.toFileUrl(video.path), { name: fileName(video.path), tag: '你的视频' });
+            await preview.showVideo(api.toFileUrl(video.path), { name: fileName(video.path), tag: '你的视频', crop: entry.crop });
         } catch (err) {
             console.error('预览视频失败:', err);
             if (selectedVideo === video) setStatus(VIDEO_UNSUPPORTED_MSG, 'error');
@@ -239,32 +250,63 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
 
     /** 选中「我的壁纸」里的一条（图片或视频） */
     function selectEntry(entry, options) {
-        return entry.type === 'video' ? selectVideo(entry, options) : selectImagePath(entry.path, options);
+        return entry.type === 'video' ? selectVideo(entry, options) : selectImagePath(entry.path, { ...options, crop: entry.crop });
+    }
+
+    /** 改的是桌面上正在用的壁纸时马上更新（视频会从头放）。返回有没有更新 */
+    async function refreshDesktop(filePath) {
+        if (!current || !samePath(current.path, filePath)) return false;
+        await api.applyWallpaper(current);
+        return true;
     }
 
     /**
-     * "从电脑选择…"：选一张图片或一个视频，先确认能读（顺便生成缩略图），
-     * 能读就放进「我的壁纸」并选中；读不了只报错，不加进列表。
+     * "从电脑选择…"：选一张图片或一个视频，弹裁剪框（顺便确认能读），
+     * 点确定就放进「我的壁纸」并选中；点取消等于没选；读不了只报错，不加进列表。
      */
     async function pickFromComputer() {
         try {
             const picked = await api.selectWallpaperFile();
             if (!picked) return;
-            let info;
+            const url = api.toFileUrl(picked.path);
+            const existing = MW.findEntry(latestConfig.myWallpapers, picked.path);
+            let crop;
             try {
-                info = await makeThumbnailInfo(api.toFileUrl(picked.path), picked.type);
+                crop = await cropDialog.open({
+                    type: picked.type, url, name: fileName(picked.path), crop: existing && existing.crop,
+                });
             } catch (err) {
                 console.error('读取所选文件失败:', err);
                 setStatus(picked.type === 'video' ? VIDEO_UNSUPPORTED_MSG : IMAGE_UNREADABLE_MSG, 'error');
                 return;
             }
+            if (!crop) return;
+            const info = await makeThumbnailInfo(url, picked.type, crop);
             const entry = await api.myWallpapers.add({
-                path: picked.path, type: picked.type, thumbDataUrl: info.dataUrl, duration: info.duration,
+                path: picked.path, type: picked.type, thumbDataUrl: info.dataUrl, duration: info.duration, crop,
             });
             await selectEntry(entry);
+            await refreshDesktop(entry.path);
         } catch (err) {
             console.error('选择壁纸失败:', err);
             setStatus('选择壁纸失败：' + err.message, 'error');
+        }
+    }
+
+    /** 「我的壁纸」格子上的裁剪按钮：重新裁一个已经导入的壁纸 */
+    async function recropEntry(entry) {
+        try {
+            const url = api.toFileUrl(entry.path);
+            const crop = await cropDialog.open({ type: entry.type, url, name: fileName(entry.path), crop: entry.crop });
+            if (!crop) return;
+            const info = await makeThumbnailInfo(url, entry.type, crop);
+            await api.myWallpapers.setCrop(entry.path, crop, info.dataUrl);
+            if (samePath(entry.path, selectedPath)) preview.setCrop(crop);
+            const updated = await refreshDesktop(entry.path);
+            setStatus(updated ? '裁剪好了，桌面上的壁纸已更新' : '裁剪好了', 'success');
+        } catch (err) {
+            console.error('裁剪失败:', err);
+            setStatus('裁剪失败：' + err.message, 'error');
         }
     }
 
@@ -277,6 +319,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
         setStatus,
         onSelect: (entry) => selectEntry(entry),
         onPick: () => pickFromComputer(),
+        onCrop: (entry) => recropEntry(entry),
     });
 
     /** 选中标记：默认壁纸和我的壁纸里同一时间只有一个选中 */
@@ -429,7 +472,7 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview }) {
                 const entry = MW.findEntry(config.myWallpapers, current.path) || { ...current };
                 await selectVideo(entry, { quiet: true });
             } else {
-                await selectImagePath(current.path, { quiet: true });
+                await selectImagePath(current.path, { quiet: true, crop: current.crop });
             }
         },
 
