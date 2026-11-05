@@ -23,6 +23,7 @@
             <button type="button" class="nav-item" data-page="elements"><svg class="i"><use href="#i-shapes"/></svg><span class="nav-t">元素<small class="en">Elements</small></span><span class="badge" data-badge="elements"></span></button>
             <button type="button" class="nav-item" data-page="effects"><svg class="i"><use href="#i-sparkles"/></svg><span class="nav-t">特效<small class="en">Effects</small></span></button>
             <button type="button" class="nav-item" data-page="music"><svg class="i"><use href="#i-disc-3"/></svg><span class="nav-t">唱片机<small class="en">Vinyl</small></span></button>
+            <button type="button" class="nav-item" data-page="unlock"><svg class="i"><use href="#i-lock-open"/></svg><span class="nav-t">解锁动画<small class="en">Unlock</small></span></button>
             <div class="nav-spacer"></div>
             <button type="button" class="now-using cf" id="now-using" title="查看当前壁纸" hidden>
                 <img id="now-using-thumb" alt="">
@@ -365,6 +366,51 @@
             </section>
 
             <!-- ==================== 设置 ==================== -->
+            <section class="page" id="page-unlock" aria-label="解锁动画">
+                <div class="page-head">
+                    <div>
+                        <h1>解锁动画<span class="en">Unlock animation</span></h1>
+                        <p>解锁电脑后全屏播放一段你的视频，放完回到桌面。</p>
+                    </div>
+                    <div class="actions">
+                        <label class="switch" title="解锁时播放动画"><input type="checkbox" id="unlock-enabled" disabled><span></span></label>
+                    </div>
+                </div>
+                <div class="list cf">
+                    <div class="row">
+                        <img class="unlock-thumb" id="unlock-thumb" alt="" hidden>
+                        <div class="row-label"><div class="t" id="unlock-video-name">还没有选择视频</div><div class="d" id="unlock-video-duration">选一段视频，解锁后全屏播放</div></div>
+                        <div class="row-ctrl">
+                            <button type="button" class="btn sm" id="btn-unlock-select"><svg class="i"><use href="#i-folder-open"/></svg>选择视频…</button>
+                            <button type="button" class="btn sm ghost" id="btn-unlock-remove" disabled><svg class="i"><use href="#i-trash-2"/></svg>移除</button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="row-label"><div class="t">淡入时长</div><div class="d">解锁后从黑屏淡入视频，0 就是直接显示</div></div>
+                        <div class="row-ctrl">
+                            <input type="range" id="unlock-fade-in" min="0" max="3" step="0.1" value="0.5">
+                            <span class="value" id="unlock-fade-in-value">0.5 秒</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="row-label"><div class="t">淡出时长</div><div class="d">放完后淡出到桌面，0 就是直接消失</div></div>
+                        <div class="row-ctrl">
+                            <input type="range" id="unlock-fade-out" min="0" max="3" step="0.1" value="0.7">
+                            <span class="value" id="unlock-fade-out-value">0.7 秒</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="row-label"><div class="t">声音</div><div class="d">默认关闭，免得在安静的地方突然响</div></div>
+                        <div class="row-ctrl"><label class="switch"><input type="checkbox" id="unlock-sound"><span></span></label></div>
+                    </div>
+                </div>
+                <div class="unlock-actions">
+                    <button type="button" class="btn primary" id="btn-unlock-preview" disabled><svg class="i"><use href="#i-play"/></svg>预览</button>
+                    <span class="note">播放时按 Esc 或点鼠标可以跳过</span>
+                </div>
+                <p class="note" id="unlock-note" hidden></p>
+            </section>
+
             <section class="page" id="page-system" aria-label="设置">
                 <div class="page-head"><div><h1>设置<span class="en">System</span></h1></div></div>
                 <div class="list cf">
@@ -450,6 +496,7 @@
     <script src="shared/elements-model.js"></script>
     <script src="shared/playlist.js"></script>
     <script src="shared/my-wallpapers.js"></script>
+    <script src="shared/unlock-animation.js"></script>
     <script src="renderer/shaders.js"></script>
     <script src="settings/controls.js"></script>
     <script src="settings/shell.js"></script>
@@ -462,6 +509,7 @@
     <script src="settings/elements-tab.js"></script>
     <script src="settings/effects-page.js"></script>
     <script src="settings/music-page.js"></script>
+    <script src="settings/unlock-page.js"></script>
     <script src="settings/system-page.js"></script>
     <script src="settings/main.js"></script>
 </body>

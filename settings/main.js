@@ -42,6 +42,7 @@
     const parallaxPage = initParallaxPage({ api, saver, setStatus, preview, wallpaperPage });
     const effectsPage = initEffectsPage({ api, saver, setStatus });
     const musicPage = initMusicPage({ api, saver, setStatus });
+    const unlockPage = initUnlockPage({ api, saver, setStatus, onPageChange: shell.onPageChange });
     const systemPage = initSystemPage({ api, saver, setStatus, onCacheCleared: () => wallpaperPage.markDepthStale() });
     initElementsTab({ api, setStatus, setBadge: shell.setBadge });
 
@@ -50,6 +51,7 @@
             const config = (await api.getConfig()) || {};
             parallaxPage.load(config);
             musicPage.load(config);
+            unlockPage.load(config);
             await Promise.all([effectsPage.load(config), systemPage.load(config), wallpaperPage.load(config)]);
         } catch (err) {
             console.error('加载配置失败:', err);

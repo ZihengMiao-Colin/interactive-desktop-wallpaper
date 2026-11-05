@@ -846,6 +846,10 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     cursor: pointer;
 }
 .inst .eye:hover { background: var(--raised-hover); color: var(--text); }
+/* 解锁动画页 */
+.unlock-thumb { flex: none; width: 96px; height: 54px; object-fit: cover; }
+.unlock-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+
 .empty {
     padding: 22px 12px;
     color: var(--text-3);
