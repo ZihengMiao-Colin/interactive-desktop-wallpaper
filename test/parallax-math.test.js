@@ -138,3 +138,78 @@ test('整体平移：元素的屏幕位移和背景一样，移到最边上也�
         }
     }
 });
+
+// ---- 裁剪 ----
+
+/** 16:10 的屏幕、3:2 的图片，这张图里和屏幕同比例的区域 */
+const SW = 1600;
+const SH = 1000;
+const IW = 1920;
+const IH = 1280;
+const SAME_RATIO_CROP = { x: 0.2, y: 0.1, w: 0.5, h: 0.5 / (1.6 / 1.5) };
+
+function assertCornersInside(cover, crop) {
+    for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        const [u, v] = P.screenToImageUV(sx, sy, cover);
+        assert.ok(u >= crop.x - 1e-9 && u <= crop.x + crop.w + 1e-9, `u=${u}`);
+        assert.ok(v >= crop.y - 1e-9 && v <= crop.y + crop.h + 1e-9, `v=${v}`);
+    }
+}
+
+test('cropCover：没有裁剪时和 coverTransform 一样，放大比例是 1', () => {
+    assert.deepEqual(P.cropCover(SW, SH, IW, IH, null), P.coverTransform(SW, SH, IW, IH));
+    assert.equal(P.cropZoom(SW, SH, IW, IH, null), 1);
+});
+
+test('cropCover：区域和屏幕同比例时刚好铺满区域', () => {
+    const c = P.cropCover(SW, SH, IW, IH, SAME_RATIO_CROP);
+    close(c.scaleX, SAME_RATIO_CROP.w);
+    close(c.scaleY, SAME_RATIO_CROP.h);
+    close(c.offsetX, SAME_RATIO_CROP.x);
+    close(c.offsetY, SAME_RATIO_CROP.y);
+});
+
+test('cropCover：屏幕比例和区域不一样时（换了显示器）在区域内再裁，不超出', () => {
+    for (const [w, h] of [[1920, 1080], [1000, 1000], [1080, 1920], [3440, 1440]]) {
+        assertCornersInside(P.cropCover(w, h, IW, IH, SAME_RATIO_CROP), SAME_RATIO_CROP);
+    }
+});
+
+test('cropZoom：裁成一半大小，放大比例是一半', () => {
+    const full = P.coverTransform(SW, SH, IW, IH);
+    close(P.cropZoom(SW, SH, IW, IH, SAME_RATIO_CROP), 0.5 / full.scaleX);
+});
+
+test('裁剪后视差在屏幕上的位移和不裁时一样', () => {
+    const s = P.strengthFromMultiplier(10);
+    const k = P.cropZoom(SW, SH, IW, IH, SAME_RATIO_CROP);
+    const plain = P.coverTransform(SW, SH, IW, IH);
+    const cropped = P.cropCover(SW, SH, IW, IH, SAME_RATIO_CROP);
+    const [ax, ay] = P.elementScreenShift(1, -0.6, 0.9, 0.5, s, plain);
+    const [bx, by] = P.elementScreenShift(1, -0.6, 0.9, 0.5, s * k, cropped);
+    close(ax, bx);
+    close(ay, by);
+});
+
+test('cropBounds：没有裁剪时是原来写死的范围，有裁剪时在区域内留一点余量', () => {
+    const [a, b, c, d] = P.cropBounds(null);
+    close(a, 0.001); close(b, 0.001); close(c, 0.999); close(d, 0.999);
+    const crop = { x: 0.2, y: 0.1, w: 0.5, h: 0.4 };
+    const [minX, minY, maxX, maxY] = P.cropBounds(crop);
+    close(minX, 0.2005); close(minY, 0.1004); close(maxX, 0.6995); close(maxY, 0.4996);
+});
+
+test('整体平移：裁剪后移到最边上也不出区域', () => {
+    const k = P.cropZoom(SW, SH, IW, IH, SAME_RATIO_CROP);
+    const s = P.strengthFromMultiplier(30) * k;
+    const cover = P.panCover(P.cropCover(SW, SH, IW, IH, SAME_RATIO_CROP), s, SAME_RATIO_CROP);
+    const m = P.motionParams('pan', s, 0.5);
+    for (const [mx, my] of [[1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+        for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+            const [iu, iv] = P.screenToImageUV(sx, sy, cover);
+            const [ru, rv] = P.rayMarchUV(() => 1, iu, iv, mx, my, m.focus, m.strength, 1, 1);
+            assert.ok(ru >= SAME_RATIO_CROP.x - 1e-9 && ru <= SAME_RATIO_CROP.x + SAME_RATIO_CROP.w + 1e-9, `u=${ru}`);
+            assert.ok(rv >= SAME_RATIO_CROP.y - 1e-9 && rv <= SAME_RATIO_CROP.y + SAME_RATIO_CROP.h + 1e-9, `v=${rv}`);
+        }
+    }
+});

@@ -11,6 +11,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
     'use strict';
 
+    /** 取色时离边界留的余量（占区域尺寸的比例） */
+    const EDGE_MARGIN = 0.001;
+
     /**
      * 原图以 Cover 方式铺满屏幕时，屏幕 UV → 图片 UV 的缩放与偏移。
      * imageUV = screenUV × scale + offset
@@ -29,6 +32,41 @@
             t.offsetX = (1 - t.scaleX) * 0.5;
         }
         return t;
+    }
+
+    /**
+     * 裁剪后的 Cover 映射：在裁剪区域（相对原图的比例）里铺满屏幕，屏幕四角一定落在区域内。
+     * 区域比例和屏幕不一样时（换了显示器）在区域内再居中裁，不会超出。没有裁剪时就是 coverTransform。
+     */
+    function cropCover(screenW, screenH, imgW, imgH, crop) {
+        if (!crop) return coverTransform(screenW, screenH, imgW, imgH);
+        const inner = coverTransform(screenW, screenH, imgW * crop.w, imgH * crop.h);
+        return {
+            scaleX: inner.scaleX * crop.w,
+            scaleY: inner.scaleY * crop.h,
+            offsetX: crop.x + inner.offsetX * crop.w,
+            offsetY: crop.y + inner.offsetY * crop.h,
+        };
+    }
+
+    /**
+     * 裁剪让画面放大了多少（≤ 1，1 是没放大）。视差位移是图片 UV 单位，放大后屏幕上动得更厉害，
+     * 强度乘上它，屏幕上的位移就和不裁时一样。
+     */
+    function cropZoom(screenW, screenH, imgW, imgH, crop) {
+        if (!crop) return 1;
+        return cropCover(screenW, screenH, imgW, imgH, crop).scaleX / coverTransform(screenW, screenH, imgW, imgH).scaleX;
+    }
+
+    /**
+     * 着色器取色的范围 [minX, minY, maxX, maxY]（图片 UV）。视差会取到屏幕外的内容，
+     * 不限制的话裁掉的部分（比如水印）会滑进画面。留一点余量，免得取到边界外的像素。
+     */
+    function cropBounds(crop) {
+        const c = crop || { x: 0, y: 0, w: 1, h: 1 };
+        const mx = c.w * EDGE_MARGIN;
+        const my = c.h * EDGE_MARGIN;
+        return [c.x + mx, c.y + my, c.x + c.w - mx, c.y + c.h - my];
     }
 
     /** 设置里的"视差强度"（5~100）换算成着色器的 uStrength */
@@ -133,11 +171,12 @@
 
     /**
      * 视频壁纸"整体平移"用的 cover：整张画面放大一点，保证移到最边上（位移 maxShift，图片 UV 单位）
-     * 也不会采样到图片外面、露出边缘被拉伸的像素。中心不变，两个方向等比放大。
+     * 也不会采样到图片（有裁剪时是裁剪区域）外面、露出边缘被拉伸的像素。中心不变，两个方向等比放大。
      */
-    function panCover(cover, maxShift) {
-        const room = 1 - 2 * maxShift;
-        const z = Math.min(1, room / cover.scaleX, room / cover.scaleY);
+    function panCover(cover, maxShift, crop = null) {
+        const roomX = (crop ? crop.w : 1) - 2 * maxShift;
+        const roomY = (crop ? crop.h : 1) - 2 * maxShift;
+        const z = Math.min(1, roomX / cover.scaleX, roomY / cover.scaleY);
         const scaleX = cover.scaleX * z;
         const scaleY = cover.scaleY * z;
         return {
@@ -162,7 +201,7 @@
     }
 
     return {
-        coverTransform, strengthFromMultiplier, parallaxUV, rayMarchUV, elementScreenShift, screenToImageUV,
+        coverTransform, cropCover, cropZoom, cropBounds, strengthFromMultiplier, parallaxUV, rayMarchUV, elementScreenShift, screenToImageUV,
         panCover, motionParams,
     };
 });
