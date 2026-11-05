@@ -75,3 +75,9 @@ test('refitPlayerWindow 把窗口压回最上面：任务栏是前台窗口时�
     refitPlayerWindow(win, fakeScreen);
     assert.deepEqual(calls, ['setBounds', 'moveTop']);
 });
+
+test('有裁剪时 query 带上，没有时没有这个键', () => {
+    const crop = { x: 0.125, y: 0.25, w: 0.5, h: 0.5 };
+    assert.equal(make({ crop }).calls[2][2].query.crop, '0.125,0.25,0.5,0.5');
+    assert.equal('crop' in make().calls[2][2].query, false);
+});

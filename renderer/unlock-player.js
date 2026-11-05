@@ -24,6 +24,9 @@
 
     video.muted = query.get('sound') !== '1';
     video.style.transition = `opacity ${fadeInMs}ms ease-out`;
+    // 只显示裁剪区域，object-fit: cover 会按这个区域铺满
+    const crop = Shared.crop.parseQuery(query.get('crop'));
+    if (crop) video.style.objectViewBox = Shared.crop.viewBoxInset(crop);
 
     video.addEventListener('loadeddata', () => unlockPlayer.report('ready'));
     video.addEventListener('error', () => unlockPlayer.report('error'));

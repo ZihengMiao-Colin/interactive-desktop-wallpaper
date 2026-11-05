@@ -23,6 +23,7 @@ test('normalizeConfig 补默认值', () => {
         fadeInMs: 500,
         fadeOutMs: 700,
         sound: false,
+        crop: null,
     });
     assert.deepEqual(normalizeConfig(undefined), DEFAULTS);
 });
@@ -128,4 +129,11 @@ test('isActive', () => {
     assert.equal(isActive('playing'), true);
     assert.equal(isActive('ready'), false);
     assert.equal(isActive('fadingOut'), false);
+});
+
+test('normalizeConfig 读裁剪，坏的读成 null', () => {
+    const crop = { x: 0.1, y: 0.2, w: 0.5, h: 0.4 };
+    assert.deepEqual(normalizeConfig({ crop }).crop, crop);
+    assert.equal(normalizeConfig({ crop: { x: 'a' } }).crop, null);
+    assert.equal(normalizeConfig({}).crop, null);
 });

@@ -97,3 +97,10 @@ test('removeFiles 删掉文件，跳过空名字和不存在的文件', () => {
     assert.doesNotThrow(() => removeFiles(dir, ['', 'nope.mp4', cfg.file]));
     assert.equal(fs.existsSync(path.join(dir, cfg.file)), false);
 });
+
+test('resolvePlayback：有裁剪时带上，没有时不写这个键', () => {
+    const { dir, cfg } = setup();
+    const crop = { x: 0.1, y: 0.2, w: 0.5, h: 0.4 };
+    assert.deepEqual(resolvePlayback({ ...cfg, crop }, dir).crop, crop);
+    assert.equal('crop' in resolvePlayback({ ...cfg, crop: null }, dir), false);
+});
