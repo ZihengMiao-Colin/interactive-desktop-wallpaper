@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-04（程序不再启动 PowerShell，修好另一台电脑上壁纸盖住图标的问题，那台电脑上已确认，见 §9 阶段 12；之前是视频壁纸 + 我的壁纸，见阶段 11）
+> 最近更新：2026-11-05（解锁动画，见 §9 阶段 14；之前是程序不再启动 PowerShell，见阶段 12）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -17,6 +17,8 @@
 Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX，`onnxruntime-node` 推理）生成灰度深度图 → 渲染进程用 Pixi.js 自定义 2.5D 视差着色器全屏绘制 → 主进程轮询全局鼠标位置，画面随鼠标产生伪 3D 视差。窗口通过 `koffi` 直接调 user32 注入到 Windows 桌面 WorkerW 层，显示在桌面图标下方。
 
 也可以把本地视频设成壁纸（2026-11-03）：不动 / 3D 视差（整段视频共用一张深度图）/ 整体平移三种效果，可以开声音。用户自己选过的图片和视频都留在壁纸页的「我的壁纸」里。
+
+每次解锁电脑后还可以全屏放一段自己的视频（2026-11-05）：盖住任务栏，淡入淡出，放完回到桌面，见 4.6。
 
 在此之上可以叠加：
 - **自定义元素**：用户导入的图片 / GIF / 视频（含绿幕），以及自带的默认元素（两个爆炸）。元素在 Pixi 场景里渲染，和背景一样随鼠标视差，并被更近的背景物体遮挡。
@@ -73,6 +75,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── elements-tab.js      "元素"页：素材库 + 左右两栏（元素列表 / 调整面板）
 │   ├── effects-page.js      "特效"页：天气 + 视频特效
 │   ├── music-page.js        "唱片机"页：播放控制、歌单（添加 / 删除 / 拖动排序 / 点一首播放）、播放顺序、外观
+│   ├── unlock-page.js       "解锁动画"页：选视频、开关、淡入淡出时长、声音、预览
 │   ├── system-page.js       "设置"页：开机自启、深度图缓存、卸载软件（确认框里选要不要删数据）
 │   └── thumbnail.js         导入素材、选壁纸时生成缩略图（顺带检查能不能读、取视频时长）
 ├── renderer/                壁纸页脚本（普通全局脚本，按 index.html 里的顺序加载）
@@ -85,6 +88,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── weather/             五种天气：kit.js（离屏贴图、贴图矩阵、粒子基类）+ rain / snow / sakura / leaves / sunlight
 │   ├── vinyl.js             唱片机：唱臂抬起 / 摆入 / 放下、唱片加减速（Web Animations）、音乐淡入淡出、位置和大小
 │   ├── video-overlay.js     全屏视频特效
+│   ├── unlock-player.html / unlock-player.js 解锁动画的全屏播放页：放视频，把进度和操作报给主进程
 │   ├── elements/
 │   │   ├── sources.js       素材源：图片 / 动图（ImageDecoder）/ 视频 → Pixi 纹理
 │   │   ├── element-shader.js 元素着色器实例
@@ -102,6 +106,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── vinyl-player.js      唱片机纯逻辑：唱片匀加减速、唱臂随进度的角度、桌面点击判断、位置和大小（normalizeLayout / clampCenter）
 │   ├── playlist.js          歌单纯逻辑：旧配置迁移、增删、排序、上一首 / 下一首、播完接哪首
 │   ├── my-wallpapers.js     我的壁纸列表（加入、去重、排序、移除、迁移）、当前壁纸是图片还是视频（resolveCurrent）
+│   ├── unlock-animation.js  解锁动画纯逻辑：配置补全、时长换算、状态转换表（transition）
 │   └── placement-math.js    摆放几何：框坐标 ↔ 屏幕、拖动、缩放、拉伸、旋转、自由变形、透视权重、点击命中、深度取样
 ├── src/
 │   ├── elements/
@@ -109,6 +114,12 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   │   ├── ipc.js           elements:* / placement:* IPC
 │   │   ├── placement-controller.js 摆放会话（保证只有一个窗口，异常时按取消处理）
 │   │   └── migrate.js       旧"自定义贴纸"配置迁移
+│   ├── unlock-animation/
+│   │   ├── controller.js    控制器：全屏窗口的一生、计时、跳过、各种出错情况
+│   │   ├── player-window.js 全屏窗口的配置（都是真实解锁实测过的）
+│   │   ├── files.js         导入视频、算出这次放什么、清理文件
+│   │   ├── ipc.js           unlock:* IPC
+│   │   └── preload.js       全屏窗口的 preload
 │   ├── wallpaper-native.js  WorkerW 注入
 │   ├── win32.js             用 koffi 调 user32.dll，注入、全屏检测、桌面点击共用
 │   ├── fullscreen-detector.js 全屏检测
@@ -169,6 +180,14 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ### 4.5 配置同步
 任何改动 → 主进程写 `config.json` → `broadcastConfig()` 同时推给壁纸窗口和设置窗口。
 
+### 4.6 解锁动画
+- 锁屏（`lock-screen`）：功能开着、视频文件在，就建全屏窗口，黑底，视频预加载后停在开头，窗口藏在锁屏界面下面。必须这时候建：实测锁屏界面让开比 `unlock-screen` 还早 11 ~ 32 毫秒，解锁后才建窗口一定先露出桌面。
+- 解锁（`unlock-screen`）：视频从透明淡入（黑底上就是从黑屏淡入），注册 Esc。壁纸继续暂停。唱片机锁屏时本来就不停，所以动画开着声音时单独让路：音量渐变到 0，只改音量，不碰播放状态（`vinyl:duck`）。
+- 快放完或跳过：主进程改窗口透明度淡出，直接露出真实桌面，动画的声音跟着降下去，壁纸和唱片机同时恢复。淡出结束销毁窗口。
+- 窗口要点：`BrowserWindow` 构造参数的大小会被裁到工作区，建好后要再 `setBounds` 才能盖住任务栏；`focusable: false` 加 `showInactive()` 不抢焦点；解锁时 `moveTop()`，否则任务栏是前台窗口时会盖在上面；Esc 走 `globalShortcut`，只在解锁后注册（锁屏界面也可能按 Esc）；鼠标跳过要监听 `mouseup`，窗口不能激活时 `mousedown` 可能被吞掉。
+- 状态转换在 `shared/unlock-animation.js` 的 `transition`，窗口和计时在 `src/unlock-animation/controller.js`。保险：点鼠标在任何状态都能关窗口、解锁后 3 秒加载不好就关、看门狗、窗口崩溃或无响应、收不到解锁事件时查 `powerMonitor.getSystemIdleState`（读到过 `locked` 才生效，同时清掉主进程的锁屏状态，否则壁纸一直停着）。解锁时再查一次该不该放：可能是从远程桌面连进来解锁的。
+- 视频复制到 `userData/unlock_animation/`：和我的壁纸只记路径不同，解锁时用户没法处理文件不见了。
+
 ---
 
 ## 5. IPC 一览
@@ -190,6 +209,9 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | 自定义元素 |
 | `placement:getDraft` / `commit` / `cancel` | R→M | 摆放窗口（草稿是元素 `{ instance, asset }` 或唱片机 `{ kind: 'vinyl', vinyl }`） |
 | `vinyl:startPlacement` | R→M | 打开摆放窗口拖动唱片机 |
+| `unlock:selectVideo` / `setVideo` / `remove` / `getInfo` / `preview` | R→M | 解锁动画：选视频 / 导入（复制文件、打开开关）/ 移除 / 文件在不在和缩略图地址 / 预览。开关、淡入淡出、声音走 `config:save` |
+| `unlock:player-event` / `unlock:start` / `unlock:fade-out` | R→M / M→R / M→R | 全屏播放页上报 `ready`、`near-end`、`skip`、`error` / 主进程通知开始播放 / 开始淡出（带时长，声音跟着降） |
+| `vinyl:duck` | M→R | 解锁动画开着声音时，唱片机音量降到 0 / 恢复 |
 | `app:getUninstallInfo` / `app:uninstall` | R→M | 能不能卸载（开发版、找不到卸载程序时不能）/ 打开卸载程序（带 `{ deleteData }`）并退出 |
 | `renderer:ready`、`app:*` | R→M | 就绪通知、应用控制 |
 
@@ -216,6 +238,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
                 // position：四个角或 'custom'（x / y 是唱盘中心在屏幕上的比例位置）；scale 0.5 ~ 2
   weather:      { type, density, speed, parallax },
   videoOverlay: { enabled, presetId, customPath, customName, blendMode, opacity, speed },
+  unlockAnimation: { enabled, file, name, thumb, duration, fadeInMs, fadeOutMs, sound },   // 时长 0 ~ 3000 毫秒，默认 500 / 700；file / thumb 是 unlock_animation/ 里的文件名；没有视频时 enabled 读成 false
   customElements: {
     library:   [{ id: 'user:<uuid>', name, type: 'image'|'animated'|'video', file, thumb, builtin: false, importedAt }],
     instances: [{ id, assetId, visible,
@@ -227,7 +250,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   },
 }
 ```
-- 存储位置：`%APPDATA%/interactive-desktop-wallpaper/`（`config.json`、`cache_index.json`、`depth_cache/`、`custom_elements/`、`wallpaper_thumbs/`（我的壁纸的缩略图）；深度图换到别的文件夹时还有卸载清单 `uninstall_extra_files.txt`，见 §9 阶段 9）。
+- 存储位置：`%APPDATA%/interactive-desktop-wallpaper/`（`config.json`、`cache_index.json`、`depth_cache/`、`custom_elements/`、`wallpaper_thumbs/`（我的壁纸的缩略图）、`unlock_animation/`（解锁动画的视频和缩略图）；深度图换到别的文件夹时还有卸载清单 `uninstall_extra_files.txt`，见 §9 阶段 9）。
 - 默认元素不在配置里，来自 `elements/manifest.json`，id 为 `builtin:<id>`。
 
 ---
@@ -247,6 +270,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 自定义贴纸 | ♻️ 已移除 | 被自定义元素取代，旧配置自动迁移 |
 | 默认壁纸图库（`wallpapers/`） | ✅ | |
 | 视频壁纸 + 我的壁纸 | ✅ 2026-11-03 | 不动 / 3D 视差 / 整体平移，可开声音；我的壁纸放自己选过的图片和视频，见 §9 阶段 11 |
+| 解锁动画 | ✅ 2026-11-05 | 解锁后全屏放自己的视频，淡入淡出时长可调，见 §9 阶段 14 |
 | 设置窗口 / 壁纸页界面 | ✅ 2026-10-26 改版，10-31 换成战术终端风格 | 左侧导航分六页、统一控件和 Lucide 图标、实时视差预览；摆放模式、Toast、调试面板同一套样式。10-31：切角、宋体标题配英文小字、夜间 / 日间 / 跟随系统主题，见 §9 阶段 10 |
 | 打包后独立运行 | ✅ v1 | NSIS 安装包，见 §9 阶段 6 |
 | 卸载 | ✅ 2026-10-31 | 设置页"卸载软件…"或 Windows 设置 → 应用，两边都能选要不要删数据，见 §9 阶段 9 |
@@ -509,6 +533,18 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 测试时发现的旧问题（视频壁纸加进来时就有）：选中效果是 3D 视差的视频时，操作栏一行放不下，以前 900px 以下才换行，所以默认 960 宽的窗口里"生成深度图"被切掉，"应用壁纸"跑到窗口外，状态文字和"边缘平滑"叠在一起。现在这个状态带 `video-depth` 类（`settings/wallpaper-page.js`），放不下就换行：第一行效果、声音、深度图状态，第二行边缘平滑和按钮，按钮靠右。图片和"不动""整体平移"还是一行。
 
 验证：Electron 里走了一遍选视频 → 切三种效果 → 点"生成深度图" → 点"应用壁纸"（提示已应用，`config.json` 的 `currentVideo` 写入了）→ 切回图片。两个按钮中心点都能点到，内容没有超出操作栏，状态文字不再重叠。操作栏高 85（两行），默认窗口里第一排缩略图露出 62/66px。820×560、1100×760、1300×760 换行，1707×1019 宽度够，还是一行，都没有横向滚动。主进程日志没有报错。`npm test` 230 个全过。
+
+### ✅ 阶段 14 — 解锁动画（2026-11-05，在 `feat/unlock-animation` 分支上做）
+设计：`docs/superpowers/specs/2026-11-05-unlock-animation-design.md`，计划：`docs/superpowers/plans/2026-11-05-unlock-animation.md`。
+
+- 用户定的：只做解锁（开机第一次登录时程序还没启动，不放）、完全盖住任务栏、淡入淡出时长可调。
+- 写设计前做了一次性实验（真实锁屏解锁）：解锁后才建窗口会先看到桌面（271 毫秒才有第一帧）；锁屏时摆好窗口就没闪（37 ~ 44 毫秒）；关掉 `CalculateNativeWinOcclusion` 没有额外好处；窗口要 `setBounds` 才能盖住任务栏；睡眠 25 秒后解锁也正常。
+- GitHub 上没找到现成项目，最接近的 AutoBloom 只在登录时播放。
+- 代码审查后修的：①唱片机锁屏时本来不停，动画开声音时会叠在一起，改成音量渐变到 0（只改音量，不碰播放状态，动画静音时音乐照常响）；②收不到解锁事件时壁纸一直停着；③从远程桌面连进来解锁时照放；④淡出时动画声音不降；⑤淡出加定时器兜底，不怕系统时钟往回跳。
+- 实测发现的：①点鼠标没反应。合成事件 `sendInputEvent` 测不出来，要用系统级点击（`mouse_event`）。窗口对 `WM_MOUSEACTIVATE` 返回 4（不激活并吞掉），平时点击落在 Chromium 的子窗口上没事，子窗口隐藏时 `mousedown` 被吞，只收得到 `mouseup`，所以改成监听松开。手动隐藏子窗口能稳定复现，真实解锁时是不是这个原因是推断的，改完实测好了。②任务栏是前台窗口时盖在全屏窗口上面，解锁时 `moveTop()` 解决。
+- 用户实测通过（2026-11-05）：Win+L 解锁、合盖或睡眠后解锁、Esc 和点鼠标跳过、先点任务栏再锁屏、淡入淡出 0 和 3 秒、开声音同时放唱片机。备用检测每次锁屏都读到了 `locked`。
+- 没测：PIN、指纹、人脸解锁；外接显示器；独占全屏游戏；打包后的安装版没有做真实锁屏（用模拟事件测过 win-unpacked）。
+- 已知小问题（审查时记下，没修）：放到一半再锁屏时壁纸先恢复再暂停，开声音的视频壁纸可能响一下；手改配置时 `true`、数组等读成合法但不是默认的值，`duration` 没有上限；播放页加载失败时解锁后黑屏 3 秒才关；只有 `createWindow` 有 try/catch。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。

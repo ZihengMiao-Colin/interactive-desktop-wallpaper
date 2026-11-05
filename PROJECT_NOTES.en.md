@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-04 (the app no longer launches PowerShell, fixing the wallpaper covering the icons on another computer, confirmed on that computer, see §9 Phase 12; before that, video wallpapers + My wallpapers, see Phase 11)
+> Last updated: 2026-11-05 (unlock animation, see §9 Phase 14; before that, the app stopped launching PowerShell, see Phase 12)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -18,6 +18,8 @@
 An Electron desktop app: the user picks an image → Depth Anything V2 (ONNX, run with `onnxruntime-node`) generates a grayscale depth map → the renderer draws it full-screen with a custom Pixi.js 2.5D parallax shader → the main process polls the global mouse position and the image shifts with pseudo-3D parallax. The window is injected into the Windows desktop WorkerW layer by calling user32 directly through `koffi`, so it sits below the desktop icons.
 
 A local video can also be set as the wallpaper (2026-11-03), with three effects: still / 3D parallax (one depth map shared by the whole video) / whole-picture pan, and optional sound. Images and videos the user picked themselves stay in "My wallpapers" on the Wallpaper page.
+
+After each unlock a video of your own can also play full screen (2026-11-05): it covers the taskbar, fades in and out, and ends on the desktop, see 4.6.
 
 On top of that you can layer:
 - **Custom elements**: user-imported images / GIFs / videos (including green screen), plus bundled default elements (two explosions). Elements are rendered in the Pixi scene, follow the mouse parallax like the background, and are occluded by closer background objects.
@@ -74,6 +76,7 @@ On top of that you can layer:
 │   ├── elements-tab.js      "Elements" page: asset library + two columns (element list / adjustment panel)
 │   ├── effects-page.js      "Effects" page: weather + video effects
 │   ├── music-page.js        "Record player" page: playback controls, playlist (add / delete / drag to reorder / click to play), play order, appearance
+│   ├── unlock-page.js       "Unlock animation" page: pick a video, on / off, fade in and out times, sound, preview
 │   ├── system-page.js       "Settings" page: launch at startup, depth map cache, uninstall (the confirmation dialog asks whether to delete data)
 │   └── thumbnail.js         Generates thumbnails when importing assets and picking wallpapers (also checks the file is readable and reads video duration)
 ├── renderer/                Wallpaper page scripts (plain global scripts, loaded in index.html order)
@@ -86,6 +89,7 @@ On top of that you can layer:
 │   ├── weather/             Five weather types: kit.js (offscreen textures, texture matrices, particle base class) + rain / snow / sakura / leaves / sunlight
 │   ├── vinyl.js             Record player: tonearm lift / swing / lower, record spin-up and spin-down (Web Animations), music fade in/out, position and size
 │   ├── video-overlay.js     Full-screen video effects
+│   ├── unlock-player.html / unlock-player.js Full-screen player for the unlock animation: plays the video and reports progress and input to the main process
 │   ├── elements/
 │   │   ├── sources.js       Asset sources: image / animated image (ImageDecoder) / video → Pixi texture
 │   │   ├── element-shader.js Element shader instance
@@ -103,6 +107,7 @@ On top of that you can layer:
 │   ├── vinyl-player.js      Record player logic: uniform spin-up/down, tonearm angle by progress, desktop click hit test, position and size (normalizeLayout / clampCenter)
 │   ├── playlist.js          Playlist logic: old-config migration, add / remove, reorder, previous / next, what plays after a track ends
 │   ├── my-wallpapers.js     My wallpapers list (add, dedupe, sort, remove, migrate) and whether the current wallpaper is an image or a video (resolveCurrent)
+│   ├── unlock-animation.js  Unlock animation logic: config normalizing, time math, state table (transition)
 │   └── placement-math.js    Placement geometry: box ↔ screen coords, drag, resize, stretch, rotate, free warp, perspective weights, hit testing, depth sampling
 ├── src/
 │   ├── elements/
@@ -110,6 +115,12 @@ On top of that you can layer:
 │   │   ├── ipc.js           elements:* / placement:* IPC
 │   │   ├── placement-controller.js Placement session (guarantees a single window, treats errors as cancel)
 │   │   └── migrate.js       Migration of the old "custom sticker" config
+│   ├── unlock-animation/
+│   │   ├── controller.js    Controller: full-screen window lifecycle, timers, skipping, every failure case
+│   │   ├── player-window.js Full-screen window setup (all tested on a real unlock)
+│   │   ├── files.js         Importing the video, working out what to play, cleanup
+│   │   ├── ipc.js           unlock:* IPC
+│   │   └── preload.js       Preload for the full-screen window
 │   ├── wallpaper-native.js  WorkerW injection
 │   ├── win32.js             Calls user32.dll through koffi, shared by injection, full-screen detection and desktop clicks
 │   ├── fullscreen-detector.js Full-screen detection
@@ -170,6 +181,14 @@ On top of that you can layer:
 ### 4.5 Config sync
 Any change → main process writes `config.json` → `broadcastConfig()` pushes it to both the wallpaper window and the settings window.
 
+### 4.6 Unlock animation
+- Lock (`lock-screen`): if the feature is on and the video file exists, the full-screen window is created with a black background, the video preloads and waits at its start, and the window sits under the lock screen. It has to happen now: the lock screen was measured to get out of the way 11 to 32 ms before `unlock-screen`, so a window created after the unlock always shows the desktop first.
+- Unlock (`unlock-screen`): the video fades in from transparent (from black, on the black background) and Esc is registered. The wallpaper stays paused. The vinyl player never stops on lock, so when the animation has sound it steps aside separately: its volume fades to 0, touching only the volume, not the playback state (`vinyl:duck`).
+- Near the end, or on skip: the main process fades the window opacity, revealing the real desktop directly, the animation sound fades with it, and the wallpaper and vinyl player come back. The window is destroyed when the fade ends.
+- Window notes: the size in the `BrowserWindow` constructor is clipped to the work area, so `setBounds` has to run after creation to cover the taskbar; `focusable: false` plus `showInactive()` keeps focus where it was; `moveTop()` at unlock, otherwise the taskbar sits on top when it is the foreground window; Esc uses `globalShortcut` and is registered only after the unlock (Esc can also be pressed on the lock screen); mouse skip listens for `mouseup`, because `mousedown` can be swallowed on a window that cannot activate.
+- State transitions live in `transition` in `shared/unlock-animation.js`; the window and timers in `src/unlock-animation/controller.js`. Safety nets: a click closes the window in any state, a video that has not loaded 3 seconds after the unlock closes it, a watchdog, window crash or hang handling, and `powerMonitor.getSystemIdleState` when the unlock event is lost (only after `locked` has been seen; it also clears the main process lock state, otherwise the wallpaper stays paused). The unlock checks again whether to play at all: the session may have been unlocked by connecting over Remote Desktop.
+- The video is copied to `userData/unlock_animation/`: unlike My wallpapers, which only keep paths, nobody can deal with a missing file at the moment of unlocking.
+
 ---
 
 ## 5. IPC overview
@@ -191,6 +210,9 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | Custom elements |
 | `placement:getDraft` / `commit` / `cancel` | R→M | Placement window (the draft is an element `{ instance, asset }` or the record player `{ kind: 'vinyl', vinyl }`) |
 | `vinyl:startPlacement` | R→M | Open the placement window to drag the record player |
+| `unlock:selectVideo` / `setVideo` / `remove` / `getInfo` / `preview` | R→M | Unlock animation: pick a video / import (copy the file, turn the feature on) / remove / whether the file exists and the thumbnail URL / preview. On / off, fades and sound go through `config:save` |
+| `unlock:player-event` / `unlock:start` / `unlock:fade-out` | R→M / M→R / M→R | The full-screen player reports `ready`, `near-end`, `skip`, `error` / the main process starts playback / the fade-out begins (with its duration, the sound follows) |
+| `vinyl:duck` | M→R | While the unlock animation has sound, the vinyl volume drops to 0 / comes back |
 | `app:getUninstallInfo` / `app:uninstall` | R→M | Whether uninstalling is possible (not in the dev build or without an uninstaller) / launch the uninstaller (with `{ deleteData }`) and quit |
 | `renderer:ready`, `app:*` | R→M | Ready notification, app control |
 
@@ -217,6 +239,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
                 // position: one of the four corners or 'custom' (x / y = platter center as a fraction of the screen); scale 0.5 ~ 2
   weather:      { type, density, speed, parallax },
   videoOverlay: { enabled, presetId, customPath, customName, blendMode, opacity, speed },
+  unlockAnimation: { enabled, file, name, thumb, duration, fadeInMs, fadeOutMs, sound },   // times 0 to 3000 ms, default 500 / 700; file / thumb are names in unlock_animation/; enabled reads as false without a video
   customElements: {
     library:   [{ id: 'user:<uuid>', name, type: 'image'|'animated'|'video', file, thumb, builtin: false, importedAt }],
     instances: [{ id, assetId, visible,
@@ -228,7 +251,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
   },
 }
 ```
-- Storage location: `%APPDATA%/interactive-desktop-wallpaper/` (`config.json`, `cache_index.json`, `depth_cache/`, `custom_elements/`, `wallpaper_thumbs/` (My wallpapers thumbnails); when depth maps are moved to another folder there is also an uninstall list `uninstall_extra_files.txt`, see §9 Phase 9).
+- Storage location: `%APPDATA%/interactive-desktop-wallpaper/` (`config.json`, `cache_index.json`, `depth_cache/`, `custom_elements/`, `unlock_animation/` (unlock animation video and thumbnail), `wallpaper_thumbs/` (My wallpapers thumbnails); when depth maps are moved to another folder there is also an uninstall list `uninstall_extra_files.txt`, see §9 Phase 9).
 - Default elements are not in the config; they come from `elements/manifest.json` with id `builtin:<id>`.
 
 ---
@@ -248,6 +271,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | Custom stickers | ♻️ Removed | Replaced by custom elements; old config migrates automatically |
 | Default wallpaper gallery (`wallpapers/`) | ✅ | |
 | Video wallpapers + My wallpapers | ✅ 2026-11-03 | Still / 3D parallax / whole-picture pan, optional sound; My wallpapers keeps the user's own images and videos, see §9 Phase 11 |
+| Unlock animation | ✅ 2026-11-05 | Your own video plays full screen after unlocking, with adjustable fades, see §9 Phase 14 |
 | Settings window / wallpaper page UI | ✅ redesigned 2026-10-26, restyled as a tactical terminal 10-31 | Six pages in a left nav, unified controls and Lucide icons, live parallax preview; placement mode, Toast and debug panel share the same style. 10-31: cut corners, serif Chinese headings with small English labels, dark / light / follow-system theme, see §9 Phase 10 |
 | Standalone packaged build | ✅ v1 | NSIS installer, see §9 Phase 6 |
 | Uninstall | ✅ 2026-10-31 | Settings page "卸载软件…" or Windows Settings → Apps; both let you choose whether to delete data, see §9 Phase 9 |
@@ -510,6 +534,18 @@ Limitation: once My wallpapers wraps to a second row (more than 5 entries), the 
 An older problem found during testing (present since video wallpapers were added): with a video set to 3D parallax selected, the action bar does not fit on one row, and it used to wrap only below 900px, so in the default 960-wide window "生成深度图" (Generate depth map) was cut off, "应用壁纸" (Apply wallpaper) ended up outside the window, and the status text overlapped "边缘平滑" (Edge smoothing). That state now has a `video-depth` class (`settings/wallpaper-page.js`) and wraps when it does not fit: effect, sound and depth map status on the first row, edge smoothing and the buttons on the second, with the buttons on the right. Images and the "不动" (Still) and "整体平移" (Pan) effects stay on one row.
 
 Verification: in Electron, went through selecting a video → switching the three effects → clicking "生成深度图" → clicking "应用壁纸" (the toast confirmed it and `currentVideo` was written to `config.json`) → switching back to an image. The center points of both buttons are clickable, nothing extends past the action bar, and the status text no longer overlaps. The bar is 85 high on two rows, and in the default window 62 of the 66px of the first row's thumbnails show. It wraps at 820×560, 1100×760 and 1300×760, and stays on one row at 1707×1019 where there is enough width, with no horizontal scroll at any size. No errors in the main process log. `npm test`: all 230 pass.
+
+### ✅ Phase 14 — Unlock animation (2026-11-05, on the `feat/unlock-animation` branch)
+Design: `docs/superpowers/specs/2026-11-05-unlock-animation-design.md`, plan: `docs/superpowers/plans/2026-11-05-unlock-animation.md`.
+
+- Decided by the user: unlock only (at the first login after a restart the app is not running yet, so nothing plays), fully covers the taskbar, adjustable fades.
+- A throwaway experiment came before the design (real lock and unlock): creating the window after the unlock shows the desktop first (first frame after 271 ms); preparing it at lock time does not flash (37 to 44 ms); turning off `CalculateNativeWinOcclusion` adds nothing; the window needs `setBounds` to cover the taskbar; unlocking after a 25-second sleep also works.
+- No existing project turned up on GitHub. The closest, AutoBloom, only plays at login.
+- Fixed after code review: (1) the vinyl player never stops on lock, so it overlapped the animation sound; its volume now fades to 0 (volume only, playback state untouched, and music keeps playing when the animation is muted); (2) the wallpaper stayed paused when the unlock event was lost; (3) the animation played when unlocking by connecting over Remote Desktop; (4) the animation sound did not fade with the window; (5) the fade-out got a timer fallback so a system clock jump cannot hold it.
+- Found in real testing: (1) clicking did nothing. Synthetic `sendInputEvent` cannot show this; it takes an OS-level click (`mouse_event`). The window answers `WM_MOUSEACTIVATE` with 4 (no activate, eat). Normally clicks land on the Chromium child window and are fine; when that child is hidden `mousedown` is swallowed and only `mouseup` arrives, so skipping now listens for the release. Hiding the child by hand reproduces it reliably; that this is what happens on a real unlock is inferred, and it tested fine after the change. (2) The taskbar sits on top of the full-screen window when it is the foreground window; `moveTop()` at unlock fixes it.
+- Passed real testing by the user (2026-11-05): Win+L unlock, unlock after closing the lid or sleeping, skipping with Esc and with a click, clicking the taskbar before locking, fades of 0 and 3 seconds, sound with the vinyl player playing. The fallback check read `locked` on every lock.
+- Not tested: PIN, fingerprint and face unlock; external monitors; exclusive full-screen games; the installed build got no real lock test (win-unpacked was tested with simulated events).
+- Known small issues (noted in review, not fixed): locking again mid-animation resumes the wallpaper and pauses it again, so a video wallpaper with sound may blip; hand-edited config turns `true` or arrays into valid but non-default values, and `duration` has no upper limit; if the player page fails to load, the screen stays black for 3 seconds after unlocking; only `createWindow` has a try/catch.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.
