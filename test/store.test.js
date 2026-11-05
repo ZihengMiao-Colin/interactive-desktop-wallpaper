@@ -305,3 +305,27 @@ test('deleteWallpaperThumb：只删 wallpaper_thumbs 里的文件', () => {
     assert.equal(fs.existsSync(p1), false);
     assert.equal(store.deleteWallpaperThumb(p1), false);
 });
+
+test('解锁动画默认关闭，旧配置补默认值', () => {
+    const c = storeWithConfig({ parallaxMultiplier: 10 }).store.getConfig().unlockAnimation;
+    assert.equal(c.enabled, false);
+    assert.equal(c.fadeInMs, 500);
+    assert.equal(c.fadeOutMs, 700);
+});
+
+test('解锁动画按字段保存，越界的时长读出来压到范围内', () => {
+    const { store } = storeWithConfig();
+    store.saveConfig({ unlockAnimation: { file: 'a.mp4', fadeInMs: 9000 } });
+    store.saveConfig({ unlockAnimation: { sound: true } });
+    const c = store.getConfig().unlockAnimation;
+    assert.equal(c.file, 'a.mp4');
+    assert.equal(c.fadeInMs, 3000);
+    assert.equal(c.sound, true);
+});
+
+test('解锁动画的文件目录在数据目录下，不存在时创建', () => {
+    const { store, dir } = storeWithConfig();
+    const unlockDir = store.getUnlockAnimationDir();
+    assert.equal(unlockDir, path.join(dir, 'unlock_animation'));
+    assert.ok(fs.existsSync(unlockDir));
+});

@@ -23,6 +23,7 @@ const { app } = require('electron');
 const { emptyCustomElements, normalizeCustomElements } = require('../shared/elements-model');
 const { normalizeVinyl } = require('../shared/playlist');
 const { normalizeList } = require('../shared/my-wallpapers');
+const unlockAnimation = require('../shared/unlock-animation');
 
 /** currentVideo 要是带 path 字符串的对象，否则读成 null */
 function validCurrentVideo(value) {
@@ -30,7 +31,7 @@ function validCurrentVideo(value) {
 }
 
 /** 需要按字段合并保存的嵌套配置项 */
-const NESTED_KEYS = ['vinyl', 'weather', 'videoOverlay'];
+const NESTED_KEYS = ['vinyl', 'weather', 'videoOverlay', 'unlockAnimation'];
 
 /** 视差强度上限（设置页滑块 5 ~ 30）。旧版本最大能调到 100，读配置时压到上限 */
 const PARALLAX_MAX = 30;
@@ -189,6 +190,7 @@ class AppStore {
             customElements: normalizeCustomElements(this._config.customElements),
             myWallpapers: normalizeList(this._config.myWallpapers),
             currentVideo: validCurrentVideo(this._config.currentVideo),
+            unlockAnimation: unlockAnimation.normalizeConfig(this._config.unlockAnimation),
         };
         if (config.parallaxMultiplier > PARALLAX_MAX) config.parallaxMultiplier = PARALLAX_MAX;
         if (!THEMES.includes(config.theme)) config.theme = defaults.theme;
@@ -229,6 +231,13 @@ class AppStore {
     /** 用户导入的自定义元素素材存放目录：userData/custom_elements（不存在就创建） */
     getElementsDir() {
         const dir = path.join(this._userDataPath, 'custom_elements');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        return dir;
+    }
+
+    /** 解锁动画的视频和缩略图目录：userData/unlock_animation（不存在就创建） */
+    getUnlockAnimationDir() {
+        const dir = path.join(this._userDataPath, 'unlock_animation');
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         return dir;
     }
@@ -423,6 +432,8 @@ class AppStore {
             },
             // 自定义元素（素材库 + 壁纸上的实例），结构见 shared/elements-model.js
             customElements: emptyCustomElements(),
+            // 解锁动画，结构见 shared/unlock-animation.js
+            unlockAnimation: { ...unlockAnimation.DEFAULTS },
         };
     }
 
