@@ -316,6 +316,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
         cancel: () => ipcRenderer.invoke('placement:cancel'),
     },
 
+    /** 解锁动画（开关、淡入淡出、声音走 saveConfig） */
+    unlockAnimation: {
+        /** 选视频：{ canceled: true } 或 { path, url, name } */
+        selectVideo: () => ipcRenderer.invoke('unlock:selectVideo'),
+        /** 导入视频（{ path, thumbDataUrl, duration }）：{ config } 或 { error } */
+        setVideo: (input) => ipcRenderer.invoke('unlock:setVideo', input),
+        /** 移除视频：{ config } */
+        remove: () => ipcRenderer.invoke('unlock:remove'),
+        /** { exists, thumbUrl } */
+        getInfo: () => ipcRenderer.invoke('unlock:getInfo'),
+        /** 预览，返回是否开始了 */
+        preview: () => ipcRenderer.invoke('unlock:preview'),
+    },
+
     /** 本地路径 → file:// URL（正确转义中文、空格、#、%） */
     toFileUrl: (filePath) => toFileUrl(filePath),
 

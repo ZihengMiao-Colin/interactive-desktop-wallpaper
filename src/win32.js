@@ -21,6 +21,7 @@ const GA_ROOT = 2;
 const GWL_STYLE = -16;
 const SM_CXSCREEN = 0;
 const SM_CYSCREEN = 1;
+const SM_REMOTESESSION = 0x1000;
 const VK_LBUTTON = 0x01;
 
 const SMTO_NORMAL = 0;
@@ -115,6 +116,9 @@ function load() {
         /** 主显示器大小（物理像素，和 getWindowRect 同一单位） */
         getScreenSize: () => ({ width: GetSystemMetrics(SM_CXSCREEN), height: GetSystemMetrics(SM_CYSCREEN) }),
         getSystemDpi: () => GetDpiForSystem(),
+
+        /** 是不是远程桌面会话 */
+        isRemoteSession: () => GetSystemMetrics(SM_REMOTESESSION) !== 0,
 
         isLeftButtonDown: () => (GetAsyncKeyState(VK_LBUTTON) & 0x8000) !== 0,
 

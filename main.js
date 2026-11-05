@@ -28,6 +28,7 @@ const {
     Menu,
     ipcMain,
     dialog,
+    globalShortcut,
     nativeImage,
     nativeTheme,
     powerMonitor,
@@ -56,6 +57,11 @@ const { upsertInstance, hasClickTriggers } = require('./shared/elements-model');
 const { isClickable: isVinylClickable, normalizeLayout: normalizeVinylLayout } = require('./shared/vinyl-player');
 const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
+const { UnlockAnimationController } = require('./src/unlock-animation/controller');
+const { createPlayerWindow, refitPlayerWindow } = require('./src/unlock-animation/player-window');
+const { cleanupUnlockFiles, resolvePlayback } = require('./src/unlock-animation/files');
+const { registerUnlockIpc } = require('./src/unlock-animation/ipc');
+const { getWin32 } = require('./src/win32');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
 const myWallpapers = require('./shared/my-wallpapers');
 const { nextWallpaperSignal } = require('./shared/frame-pacing');
@@ -909,6 +915,16 @@ function registerIpcHandlers() {
         broadcastConfig,
         placement,
     });
+
+    // ---- 解锁动画 ----
+    registerUnlockIpc({
+        ipcMain,
+        dialog,
+        store,
+        getDialogParent: () => settingsWindow || wallpaperWindow,
+        broadcastConfig,
+        controller: unlockAnimation,
+    });
 }
 
 // ==================== 开机自启 ====================
@@ -955,6 +971,8 @@ let isSuspended = false;
 let isPlacing = false;
 /** 上一次发给壁纸窗口的暂停 / 恢复消息 */
 let lastWallpaperSignal = null;
+/** 解锁动画控制器（startApp 里建） */
+let unlockAnimation = null;
 
 /**
  * 按摆放、锁屏 / 睡眠、被窗口挡住几种状态，给壁纸窗口发暂停（带原因）或恢复，状态没变不发。
@@ -965,7 +983,7 @@ function syncWallpaperSignal() {
     if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return;
     const next = nextWallpaperSignal(lastWallpaperSignal, {
         placement: isPlacing,
-        system: isScreenLocked || isSuspended,
+        system: isScreenLocked || isSuspended || unlockAnimation.holdsWallpaper,
         covered: !isRenderingActive,
     });
     if (!next) return;
@@ -975,6 +993,32 @@ function syncWallpaperSignal() {
     } else {
         wallpaperWindow.webContents.send('renderer:resume', { silent: next.silent });
     }
+}
+
+// ==================== 解锁动画 ====================
+
+/** 远程桌面会话里不放解锁动画。user32 加载失败时当作不是 */
+function isRemoteSession() {
+    try {
+        return getWin32().isRemoteSession();
+    } catch (_) {
+        return false;
+    }
+}
+
+function createUnlockAnimation() {
+    return new UnlockAnimationController({
+        getPlayback: ({ preview = false } = {}) => {
+            if (!preview && (isPlacing || isRemoteSession())) return null;
+            return resolvePlayback(store.getConfig().unlockAnimation, store.getUnlockAnimationDir(), { preview });
+        },
+        createWindow: (playback) => createPlayerWindow({ BrowserWindow, screen }, playback),
+        refitWindow: (win) => refitPlayerWindow(win, screen),
+        registerSkipKey: (onSkip) => globalShortcut.register('Escape', onSkip),
+        unregisterSkipKey: () => globalShortcut.unregister('Escape'),
+        isSessionLocked: () => powerMonitor.getSystemIdleState(1) === 'locked',
+        onHoldChange: syncWallpaperSignal,
+    });
 }
 
 // ==================== 全屏检测 ====================
@@ -1012,10 +1056,14 @@ function setupPowerMonitor() {
         syncWallpaperSignal();
     });
     powerMonitor.on('lock-screen', () => {
+        // 排在最前面：睡眠时离 suspend 只有约 90 毫秒
+        unlockAnimation.handleLock();
         isScreenLocked = true;
         syncWallpaperSignal();
     });
     powerMonitor.on('unlock-screen', () => {
+        // 先让动画占住壁纸再清锁屏状态，否则壁纸会先恢复一下又暂停，声音会响一下
+        unlockAnimation.handleUnlock();
         isScreenLocked = false;
         syncWallpaperSignal();
     });
@@ -1033,6 +1081,8 @@ function cleanupAndQuit() {
     if (desktopClickWatcher) {
         desktopClickWatcher.stop();
     }
+
+    if (unlockAnimation) unlockAnimation.dispose();
 
     if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
         wallpaperWindow.close();
@@ -1115,12 +1165,15 @@ function startApp() {
     // 清理上次没删掉的素材副本（移除素材时视频可能正被占用）
     const orphans = cleanupOrphanFiles(store.getElementsDir(), store.getConfig().customElements.library);
     if (orphans.length) console.log('[Main] 已清理无用的素材文件:', orphans);
+    const unlockOrphans = cleanupUnlockFiles(store.getUnlockAnimationDir(), store.getConfig().unlockAnimation);
+    if (unlockOrphans.length) console.log('[Main] 已清理无用的解锁动画文件:', unlockOrphans);
 
     // 设置窗口的界面主题（要在建窗口之前，标题栏颜色按它取）
     applyTheme(store.getConfig().theme);
     nativeTheme.on('updated', updateSettingsChrome);
 
     // 2. 注册 IPC 处理器
+    unlockAnimation = createUnlockAnimation();
     registerIpcHandlers();
 
     // 3. 创建壁纸窗口
