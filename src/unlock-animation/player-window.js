@@ -52,9 +52,13 @@ function createPlayerWindow({ BrowserWindow, screen }, playback) {
     return win;
 }
 
-/** 解锁时再铺一次：锁屏期间可能接了显示器、改了分辨率 */
+/**
+ * 解锁时再铺一次：锁屏期间可能接了显示器、改了分辨率。
+ * 也要压回最上面：任务栏是前台窗口时（比如锁屏前刚点过它）会盖在全屏窗口上面。
+ */
 function refitPlayerWindow(win, screen) {
     win.setBounds(screen.getPrimaryDisplay().bounds);
+    win.moveTop();
 }
 
 module.exports = { createPlayerWindow, refitPlayerWindow };

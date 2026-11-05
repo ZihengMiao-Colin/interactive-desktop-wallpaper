@@ -31,7 +31,8 @@
     video.addEventListener('timeupdate', () => {
         if (video.currentTime * 1000 >= fadeOutStartMs(video.duration * 1000, fadeOutMs)) reportNearEnd();
     });
-    document.addEventListener('mousedown', () => unlockPlayer.report('skip'));
+    // 用松开不用按下：窗口不能激活，锁屏后 Chromium 的子窗口隐藏时，按下会被主窗口吞掉，只收得到松开
+    document.addEventListener('mouseup', () => unlockPlayer.report('skip'));
 
     unlockPlayer.onStart(() => {
         video.style.opacity = '1';

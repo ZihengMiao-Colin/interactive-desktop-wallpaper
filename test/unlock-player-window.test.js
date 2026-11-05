@@ -64,7 +64,14 @@ test('静音时 sound 是 0', () => {
 });
 
 test('refitPlayerWindow 按当前主显示器设大小', () => {
-    const win = { setBounds(b) { this.b = b; } };
+    const win = { setBounds(b) { this.b = b; }, moveTop() {} };
     refitPlayerWindow(win, fakeScreen);
     assert.deepEqual(win.b, SCREEN);
+});
+
+test('refitPlayerWindow 把窗口压回最上面：任务栏是前台窗口时会盖在它上面', () => {
+    const calls = [];
+    const win = { setBounds() { calls.push('setBounds'); }, moveTop() { calls.push('moveTop'); } };
+    refitPlayerWindow(win, fakeScreen);
+    assert.deepEqual(calls, ['setBounds', 'moveTop']);
 });
