@@ -338,6 +338,18 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 30. The depth map is still generated from the whole image. With a very small crop, less depth map resolution reaches the screen and parallax detail drops a little.
 31. The settings preview is wider than the screen, so it shows less than the real desktop (same as before cropping); the crop box is what counts. The no-WebGL preview ignores the crop.
 32. A WebM with no duration in its header (for example from the browser's MediaRecorder) has no time slider in the crop box, only a frame near the start. Cropping itself still works.
+33. On the development machine, packaged builds cannot attach to the desktop layer (found 2026-11-05; 360 Total Security is suspected, **not yet proven**). `SetParent` returns 0 with error code 0, so the fallback mode runs (item 9: the wallpaper sits above all windows, and the mouse passes through it). 1.3.0 did not cause this: `dist/test-build`, which passed on November 4, fails now too. Controlled runs (development machine, fresh data folder, each at least once):
+
+    | Executable | Result |
+    |---|---|
+    | `electron.exe` (with `.` and with the packaged content) | works |
+    | `electron.exe` plus 1 byte at the end | works |
+    | `electron.exe` with only the icon changed by rcedit | fails |
+    | `electron.exe` with only the version info changed by rcedit | fails |
+    | Packaged exe with an ASCII file name | fails |
+    | `dist/test-build`, `dist/unlock-test`, `dist/win-unpacked` | all fail |
+
+    So it has nothing to do with the app code or file name, and it is not DPI (both sides are per-monitor v2 with hosting behavior 0; switching to mixed does not help) or signing (`electron.exe` is unsigned too). It only depends on rcedit having rewritten the exe. 360 Total Security is running on this machine (`ZhuDongFangYu`). The guess: it recognizes the original `electron.exe` (trailing bytes do not change the PE image) and stops unknown programs from parenting a window to Explorer's desktop window. Proving it needs another run with 360 closed or the app added to its trusted list.
 
 ---
 
@@ -624,7 +636,9 @@ Found and fixed while measuring: removing the wallpaper in use from My wallpaper
 
 The shaders and `parallax-math.js` only gained the crop; the parallax algorithm did not change, so the Android version does not need to follow.
 
-`npm test`: all 357 pass (44 new). Not measured: a real lock and unlock (the preview uses the same window and page), the real system file dialog (replaced via `dialog.showOpenDialog` in the test; everything after it is real), the packaged installer, actually changing displays (ratio changes only have unit tests).
+`npm test`: all 357 pass (44 new). Not measured: a real lock and unlock (the preview uses the same window and page), the real system file dialog (replaced via `dialog.showOpenDialog` in the test; everything after it is real), a copy installed by the installer, actually changing displays (ratio changes only have unit tests).
+
+Phases 13 to 16 and the never-published v1.2.0 (Phases 8 to 12) ship together as **v1.3.0** (2026-11-05), the first public release since v1.1.0. `package.json` is now 1.3.0 and all 357 `npm test` tests pass; `app.asar` matches the source; `dist/win-unpacked` with a fresh data folder: crop on import, depth generation with the packaged ONNX, apply and the unlock preview all work, with 0 watermark pixels. But this packaged run did not attach to the desktop layer, see §8 item 33.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.
