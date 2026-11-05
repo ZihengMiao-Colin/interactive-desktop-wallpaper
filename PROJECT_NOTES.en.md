@@ -653,7 +653,7 @@ The shaders and `parallax-math.js` only gained the crop; the parallax algorithm 
 
 `npm test`: all 357 pass (44 new). Not measured: a real lock and unlock (the preview uses the same window and page), the real system file dialog (replaced via `dialog.showOpenDialog` in the test; everything after it is real), a copy installed by the installer, actually changing displays (ratio changes only have unit tests).
 
-Phases 13 to 16 and the never-published v1.2.0 (Phases 8 to 12) ship together as **v1.3.0** (2026-11-05), the first public release since v1.1.0. `package.json` is now 1.3.0 and all 357 `npm test` tests pass; `app.asar` matches the source; `dist/win-unpacked` with a fresh data folder: crop on import, depth generation with the packaged ONNX, apply and the unlock preview all work, with 0 watermark pixels. With 360 running, packaged builds do not attach to the desktop layer; with 360 closed they do, see §8 item 33.
+Phases 13 to 16 and the never-published v1.2.0 (Phases 8 to 12) were built together as **v1.3.0** (2026-11-05), which only ever existed as a draft and was not made public (see the end of Phase 17). `package.json` is now 1.3.0 and all 357 `npm test` tests pass; `app.asar` matches the source; `dist/win-unpacked` with a fresh data folder: crop on import, depth generation with the packaged ONNX, apply and the unlock preview all work, with 0 watermark pixels. With 360 running, packaged builds do not attach to the desktop layer; with 360 closed they do, see §8 item 33.
 
 ### ✅ Phase 17 — No longer blocking programs when the wallpaper cannot attach to the desktop (2026-11-05)
 
@@ -683,6 +683,10 @@ Development build (`electron.exe`, not blocked by 360): injection succeeds and n
 After the user closed 360 from the tray (the `ZhuDongFangYu` service was still running), same packaged build, fresh data folder: the window attached under WorkerW (whose parent is Progman), `app:isOnDesktopLayer` returned `true`, no notice was shown (confirmed by screenshot), the window was 1708×1068, the file dialog opened and closed normally with the settings window closed, and the log had 0 errors.
 
 Not tested: whether the trusted list helps (360's settings are left alone); see §8 item 34 for the rest.
+
+Phase 17 ships as **v1.3.1** (2026-11-05). The v1.3.0 draft was never made public and is skipped like v1.2.0, so v1.3.1 is the first public release since v1.1.0: its notes cover everything since then, and the 360 section describes the new behaviour. `package.json` is now 1.3.1 and all 371 `npm test` tests pass. Extracting `app.asar` and comparing it with the source shows only `package.json` differs, which electron-builder rewrites. Running `dist/win-unpacked` with a fresh data folder and 360 on, the version, fallback mode, notice and Z order are all right.
+
+This build was made in a worktree (`npm ci` first, then `depth_anything_v2_small_ir9.onnx` copied in). Compared file by file with the previous build in the main folder: apart from the code above, only line endings differ. `resources/app-update.yml` is gone because a worktree's `.git` is a file, so electron-builder cannot find the repository address; the app has no auto-updater and does not use it. `app.asar` also holds 940KB of unreferenced `node_modules` content (Pixi's license, `punycode` and other open-source code, written twice by electron-builder), which has no effect at runtime.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.
