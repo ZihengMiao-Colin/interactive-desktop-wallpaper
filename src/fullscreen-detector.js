@@ -1,79 +1,33 @@
 /**
  * fullscreen-detector.js — 全屏检测：用户在用全屏应用（游戏、视频播放器等）时暂停壁纸渲染，释放 GPU
  *
- * 常驻一个 PowerShell 助手（见 ps-helper.js），每秒写一行 "FULLSCREEN <前台窗口进程号>" 或 NORMAL；
- * 连续几次同状态才真正切换（防抖）。
- *
- * 屏幕尺寸用 GetSystemMetrics 取：PowerShell 5.1 默认没有加载 System.Windows.Forms，
- * 旧脚本用 [System.Windows.Forms.Screen] 时每次都抛异常、判断永远是 NORMAL，功能完全没生效。
+ * 每秒用 user32 读一次前台窗口（见 win32.js）：铺满屏幕且不是桌面 / 任务栏就算全屏，
+ * 连续几次同状态才真正切换（防抖）。这几个调用不发消息，开销很小，直接在主进程定时跑。
  */
 
-const { PowerShellHelper } = require('./ps-helper');
+const { getWin32 } = require('./win32');
+
+/** 前台窗口占屏幕的比例达到这么多算全屏 */
+const FULLSCREEN_COVERAGE = 0.90;
+
+/** 桌面和任务栏铺满屏幕也不算全屏应用 */
+const SHELL_CLASSES = new Set(['Progman', 'WorkerW', 'Shell_TrayWnd', 'MSTaskSwWClass']);
 
 /**
- * 生成常驻检测助手脚本。
- *
- * 注意：脚本内不要出现 "${"（会被外层 JS 模板字符串当成插值）。
- *
- * @param {number} intervalMs - 助手的内部检测间隔
- * @returns {string} PowerShell 脚本
+ * 前台窗口是全屏应用时返回它的进程号，否则返回 null。
+ * @param {object} api - win32 接口
+ * @returns {number|null}
  */
-function buildHelperScript(intervalMs) {
-    return `
-$ErrorActionPreference = 'SilentlyContinue'
-$ProgressPreference = 'SilentlyContinue'
+function fullscreenForegroundPid(api) {
+    const hwnd = api.getForegroundWindow();
+    if (!hwnd) return null;
 
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
+    const { left, top, right, bottom } = api.getWindowRect(hwnd);
+    const { width, height } = api.getScreenSize();
+    const coverage = ((right - left) * (bottom - top)) / (width * height);
+    if (coverage < FULLSCREEN_COVERAGE || SHELL_CLASSES.has(api.getClassName(hwnd))) return null;
 
-public class WCheck {
-    [StructLayout(LayoutKind.Sequential)]
-    public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-
-    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-    [DllImport("user32.dll")] public static extern int GetClassName(IntPtr hWnd, StringBuilder cls, int count);
-    [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
-    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
-}
-"@
-
-$screenW = [WCheck]::GetSystemMetrics(0)
-$screenH = [WCheck]::GetSystemMetrics(1)
-if ($screenW -le 0) { $screenW = 1920 }
-if ($screenH -le 0) { $screenH = 1080 }
-$screenArea = [double]$screenW * [double]$screenH
-
-[Console]::Out.WriteLine('READY')
-[Console]::Out.Flush()
-
-while ($true) {
-    $state = 'NORMAL'
-    $hwnd = [WCheck]::GetForegroundWindow()
-    if ($hwnd -ne [IntPtr]::Zero) {
-        $rect = New-Object WCheck+RECT
-        [void][WCheck]::GetWindowRect($hwnd, [ref]$rect)
-        $w = $rect.Right - $rect.Left
-        $h = $rect.Bottom - $rect.Top
-        $cls = New-Object System.Text.StringBuilder 256
-        [void][WCheck]::GetClassName($hwnd, $cls, 256)
-        $name = $cls.ToString()
-        $isShell = ($name -eq 'Progman' -or $name -eq 'WorkerW' -or $name -eq 'Shell_TrayWnd' -or $name -eq 'MSTaskSwWClass')
-        $coverage = ([double]$w * [double]$h) / $screenArea
-        if ($coverage -ge 0.90 -and -not $isShell) {
-            # 带上前台窗口的进程号，主进程据此忽略本程序自己的窗口（例如摆放窗口）
-            $fgPid = [uint32]0
-            [void][WCheck]::GetWindowThreadProcessId($hwnd, [ref]$fgPid)
-            $state = 'FULLSCREEN ' + $fgPid
-        }
-    }
-    [Console]::Out.WriteLine($state)
-    [Console]::Out.Flush()
-    Start-Sleep -Milliseconds ${intervalMs}
-}
-`;
+    return api.getProcessId(hwnd);
 }
 
 class FullscreenDetector {
@@ -84,6 +38,8 @@ class FullscreenDetector {
      * @param {Function} options.onFullscreenStart - 全屏开始回调
      * @param {Function} options.onFullscreenEnd - 全屏结束回调
      * @param {number} [options.ignorePid] - 属于这个进程的全屏窗口不算全屏应用（传主进程 pid）
+     * @param {object} [options.win32] - win32 接口，测试时传假的
+     * @param {() => object} [options.loadWin32] - 取 win32 接口的函数，默认 getWin32
      */
     constructor(options = {}) {
         this.pollInterval = options.pollInterval || 1000;
@@ -92,11 +48,9 @@ class FullscreenDetector {
         this.onFullscreenEnd = options.onFullscreenEnd || (() => {});
         this.ignorePid = options.ignorePid || null;
 
-        this._helper = new PowerShellHelper({
-            name: 'FullscreenDetector',
-            script: buildHelperScript(this.pollInterval),
-            onLine: (line) => this._onLine(line),
-        });
+        this._win32 = options.win32 || null;
+        this._loadWin32 = options.loadWin32 || getWin32;
+        this._timer = null;
 
         this._isFullscreen = false;
         this._fullscreenCounter = 0;
@@ -112,26 +66,33 @@ class FullscreenDetector {
         this._rendererReady = ready;
     }
 
-    /** 启动检测（异步，立即返回，不阻塞主进程） */
+    /** 启动检测。user32 加载失败时只是不检测，壁纸照常运行 */
     start() {
-        this._helper.start();
+        if (this._timer) return;
+
+        try {
+            if (!this._win32) this._win32 = this._loadWin32();
+        } catch (err) {
+            console.error('[FullscreenDetector] Cannot load user32:', err.message);
+            return;
+        }
+        this._timer = setInterval(() => this._poll(), this.pollInterval);
+        console.log('[FullscreenDetector] Started');
     }
 
-    /** 停止检测并杀掉助手进程 */
+    /** 停止检测 */
     stop() {
-        this._helper.stop();
+        if (!this._timer) return;
+        clearInterval(this._timer);
+        this._timer = null;
+        console.log('[FullscreenDetector] Stopped');
     }
 
     // ==================== 内部方法 ====================
 
-    /** 助手每秒一行："FULLSCREEN <前台窗口进程号>" 或 NORMAL */
-    _onLine(line) {
-        if (line.startsWith('FULLSCREEN')) {
-            const pid = parseInt(line.slice('FULLSCREEN'.length), 10);
-            this._report(!(this.ignorePid && pid === this.ignorePid));
-        } else if (line.startsWith('NORMAL')) {
-            this._report(false);
-        }
+    _poll() {
+        const pid = fullscreenForegroundPid(this._win32);
+        this._report(pid !== null && pid !== this.ignorePid);
     }
 
     /**

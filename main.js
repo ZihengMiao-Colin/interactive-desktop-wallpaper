@@ -45,7 +45,7 @@ log.errorHandler.startCatching();
 Object.assign(console, log.functions);
 
 // ---- 自定义模块 ----
-const { injectToWallpaperLayer, restoreFromWallpaperLayer } = require('./src/wallpaper-native');
+const { injectToWallpaperLayer } = require('./src/wallpaper-native');
 const { createTray, updateTrayMenu } = require('./src/tray-manager');
 const { FullscreenDetector } = require('./src/fullscreen-detector');
 const { DesktopClickWatcher } = require('./src/desktop-click-watcher');
@@ -204,7 +204,7 @@ function createWallpaperWindow() {
         // 显示出来会盖住用户所有程序（表现："启动后壁纸把整个屏幕都盖住了"）。
         // 等注入有结果再决定怎么显示。
         const hwnd = wallpaperWindow.getNativeWindowHandle();
-        injectToWallpaperLayer(hwnd, width, height).then((injected) => {
+        injectToWallpaperLayer(hwnd).then((injected) => {
             if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return;
 
             if (injected) {
@@ -1034,10 +1034,7 @@ function cleanupAndQuit() {
         desktopClickWatcher.stop();
     }
 
-    // 从 WorkerW 层恢复（可选，防止桌面图标异常）
     if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
-        const hwnd = wallpaperWindow.getNativeWindowHandle();
-        restoreFromWallpaperLayer(hwnd);
         wallpaperWindow.close();
     }
 

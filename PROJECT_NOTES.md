@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-03（视频壁纸 + 我的壁纸，已合并到 main 并推送到 GitHub（没有发新版本），见 §9 阶段 11；同一天删掉了壁纸页右上角的调试面板，见 §8 第 15 条）
+> 最近更新：2026-11-04（程序不再启动 PowerShell，修好另一台电脑上壁纸盖住图标的问题，那台电脑上已确认，见 §9 阶段 12；之前是视频壁纸 + 我的壁纸，见阶段 11）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -14,7 +14,7 @@
 
 ## 1. 一句话概括
 
-Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX，`onnxruntime-node` 推理）生成灰度深度图 → 渲染进程用 Pixi.js 自定义 2.5D 视差着色器全屏绘制 → 主进程轮询全局鼠标位置，画面随鼠标产生伪 3D 视差。窗口通过 PowerShell + C# 注入到 Windows 桌面 WorkerW 层，显示在桌面图标下方。
+Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX，`onnxruntime-node` 推理）生成灰度深度图 → 渲染进程用 Pixi.js 自定义 2.5D 视差着色器全屏绘制 → 主进程轮询全局鼠标位置，画面随鼠标产生伪 3D 视差。窗口通过 `koffi` 直接调 user32 注入到 Windows 桌面 WorkerW 层，显示在桌面图标下方。
 
 也可以把本地视频设成壁纸（2026-11-03）：不动 / 3D 视差（整段视频共用一张深度图）/ 整体平移三种效果，可以开声音。用户自己选过的图片和视频都留在壁纸页的「我的壁纸」里。
 
@@ -32,6 +32,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 渲染 | Pixi.js 7.4.2（npm 本地依赖，版本锁定），自定义 Filter / Mesh 着色器 |
 | 动图解码 | Chromium 自带的 WebCodecs `ImageDecoder`（没有引入 `@pixi/gif`） |
 | 深度模型 | Depth Anything V2 Small。应用里用 `onnxruntime-node`（1.31.1，版本锁定）在 utilityProcess 子进程里推理（`src/depth/`），前后处理从 `generate_depth_map.py` 移植，结果和 Python 版逐像素一致。ONNX 输入固定 518×518（不能保持原图比例）；输出深度图最长边 1920 |
+| Win32 调用 | `koffi`（3.3.6，版本锁定）在主进程里直接调 user32.dll（`src/win32.js`）。程序运行时不启动 PowerShell，原因见 §9 阶段 12 |
 | Python | 项目内 `venv/`（3.11.9），只装了 onnxruntime / numpy / pillow。应用本身不再用 Python，只给 `tools/` 下的素材脚本和 Python 测试用 |
 | ONNX 模型 | 根目录（`.gitignore` 忽略）：`_ir9.onnx` 100MB（选最大的，实际用这个）、`_int8.onnx` 28MB、2MB 的空壳。打包时 `_ir9.onnx` 复制成 `resources/models/depth_anything_v2_small.onnx` |
 | 打包 | electron-builder，只出 NSIS 安装包（`npm run build` → `dist/Interactive3DWallpaper-Setup-<版本>.exe`，约 334MB；装好约 560MB）。素材和模型在 `resources/` 下（asar 外），onnxruntime 的 dll 解包到 `app.asar.unpacked` |
@@ -109,7 +110,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   │   ├── placement-controller.js 摆放会话（保证只有一个窗口，异常时按取消处理）
 │   │   └── migrate.js       旧"自定义贴纸"配置迁移
 │   ├── wallpaper-native.js  WorkerW 注入
-│   ├── ps-helper.js         常驻 PowerShell 助手（按行读输出、异常重启），下面两个共用
+│   ├── win32.js             用 koffi 调 user32.dll，注入、全屏检测、桌面点击共用
 │   ├── fullscreen-detector.js 全屏检测
 │   ├── desktop-click-watcher.js 桌面单击检测（有"点击播放"元素时才开）
 │   ├── depth/
@@ -125,6 +126,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ├── wallpapers/              默认壁纸图库：manifest.json + 图片 + depth/ + thumbs/
 ├── overlay/                 全屏视频特效素材
 ├── tools/prepare_builtin_element.py  默认绿幕元素预处理（裁剪 / 缩放 / 缩略图）
+├── tools/desktop-diagnose.bat       壁纸挂不上桌面层时收集排查信息（系统、窗口层级、日志），结果放在桌面的 txt 里
 ├── tools/prepare_wallpapers.py       默认壁纸图库素材生成（缩图 / 缩略图 / 深度图；`--depth-only` 只重算深度图）
 ├── dev/                     浏览器预览用的假配置和示例 GIF
 ├── build/installer.nsh      NSIS 自定义脚本：卸载向导的"同时删除我的数据"勾选框、删数据、删开机自启
@@ -322,7 +324,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
    - 旋转（摆放模式框上方的圆点，按住 Shift 每次 15°）、单向拉伸（边中点，`transform.stretch` 是高度相对原始比例的倍数）、水平 / 垂直翻转。
    - 自由变形：工具条"自由变形"后单独拖四个角，贴图按透视铺开（顶点带齐次权重 q，见 `projectiveWeights`）；拖成凹四边形时不接受。"复原"清掉旋转、拉伸、翻转和变形。
    - 点击播放（播放方式第三项）：平时停在第一帧，点中元素时播放一次；打开"在点击位置出现"后平时隐藏，点桌面哪里就在那里播放一次（自动深度时取点击处的深度）。
-   - 桌面点击检测：常驻助手每 15ms 读左键状态，按下到松开 ≤500ms、移动 ≤6px 且松开处是桌面（根窗口类名 Progman / WorkerW）才算；只在有显示中的点击播放元素（或唱片机里有音乐，见第 6 项）时开启。和全屏检测共用 `src/ps-helper.js`。
+   - 桌面点击检测：主进程每 15ms 读左键状态，按下到松开 ≤500ms、移动 ≤6px 且松开处是桌面（根窗口类名 Progman / WorkerW）才算；只在有显示中的点击播放元素（或唱片机里有音乐，见第 6 项）时开启。和全屏检测共用 `src/win32.js`。
    - 实测：Electron 里渲染、摆放手柄、设置页调色、主进程转发点击都验证过；真实鼠标点桌面这一步要人工试（自动测试不能去点用户的桌面）。
 4. [x] 前端界面改版（2026-10-26，用户把方案交给助手决定，看过 mockup 后确认）。
    - 设计：[docs/superpowers/specs/2026-10-26-ui-redesign-design.md](docs/superpowers/specs/2026-10-26-ui-redesign-design.md)；计划：[docs/superpowers/plans/2026-10-26-ui-redesign.md](docs/superpowers/plans/2026-10-26-ui-redesign.md)。
@@ -464,6 +466,29 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 验证：`npm test` 200 个全过（新增我的壁纸逻辑 9 个、整体平移 3 个、存储 5 个、暂停规则 1 个、串行队列 2 个）。Electron 实测（单独的数据目录 + 调试端口；文件对话框在主进程里临时替换成返回指定文件）：三种效果截图、静止时按视频帧率（30/s）重画而 ticker 停着、有声视频被挡住时继续放、摆放时停、10 次连续切换只留一个视频且最后一个生效、换回图片后视频释放、图片停帧正常；元素在三种效果下的移动和遮挡；天气 / 视频特效 / 唱片机叠加；mp4、webm、中文 + 空格 + # + % 路径；纯音频 mp4 和改名的文本文件被拒绝；清缓存后 3D 视差视频按不动播放；文件被删后重启有提示；预览视频切页面、最小化时暂停；我的壁纸的加入 / 移除 / 找不到文件 / 重启保留 / 旧配置迁移；视差页提示；820×560 无横向滚动；浏览器预览无报错。
 - 整体审查后修的（2026-11-03）：①唤醒、解锁时 powerMonitor 把 Electron 的事件对象当参数传进来，原来直接转发给 IPC，序列化会失败（图片壁纸也受影响）；②锁屏期间全屏检测照常在跑，covered 会盖掉锁屏，开了声音的视频可能在锁屏界面出声。改成主进程分开记摆放 / 锁屏睡眠 / 被挡住三种状态，由 `shared/frame-pacing.js` 的 `nextWallpaperSignal` 合成一个暂停原因（有按事件顺序的单元测试），壁纸页重新加载时补发当前状态；③「我的壁纸」每次配置广播都整格重画、逐个查文件在不在（拖滑块时每秒好几次，文件在离线的网络盘上会卡），改成列表和当前壁纸变了才重画。修完实测：模拟锁屏 → 睡眠唤醒仍锁着不恢复 → 解锁恢复；锁屏期间打开最大化窗口不发消息、解锁后换成 covered（静默）、关掉窗口后恢复。
 - 没测：真实的锁屏 / 睡眠（用主进程调试端口模拟的事件，最大化窗口是真的）；真实出声（测试视频没有音轨，只检查了没静音、在播放）；托盘"更换壁纸"（要点原生对话框）；打包后的安装版；集成显卡上的耗电。
+
+### ✅ 阶段 12 — 程序不再启动 PowerShell（2026-11-04）
+
+用户报告：另一台电脑（Windows 企业版 25H2，缩放 150%）上壁纸变成单独的窗口，盖住桌面图标，点"显示桌面"后消失。开发机上开发版和 1.1.0 打包版都复现不出来，于是写了 `tools/desktop-diagnose.bat`（双击后把系统信息、桌面窗口层级、"显示桌面"前后的变化和日志收集到桌面的一个 txt，只读），拿到那台电脑上跑。
+
+- 现象：壁纸窗口是顶层窗口（`parent` 是桌面根窗口）、带 `WS_EX_TRANSPARENT`，也就是注入失败后走的兜底模式；WorkerW 底下是空的。
+- 根因：程序启动不了 `powershell.exe`（`spawn EPERM` / `spawn UNKNOWN`），注入脚本一行都没执行。全屏检测和桌面点击的助手也一起失败。
+- 时间线：10-31 14:07:19 两个助手在 74ms 内同时退出，程序还在正常运行（不是关机），之后每次启动 PowerShell 都失败，重启、重装、隔 4 天都一样。而诊断工具的 `.bat` 能正常启动 PowerShell，所以被拦的只是本程序启动 PowerShell 这个行为。
+- 不是 1.1.0 引入的：1.1.0 在那台电脑上正常跑过一个多小时（10-31 13:05 起音频每隔三四分钟加载一次，这是歌单自动换歌，1.0.0 只有单曲循环），两个版本的注入代码也一样。用户觉得 1.0.0 没问题，是因为拦截恰好发生在升级之后。
+- 谁拦的没有确认：只拦特定程序启动 PowerShell，最像安全软件；隐藏窗口的 PowerShell 加 `-ExecutionPolicy Bypass`、再轮询 `GetAsyncKeyState`，确实很像恶意软件。修法不依赖是哪一家。
+
+改法：
+- 新增 `src/win32.js`，用 `koffi`（3.3.6，版本锁定）在主进程里直接调 user32；注入、全屏检测、桌面点击都改成进程内调用，删掉 `src/ps-helper.js`，程序运行时不再启动 PowerShell。注入从 3 到 4 秒变成约 0.4 秒。
+- 会给窗口发消息的调用（SetParent、SendMessage、RedrawWindow 等）走 koffi 的 `.async`，在工作线程上执行并限时，explorer 卡住时主进程不跟着卡，主线程也能处理发给壁纸窗口的消息。只读调用同步调。
+- 删掉 `restoreFromWallpaperLayer`：退出时窗口直接关闭。以前的 PowerShell 要一秒多才启动，窗口早关了，实际没起作用；改成立刻执行反而会让壁纸闪成顶层窗口。
+- 桌面点击的 6 像素按系统 DPI 换算：以前的助手不感知 DPI，读到的是缩放后的坐标，主进程读到的是物理像素。
+- 打包：`asarUnpack` 加上 `node_modules/@koromix/koffi-win32-x64/**`。
+
+验证：`npm test` 230 个全过（新增注入 14 个、桌面点击 9 个，全屏检测改成假 win32 接口）。开发机上用垫片让启动 `powershell.exe` 直接抛 EPERM：旧代码的日志和那台电脑一模一样；新代码 0 次尝试启动，窗口挂到 WorkerW 下，"显示桌面"后壁纸还在、图标在上面，全屏检测正常暂停和恢复。用真实鼠标点击测了桌面点击检测，用托盘菜单测了退出（退出码 0）。`dist/test-build` 打包版用全新数据目录跑过：`koffi.node` 在 asar 外面，程序名下没有非本程序的子进程，"显示桌面"正常。
+
+用户在出问题的那台电脑上装了测试安装包 `Interactive3DWallpaper-Setup-1.1.1-test.exe`（代码和这次提交一样，版本号只在打包时覆盖），确认没问题（2026-11-04）。
+
+限制：注入真的失败时（比如以后 Windows 又改桌面结构）仍然走兜底模式，壁纸会盖住图标。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。

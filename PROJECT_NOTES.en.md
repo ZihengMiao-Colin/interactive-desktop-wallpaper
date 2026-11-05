@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-03 (video wallpapers + My wallpapers, merged into main and pushed to GitHub (no new release), see §9 Phase 11; the same day the debug panel in the top-right of the wallpaper page was removed, see §8 item 15)
+> Last updated: 2026-11-04 (the app no longer launches PowerShell, fixing the wallpaper covering the icons on another computer, confirmed on that computer, see §9 Phase 12; before that, video wallpapers + My wallpapers, see Phase 11)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -15,7 +15,7 @@
 
 ## 1. One-line summary
 
-An Electron desktop app: the user picks an image → Depth Anything V2 (ONNX, run with `onnxruntime-node`) generates a grayscale depth map → the renderer draws it full-screen with a custom Pixi.js 2.5D parallax shader → the main process polls the global mouse position and the image shifts with pseudo-3D parallax. The window is injected into the Windows desktop WorkerW layer via PowerShell + C#, so it sits below the desktop icons.
+An Electron desktop app: the user picks an image → Depth Anything V2 (ONNX, run with `onnxruntime-node`) generates a grayscale depth map → the renderer draws it full-screen with a custom Pixi.js 2.5D parallax shader → the main process polls the global mouse position and the image shifts with pseudo-3D parallax. The window is injected into the Windows desktop WorkerW layer by calling user32 directly through `koffi`, so it sits below the desktop icons.
 
 A local video can also be set as the wallpaper (2026-11-03), with three effects: still / 3D parallax (one depth map shared by the whole video) / whole-picture pan, and optional sound. Images and videos the user picked themselves stay in "My wallpapers" on the Wallpaper page.
 
@@ -33,6 +33,7 @@ On top of that you can layer:
 | Rendering | Pixi.js 7.4.2 (local npm dependency, version pinned), custom Filter / Mesh shaders |
 | Animated image decoding | Chromium's built-in WebCodecs `ImageDecoder` (no `@pixi/gif`) |
 | Depth model | Depth Anything V2 Small. The app runs it with `onnxruntime-node` (1.31.1, pinned) in a utilityProcess child process (`src/depth/`); pre/post-processing is ported from `generate_depth_map.py` and the results match the Python version pixel for pixel. ONNX input is fixed at 518×518 (aspect ratio cannot be kept); the output depth map's longest side is 1920 |
+| Win32 calls | `koffi` (3.3.6, pinned) calls user32.dll directly in the main process (`src/win32.js`). The app does not launch PowerShell at runtime; see §9 Phase 12 for why |
 | Python | In-project `venv/` (3.11.9) with only onnxruntime / numpy / pillow. The app no longer uses Python; it is only for the asset scripts under `tools/` and the Python tests |
 | ONNX models | Project root (ignored by `.gitignore`): `_ir9.onnx` 100MB (the largest is picked; this is the one actually used), `_int8.onnx` 28MB, and a 2MB empty shell. Packaging copies `_ir9.onnx` to `resources/models/depth_anything_v2_small.onnx` |
 | Packaging | electron-builder, NSIS installer only (`npm run build` → `dist/Interactive3DWallpaper-Setup-<version>.exe`, ~334MB; ~560MB installed). Assets and the model live under `resources/` (outside asar); onnxruntime's DLLs are unpacked to `app.asar.unpacked` |
@@ -110,7 +111,7 @@ On top of that you can layer:
 │   │   ├── placement-controller.js Placement session (guarantees a single window, treats errors as cancel)
 │   │   └── migrate.js       Migration of the old "custom sticker" config
 │   ├── wallpaper-native.js  WorkerW injection
-│   ├── ps-helper.js         Long-running PowerShell helper (line-based output, restarts on failure), shared by the two below
+│   ├── win32.js             Calls user32.dll through koffi, shared by injection, full-screen detection and desktop clicks
 │   ├── fullscreen-detector.js Full-screen detection
 │   ├── desktop-click-watcher.js Desktop click detection (only on when there are "click to play" elements)
 │   ├── depth/
@@ -126,6 +127,7 @@ On top of that you can layer:
 ├── wallpapers/              Default wallpaper gallery: manifest.json + images + depth/ + thumbs/
 ├── overlay/                 Full-screen video effect assets
 ├── tools/prepare_builtin_element.py  Default green-screen element preprocessing (crop / scale / thumbnail)
+├── tools/desktop-diagnose.bat       Collects troubleshooting info (system, window hierarchy, log) into a txt on the Desktop when the wallpaper will not attach to the desktop layer
 ├── tools/prepare_wallpapers.py       Default wallpaper gallery asset generation (downscale / thumbnail / depth map; `--depth-only` recomputes depth maps only)
 ├── dev/                     Fake config and sample GIF for browser preview
 ├── build/installer.nsh      NSIS custom script: "Also delete my data" checkbox in the uninstall wizard, deleting data, removing the startup entry
@@ -323,7 +325,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
    - Rotation (the dot above the placement box; hold Shift for 15° steps), one-way stretch (edge midpoints; `transform.stretch` is the height multiplier relative to the original ratio), horizontal / vertical flip.
    - Free warp: after "Free warp" in the toolbar, drag the four corners individually and the texture is laid out in perspective (vertices carry a homogeneous weight q, see `projectiveWeights`); concave quads are rejected. "Reset" clears rotation, stretch, flip and warp.
    - Click to play (third playback mode): normally stays on the first frame and plays once when the element is clicked; with "Appear at click position" on, it is normally hidden and plays once wherever the desktop is clicked (with auto depth it takes the depth at the click point).
-   - Desktop click detection: the long-running helper reads the left button state every 15ms; a click counts only if press-to-release ≤500ms, movement ≤6px, and the release point is the desktop (root window class Progman / WorkerW). It is only on when there is a visible click-to-play element (or the record player has music, see item 6). Shares `src/ps-helper.js` with full-screen detection.
+   - Desktop click detection: the main process reads the left button state every 15ms; a click counts only if press-to-release ≤500ms, movement ≤6px, and the release point is the desktop (root window class Progman / WorkerW). It is only on when there is a visible click-to-play element (or the record player has music, see item 6). Shares `src/win32.js` with full-screen detection.
    - Tested: rendering in Electron, placement handles, recoloring in settings, and the main process forwarding clicks were all verified; the real-mouse desktop click step needs manual testing (automated tests cannot click the user's desktop).
 4. [x] Front-end UI redesign (2026-10-26; the user left the design to the assistant and confirmed after seeing mockups).
    - Design: [docs/superpowers/specs/2026-10-26-ui-redesign-design.md](docs/superpowers/specs/2026-10-26-ui-redesign-design.md); plan: [docs/superpowers/plans/2026-10-26-ui-redesign.md](docs/superpowers/plans/2026-10-26-ui-redesign.md).
@@ -465,6 +467,29 @@ The user wanted to set a video directly as the wallpaper (previously videos coul
 - Verification: `npm test` 200 passing (new: 9 for My wallpapers logic, 3 for pan, 5 for storage, 1 for the pause rule, 2 for the serial queue). Electron tests (separate data directory + debug port; the file dialog was temporarily replaced in the main process to return a chosen file): screenshots of the three effects; an idle video wallpaper redraws at the video frame rate (30/s) while the ticker stays stopped; a video with sound keeps playing while covered and stops during placement; 10 quick switches leave one video alive and the last one wins; switching back to an image frees the video and image frame-stopping still works; element movement and occlusion under the three effects; weather / video overlay / vinyl on top; mp4, webm, a path with Chinese, spaces, # and %; an audio-only mp4 and a renamed text file are rejected; a 3D-parallax video plays as still after clearing the cache; a deleted file shows a notice on restart; the preview video pauses on page switch and minimize; My wallpapers add / remove / file not found / kept across restarts / old-config migration; parallax page notes; no horizontal scroll at 820×560; browser preview without errors.
 - Fixed after the whole-branch review (2026-11-03): (1) on wake and unlock, powerMonitor passes Electron's event object as the first argument, which used to be forwarded straight into IPC and fails to serialize (image wallpapers affected too); (2) fullscreen detection keeps running while locked, so `covered` could override the lock and a video with sound could play on the lock screen. The main process now tracks placement / lock-or-sleep / covered separately and `nextWallpaperSignal` in `shared/frame-pacing.js` combines them into one pause reason (unit-tested over event orders); a reloaded wallpaper page gets the current state again; (3) "My wallpapers" re-rendered and re-checked every file on every config broadcast (several times a second while dragging a slider; slow on an offline network drive), now it only re-renders when the list or the current wallpaper changes. Tested after the fix: simulated lock → sleep and wake while locked does not resume → unlock resumes; a maximized window opened while locked sends nothing, after unlock it becomes `covered` (silently), closing the window resumes.
 - Not tested: a real lock / sleep (events simulated through the main-process debug port; the maximized window was real); real audible sound (the test videos had no audio track, only checked unmuted and playing); the tray "Change wallpaper" (needs the native dialog); the packaged installer; power use on integrated graphics.
+
+### ✅ Phase 12 — The app no longer launches PowerShell (2026-11-04)
+
+User report: on another computer (Windows Enterprise 25H2, 150% scaling) the wallpaper became a separate window that covered the desktop icons and vanished after clicking "Show desktop". Neither the dev version nor the packaged 1.1.0 reproduced it on the dev machine, so `tools/desktop-diagnose.bat` was written (double-click to collect system info, the desktop window hierarchy, the before/after of "Show desktop", and the log into one txt on the Desktop; read-only) and run on that computer.
+
+- Symptom: the wallpaper window was top-level (`parent` is the desktop root) with `WS_EX_TRANSPARENT`, which is the fallback mode after a failed injection; the WorkerW had no children.
+- Root cause: the app could not launch `powershell.exe` (`spawn EPERM` / `spawn UNKNOWN`), so not one line of the injection script ran. The full-screen and desktop click helpers failed along with it.
+- Timeline: on 10-31 at 14:07:19 both helpers exited within 74ms while the app kept running (not a shutdown), and every PowerShell launch failed after that, across restarts, a reinstall and 4 days. The diagnostic `.bat` could launch PowerShell normally, so only this app launching PowerShell was blocked.
+- Not introduced by 1.1.0: 1.1.0 ran fine on that computer for over an hour (from 10-31 13:05 audio loaded every three to four minutes, which is playlist auto-advance; 1.0.0 only had single-track loop), and the injection code is identical in both versions. The user felt 1.0.0 was fine because the block happened to start right after upgrading.
+- What blocked it is unconfirmed: blocking only a specific program from launching PowerShell looks most like security software, and hidden PowerShell with `-ExecutionPolicy Bypass` polling `GetAsyncKeyState` does look like malware. The fix does not depend on which product it was.
+
+The fix:
+- New `src/win32.js` uses `koffi` (3.3.6, pinned) to call user32 directly in the main process; injection, full-screen detection and desktop click detection are all in-process now, `src/ps-helper.js` is gone, and the app no longer launches PowerShell at runtime. Injection went from 3-4 seconds to about 0.4 seconds.
+- Calls that send messages to windows (SetParent, SendMessage, RedrawWindow, etc.) go through koffi's `.async`, run on a worker thread with a time limit, so a hung explorer does not hang the main process and the main thread can still handle messages sent to the wallpaper window. Read-only calls are synchronous.
+- Removed `restoreFromWallpaperLayer`: on quit the window simply closes. The old PowerShell took over a second to start, by which time the window was already gone, so it never did anything; running it immediately would make the wallpaper flash as a top-level window.
+- The 6-pixel desktop click limit now scales with system DPI: the old helper was DPI-unaware and read scaled coordinates, while the main process reads physical pixels.
+- Packaging: `asarUnpack` now includes `node_modules/@koromix/koffi-win32-x64/**`.
+
+Verification: `npm test` all 230 passing (14 new for injection, 9 for desktop clicks, full-screen tests moved to a fake win32 interface). On the dev machine a shim made launching `powershell.exe` throw EPERM: the old code logged exactly what that computer logged; the new code made 0 launch attempts, attached the window under WorkerW, kept the wallpaper with icons on top after "Show desktop", and paused and resumed full-screen detection correctly. Desktop click detection was tested with a real mouse click, and quitting through the tray menu (exit code 0). The packaged build in `dist/test-build` was run with a fresh data folder: `koffi.node` is outside the asar, no child processes other than the app's own, and "Show desktop" works.
+
+The user installed the test installer `Interactive3DWallpaper-Setup-1.1.1-test.exe` (same code as this commit; the version is only overridden at build time) on the affected computer and confirmed it works (2026-11-04).
+
+Limitation: if injection really fails (say Windows changes the desktop structure again) it still falls back to the mode where the wallpaper covers the icons.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

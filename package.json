@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "electron-log": "^5.0.1",
+    "koffi": "3.3.6",
     "onnxruntime-node": "1.31.1",
     "pixi.js": "7.4.2"
   },
@@ -46,7 +47,8 @@
       "!node_modules/onnxruntime-node/script/**"
     ],
     "asarUnpack": [
-      "node_modules/onnxruntime-node/bin/**"
+      "node_modules/onnxruntime-node/bin/**",
+      "node_modules/@koromix/koffi-win32-x64/**"
     ],
     "extraResources": [
       {
