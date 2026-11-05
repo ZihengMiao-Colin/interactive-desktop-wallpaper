@@ -41,21 +41,24 @@ uniform vec2 uDepthSize;
 uniform vec2 uMouse;
 uniform vec2 uCoverScale;
 uniform vec2 uCoverOffset;
+uniform vec2 uCropMin;
+uniform vec2 uCropMax;
 uniform float uStrength;
 uniform float uFocus;
 uniform float uShowDepth;
 ${PARALLAX_GLSL}
 void main(void) {
     vec2 baseUV = vUV * uCoverScale + uCoverOffset;
-    vec2 finalUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), vec2(0.001), vec2(0.999));
+    vec2 finalUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), uCropMin, uCropMax);
     gl_FragColor = uShowDepth > 0.5 ? texture2D(uDepth, finalUV) : texture2D(uImage, finalUV);
 }
 `;
 
 /**
  * @returns {{
- *   showImage: (dataUrl: string, info: { name: string, tag: string }) => void,
- *   showVideo: (fileUrl: string, info: { name: string, tag: string }) => Promise<{ width: number, height: number, duration: number }>,
+ *   showImage: (dataUrl: string, info: { name: string, tag: string, crop?: object|null }) => void,
+ *   showVideo: (fileUrl: string, info: { name: string, tag: string, crop?: object|null }) => Promise<{ width: number, height: number, duration: number }>,
+ *   setCrop: (crop: object|null) => void,
  *   setMotion: (motion: 'depth'|'none'|'pan') => void,
  *   setActive: (active: boolean) => void,
  *   setUsing: (using: boolean) => void,
@@ -88,6 +91,8 @@ function initDepthPreview() {
     let loadToken = 0;
     /** 视频壁纸的效果：'depth' 3D 视差（图片总是这个）| 'none' 不动 | 'pan' 整体平移 */
     let motion = 'depth';
+    /** 裁剪区域（shared/crop.js），没有裁剪时为 null。没有 WebGL 时的退路不跟裁剪走，壁纸本身也要 WebGL */
+    let crop = null;
     /** 预览的是视频时的 <video>（放在预览里、隐藏，每出一帧上传一次纹理） */
     let videoEl = null;
     /** 设置窗口隐藏、或者切到没有预览的页面时为 false：视频暂停、不重画 */
@@ -125,7 +130,7 @@ function initDepthPreview() {
         ctx.vertexAttribPointer(aPos, 2, ctx.FLOAT, false, 0, 0);
 
         const uniforms = {};
-        for (const name of ['uImage', 'uDepth', 'uDepthSize', 'uMouse', 'uCoverScale', 'uCoverOffset', 'uStrength', 'uFocus', 'uShowDepth']) {
+        for (const name of ['uImage', 'uDepth', 'uDepthSize', 'uMouse', 'uCoverScale', 'uCoverOffset', 'uCropMin', 'uCropMax', 'uStrength', 'uFocus', 'uShowDepth']) {
             uniforms[name] = ctx.getUniformLocation(program, name);
         }
         ctx.uniform1i(uniforms.uImage, 0);
@@ -234,12 +239,17 @@ function initDepthPreview() {
         ctx.viewport(0, 0, w, h);
 
         // 强度、对焦按效果换算（和壁纸一致）；整体平移时画面放大一点，移到最边上也不露出拉伸的边缘
-        const base = isLive() ? Shared.parallax.strengthFromMultiplier(params.parallaxMultiplier) : 0;
-        const m = Shared.parallax.motionParams(motion, base, params.focusDepth);
-        let cover = Shared.parallax.coverTransform(w, h, gl.image.width, gl.image.height);
-        if (motion === 'pan') cover = Shared.parallax.panCover(cover, m.strength);
+        const P = Shared.parallax;
+        const { width: imgW, height: imgH } = gl.image;
+        const base = isLive() ? P.strengthFromMultiplier(params.parallaxMultiplier) * P.cropZoom(w, h, imgW, imgH, crop) : 0;
+        const m = P.motionParams(motion, base, params.focusDepth);
+        let cover = P.cropCover(w, h, imgW, imgH, crop);
+        if (motion === 'pan') cover = P.panCover(cover, m.strength, crop);
+        const [cropMinX, cropMinY, cropMaxX, cropMaxY] = P.cropBounds(crop);
         ctx.uniform2f(uniforms.uCoverScale, cover.scaleX, cover.scaleY);
         ctx.uniform2f(uniforms.uCoverOffset, cover.offsetX, cover.offsetY);
+        ctx.uniform2f(uniforms.uCropMin, cropMinX, cropMinY);
+        ctx.uniform2f(uniforms.uCropMax, cropMaxX, cropMaxY);
         // 鼠标右移时近景向左偏，所以传入取反后的值（和壁纸一致）
         ctx.uniform2f(uniforms.uMouse, -current[0], -current[1]);
         ctx.uniform1f(uniforms.uStrength, m.strength);
@@ -361,6 +371,7 @@ function initDepthPreview() {
             depthUrl = '';
             mode = 'image';
             motion = 'depth';
+            crop = info.crop || null;
             target[0] = target[1] = current[0] = current[1] = 0;
             nameEl.textContent = info.name;
             tagEl.textContent = info.tag;
@@ -391,6 +402,7 @@ function initDepthPreview() {
             depthUrl = '';
             mode = 'image';
             motion = 'none';
+            crop = info.crop || null;
             target[0] = target[1] = current[0] = current[1] = 0;
             nameEl.textContent = info.name;
             tagEl.textContent = info.tag;
@@ -451,6 +463,12 @@ function initDepthPreview() {
                 }, { once: true });
                 video.src = fileUrl;
             });
+        },
+
+        /** 换当前图片或视频的裁剪（重新裁剪后） */
+        setCrop(next) {
+            crop = next || null;
+            redraw();
         },
 
         /** 视频的效果：'depth' 3D 视差 | 'none' 不动 | 'pan' 整体平移 */

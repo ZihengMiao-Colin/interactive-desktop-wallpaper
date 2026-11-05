@@ -77,6 +77,7 @@ class ElementsLayer {
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
         const cover = this.scene.getCover();
+        const [cropMinX, cropMinY, cropMaxX, cropMaxY] = this.scene.getCropBounds();
         const depthTexture = this.scene.getDepthTexture();
         const depthSize = this.scene.getDepthSize();
         const { elementSize } = Shared.placement;
@@ -128,6 +129,8 @@ class ElementsLayer {
             u.uScreenSize = [screenW, screenH];
             u.uCoverScale = [cover.scaleX, cover.scaleY];
             u.uCoverOffset = [cover.offsetX, cover.offsetY];
+            u.uCropMin = [cropMinX, cropMinY];
+            u.uCropMax = [cropMaxX, cropMaxY];
             u.uMouse = [mouseX, mouseY];
             u.uStrength = strength;
             u.uFocus = focus;

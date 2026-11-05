@@ -634,8 +634,9 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     font-size: 11px;
 }
 .wp .dur svg.i { width: 11px; height: 11px; }
-/* 悬停才出现的 ×：从列表移除（不删原文件） */
-.wp .rm {
+/* 悬停才出现的两个按钮：裁剪、×（从列表移除，不删原文件） */
+.wp .rm,
+.wp .cr {
     position: absolute;
     top: 6px;
     right: 6px;
@@ -649,13 +650,19 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     opacity: 0;
     transition: opacity 0.12s;
 }
-.wp .rm svg.i { width: 14px; height: 14px; }
+.wp .cr { right: 32px; }
+.wp .rm svg.i,
+.wp .cr svg.i { width: 14px; height: 14px; }
 .wp .rm:hover { background: var(--danger); color: var(--on-danger); }
+.wp .cr:hover { background: var(--accent); color: var(--accent-ink); }
 .wp:hover .rm,
-.wp .rm:focus-visible { opacity: 1; }
-.wp:disabled .rm { display: none; }
-/* 有 × 的时候"使用中"往左让一让 */
-.mine .wp:hover .using { right: 30px; }
+.wp:hover .cr,
+.wp .rm:focus-visible,
+.wp .cr:focus-visible { opacity: 1; }
+.wp:disabled .rm,
+.wp:disabled .cr { display: none; }
+/* 悬停出现按钮时"使用中"往左让一让（文件找不到时没有裁剪按钮，但也不会有"使用中"） */
+.mine .wp:hover .using { right: 58px; }
 .wp .missing-chip { position: absolute; top: 6px; left: 6px; z-index: 1; }
 .wp.missing img { opacity: 0.35; }
 /* "从电脑选择"：自己画切角框（.wp 的外框不用） */
@@ -1253,6 +1260,76 @@ input[type=range].hue::-webkit-slider-runnable-track {
 .confirm-option b { display: block; font-size: 13.5px; font-weight: 500; }
 .confirm-option small { display: block; margin-top: 2px; color: var(--text-2); font-size: 12px; line-height: 1.55; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
+
+/* ==================== 裁剪框：比确认框宽，舞台大小由 crop-dialog.js 按素材比例算 ==================== */
+.confirm.crop-dialog { width: min(760px, calc(100vw - 40px)); padding: 18px 24px 20px; }
+.crop-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.crop-head h2 { flex-shrink: 0; font-size: 18px; }
+.crop-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-3);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.crop-stage {
+    position: relative;
+    margin: 0 auto;
+    overflow: hidden;
+    background: #000;
+    touch-action: none;
+    user-select: none;
+}
+.crop-stage img,
+.crop-stage video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+/* 框外变暗；框内是留下的部分，三分线帮助对齐 */
+.crop-box {
+    position: absolute;
+    outline: 1px solid var(--accent-text);
+    box-shadow: 0 0 0 9999px rgba(8, 10, 12, 0.66);
+    cursor: move;
+}
+.crop-box::before,
+.crop-box::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+}
+.crop-box::before {
+    inset: 0 33.33%;
+    border-inline: 1px solid rgba(255, 255, 255, 0.22);
+}
+.crop-box::after {
+    inset: 33.33% 0;
+    border-block: 1px solid rgba(255, 255, 255, 0.22);
+}
+/* 角点画在框里面：框贴着图片边时也不会被裁掉一半 */
+.crop-handle { position: absolute; z-index: 1; width: 20px; height: 20px; border: 0 solid var(--accent); }
+.crop-handle.nw { top: 0; left: 0; border-width: 3px 0 0 3px; cursor: nwse-resize; }
+.crop-handle.ne { top: 0; right: 0; border-width: 3px 3px 0 0; cursor: nesw-resize; }
+.crop-handle.sw { bottom: 0; left: 0; border-width: 0 0 3px 3px; cursor: nesw-resize; }
+.crop-handle.se { bottom: 0; right: 0; border-width: 0 3px 3px 0; cursor: nwse-resize; }
+.crop-time {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    color: var(--text-2);
+    font-size: 12.5px;
+}
+.crop-time[hidden] { display: none; }
+.crop-time input[type=range] { flex: 1; min-width: 0; }
+.crop-time .value { min-width: 36px; font-family: var(--f-mono); text-align: right; }
+.crop-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.crop-foot .chip { flex-shrink: 0; }
+.crop-foot .chip[hidden] { display: none; }
+.crop-spacer { flex: 1; }
 
 /* ==================== 窄窗口 ==================== */
 @media (max-width: 900px) {

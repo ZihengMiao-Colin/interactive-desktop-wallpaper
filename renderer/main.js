@@ -149,7 +149,8 @@ function updateLoop(delta) {
     currentY += (targetY - currentY) * k;
 
     // 鼠标右移时近景向左偏，所以传入取反后的值。视频壁纸按效果换算（不动：强度 0；整体平移：全画面在深度 1）
-    const strength = Shared.parallax.strengthFromMultiplier(CONFIG.parallaxMultiplier);
+    // 裁剪后画面放大了，强度跟着缩小，屏幕上的位移和不裁时一样
+    const strength = Shared.parallax.strengthFromMultiplier(CONFIG.parallaxMultiplier) * Scene.getCropZoom();
     const m = Shared.parallax.motionParams(Scene.getMotion(), strength, Number(CONFIG.focusDepth));
     Scene.setParallax(-currentX, -currentY, m.strength, m.focus);
     elementsLayer.update(now, -currentX, -currentY, m.strength, m.focus, m);
@@ -162,7 +163,7 @@ function updateLoop(delta) {
 
 // ==================== 视频壁纸 ====================
 
-/** 当前桌面上的壁纸 { type, path, effect?, sound? }（Shared.myWallpapers.resolveCurrent 的格式） */
+/** 当前桌面上的壁纸 { type, path, effect?, sound?, crop? }（Shared.myWallpapers.resolveCurrent 的格式） */
 let currentWallpaper = null;
 /** 背景是视频时的视频壁纸对象（renderer/video-wallpaper.js） */
 let currentVideo = null;
@@ -186,14 +187,14 @@ function syncVideoPlayback() {
 
 /**
  * 换上一个视频壁纸。读不出来时抛错，桌面保持原来的壁纸。
- * @param {{path: string, effect: string, sound: boolean}} descriptor
+ * @param {{path: string, effect: string, sound: boolean, crop?: object}} descriptor
  */
 async function showVideoWallpaper(descriptor) {
     const depth = descriptor.effect === 'depth' ? await window.electronAPI.getDepthCache(descriptor.path) : null;
     // 摆放窗口里一直静音（桌面上的壁纸还在出声）
     const video = await createVideoWallpaper(descriptor.path, { sound: !isEditMode && descriptor.sound });
     try {
-        await Scene.loadVideo(video, { motion: descriptor.effect, depthSource: depth });
+        await Scene.loadVideo(video, { motion: descriptor.effect, depthSource: depth, crop: descriptor.crop || null });
     } catch (err) {
         video.destroy();
         throw err;
@@ -206,8 +207,8 @@ async function showVideoWallpaper(descriptor) {
 }
 
 /** 换上一张图片壁纸（之前是视频的话 Scene.load 会释放它） */
-async function showImageWallpaper(imagePath, depth) {
-    await Scene.load(imagePath, depth);
+async function showImageWallpaper(imagePath, depth, crop = null) {
+    await Scene.load(imagePath, depth, crop);
     currentVideo = null;
     currentWallpaper = { type: 'image', path: imagePath };
     wake();
@@ -271,7 +272,7 @@ function registerIpcListeners() {
         try {
             const cachedDepth = await window.electronAPI.getDepthCache(imagePath);
             if (cachedDepth) {
-                await showImageWallpaper(imagePath, cachedDepth);
+                await showImageWallpaper(imagePath, cachedDepth, descriptor.crop || null);
                 UI.showToast('壁纸已更换', 2000);
             } else {
                 UI.showToast('请先在设置窗口中生成深度图（托盘菜单 → 打开设置）', 4000);
@@ -316,7 +317,7 @@ async function resolveInitialSources() {
         if (!window.electronAPI.fileExists(current.path)) return { ...fallback, missing: current.path };
         if (current.type === 'video') return { ...fallback, video: current };
         const cachedDepth = await window.electronAPI.getDepthCache(current.path);
-        return { bg: current.path, depth: cachedDepth || null };
+        return { bg: current.path, depth: cachedDepth || null, crop: current.crop || null };
     } catch (err) {
         console.warn('[App] 读取上次的壁纸配置失败:', err);
     }
@@ -343,7 +344,7 @@ async function start() {
                     await showImageWallpaper(sources.bg, sources.depth);
                 }
             } else {
-                await showImageWallpaper(sources.bg, sources.depth);
+                await showImageWallpaper(sources.bg, sources.depth, sources.crop);
             }
         } catch (err) {
             console.error('[App] 壁纸加载失败，改用项目自带的 background.png:', err);

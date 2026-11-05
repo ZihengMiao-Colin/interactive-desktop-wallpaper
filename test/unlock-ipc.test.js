@@ -104,7 +104,7 @@ test('getInfo：有视频时给缩略图地址', async () => {
 
 test('getInfo：没选过视频', async () => {
     const { invoke } = setup();
-    assert.deepEqual(await invoke('unlock:getInfo'), { exists: false, thumbUrl: null });
+    assert.deepEqual(await invoke('unlock:getInfo'), { exists: false, videoUrl: null, thumbUrl: null });
 });
 
 test('getInfo：文件被删了 exists 是 false', async () => {
@@ -137,4 +137,52 @@ test('播放页面的事件转给控制器，带上发送方', () => {
     const sender = {};
     emit('unlock:player-event', { sender }, 'ready');
     assert.deepEqual(controller.events, [[sender, 'ready']]);
+});
+
+const CROP = { x: 0.1, y: 0.2, w: 0.5, h: 0.4 };
+
+test('setVideo 记下裁剪；换视频时不带裁剪就清掉，不沿用上一个视频的', async () => {
+    const { invoke, src } = setup();
+    const first = await invoke('unlock:setVideo', { path: src('a.mp4'), thumbDataUrl: THUMB, duration: 6, crop: CROP });
+    assert.deepEqual(first.config.unlockAnimation.crop, CROP);
+    const second = await invoke('unlock:setVideo', { path: src('b.mp4'), thumbDataUrl: THUMB, duration: 6 });
+    assert.equal(second.config.unlockAnimation.crop, null);
+});
+
+test('setCrop 改裁剪、换一张缩略图并删掉旧的，视频不动', async () => {
+    const { invoke, src, unlockFile, broadcasts } = setup();
+    const { config } = await invoke('unlock:setVideo', { path: src('a.mp4'), thumbDataUrl: THUMB, duration: 6 });
+    const old = config.unlockAnimation;
+    const before = broadcasts.count;
+
+    const res = await invoke('unlock:setCrop', { crop: CROP, thumbDataUrl: THUMB });
+    const u = res.config.unlockAnimation;
+    assert.deepEqual(u.crop, CROP);
+    assert.equal(u.file, old.file);
+    assert.notEqual(u.thumb, old.thumb);
+    assert.ok(fs.existsSync(unlockFile(u.thumb)));
+    assert.equal(fs.existsSync(unlockFile(old.thumb)), false);
+    assert.ok(fs.existsSync(unlockFile(u.file)));
+    assert.equal(broadcasts.count, before + 1);
+});
+
+test('setCrop：没有视频时报错', async () => {
+    const { invoke } = setup();
+    assert.ok((await invoke('unlock:setCrop', { crop: CROP, thumbDataUrl: THUMB })).error);
+});
+
+test('remove 清掉裁剪', async () => {
+    const { invoke, src } = setup();
+    await invoke('unlock:setVideo', { path: src('a.mp4'), thumbDataUrl: THUMB, duration: 6, crop: CROP });
+    const { config } = await invoke('unlock:remove');
+    assert.equal(config.unlockAnimation.crop, null);
+});
+
+test('getInfo 给出视频地址（重新裁剪用），文件不在时是 null', async () => {
+    const { invoke, src, unlockFile } = setup();
+    assert.equal((await invoke('unlock:getInfo')).videoUrl, null);
+    const { config } = await invoke('unlock:setVideo', { path: src('a.mp4'), thumbDataUrl: THUMB, duration: 6 });
+    assert.match((await invoke('unlock:getInfo')).videoUrl, /^file:\/\//);
+    fs.unlinkSync(unlockFile(config.unlockAnimation.file));
+    assert.equal((await invoke('unlock:getInfo')).videoUrl, null);
 });

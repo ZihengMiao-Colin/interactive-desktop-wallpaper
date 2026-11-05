@@ -23,6 +23,8 @@ class DepthParallaxFilter extends PIXI.Filter {
             uFocus: 0.50,
             uCoverScale: new Float32Array([1.0, 1.0]),
             uCoverOffset: new Float32Array([0.0, 0.0]),
+            uCropMin: new Float32Array([0.001, 0.001]),
+            uCropMax: new Float32Array([0.999, 0.999]),
         });
     }
 }
@@ -56,6 +58,10 @@ const Scene = (() => {
     let motion = 'depth';
     /** 整体平移时的最大位移（= 视差强度），cover 按它放大 */
     let panStrength = 0;
+    /** 裁剪区域 { x, y, w, h }（shared/crop.js），没有裁剪时为 null */
+    let crop = null;
+    /** 裁剪让画面放大的比例（Shared.parallax.cropZoom），视差强度要乘上它 */
+    let cropZoom = 1;
 
     /**
      * 加载图片。Windows 绝对路径在 Electron 里经 preload 读成 Data URL，
@@ -114,21 +120,27 @@ const Scene = (() => {
         return canvas;
     }
 
-    /** 计算原图以 Cover 方式铺满窗口时的 UV 缩放与偏移，并写入滤镜 */
+    /** 计算原图（有裁剪时是裁剪区域）以 Cover 方式铺满窗口时的 UV 缩放与偏移，并写入滤镜 */
     function updateCover() {
         // 用 window 尺寸而不是 app.screen：Pixi 的 resizeTo 会推迟到下一帧才更新 app.screen，
         // resize 事件里读到的还是旧尺寸（窗口从 0×0 变大时会算出 NaN）
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
         if (!screenW || !screenH) return;
-        cover = Shared.parallax.coverTransform(screenW, screenH, bgWidth || screenW, bgHeight || screenH);
+        const imgW = bgWidth || screenW;
+        const imgH = bgHeight || screenH;
+        cover = Shared.parallax.cropCover(screenW, screenH, imgW, imgH, crop);
+        cropZoom = Shared.parallax.cropZoom(screenW, screenH, imgW, imgH, crop);
         // 整体平移：画面放大一点，移到最边上也不露出边缘被拉伸的像素
-        if (motion === 'pan') cover = Shared.parallax.panCover(cover, panStrength);
+        if (motion === 'pan') cover = Shared.parallax.panCover(cover, panStrength, crop);
 
         if (filter) {
+            const [minX, minY, maxX, maxY] = Shared.parallax.cropBounds(crop);
             // 必须整体赋值数组，才能触发 Pixi UniformGroup 的脏标记
             filter.uniforms.uCoverScale = [cover.scaleX, cover.scaleY];
             filter.uniforms.uCoverOffset = [cover.offsetX, cover.offsetY];
+            filter.uniforms.uCropMin = [minX, minY];
+            filter.uniforms.uCropMax = [maxX, maxY];
         }
     }
 
@@ -142,8 +154,9 @@ const Scene = (() => {
      * 加载（或更换）壁纸与深度图。首次调用会建好精灵和滤镜，之后只替换纹理并释放旧纹理。
      * @param {string} bgSource - 壁纸路径或 Data URL，加载失败会抛错
      * @param {string|null} depthSource - 深度图路径或 Data URL；为 null 或加载失败时用占位深度图
+     * @param {{x: number, y: number, w: number, h: number}|null} [nextCrop] - 裁剪区域
      */
-    async function load(bgSource, depthSource) {
+    async function load(bgSource, depthSource, nextCrop = null) {
         const bgImg = await loadImage(bgSource);
 
         let depthSrc = null;
@@ -163,16 +176,17 @@ const Scene = (() => {
             height: bgImg.naturalHeight,
             depthSrc,
             motion: 'depth',
+            crop: nextCrop,
         });
     }
 
     /**
      * 加载（或更换）视频壁纸。旧的背景（图片或视频）会被释放。
      * @param {Awaited<ReturnType<typeof createVideoWallpaper>>} videoWallpaper
-     * @param {{motion: 'depth'|'none'|'pan', depthSource: string|null}} options
+     * @param {{motion: 'depth'|'none'|'pan', depthSource: string|null, crop?: object|null}} options
      *   motion 为 'depth' 但没有深度图（比如缓存被清了）时按 'none' 播放
      */
-    async function loadVideo(videoWallpaper, { motion: wanted, depthSource }) {
+    async function loadVideo(videoWallpaper, { motion: wanted, depthSource, crop: nextCrop = null }) {
         let nextMotion = wanted === 'depth' || wanted === 'pan' ? wanted : 'none';
         let depthSrc = null;
         if (nextMotion === 'depth') {
@@ -195,11 +209,12 @@ const Scene = (() => {
             height: videoWallpaper.height,
             depthSrc: depthSrc || createFlatDepth(),
             motion: nextMotion,
+            crop: nextCrop,
         });
     }
 
     /** 换上新的背景纹理和深度图，释放旧的（视频要整个销毁，图片纹理连同 GPU 资源一起释放） */
-    function applySources({ texture, video, width, height, depthSrc, motion: nextMotion }) {
+    function applySources({ texture, video, width, height, depthSrc, motion: nextMotion, crop: nextCrop }) {
         const oldBg = bgTexture;
         const oldVideo = bgVideo;
         const oldDepth = depthTexture;
@@ -207,6 +222,7 @@ const Scene = (() => {
         bgTexture = texture;
         bgVideo = video;
         motion = nextMotion;
+        crop = nextCrop;
         depthTexture = makeTexture(depthSrc);
         // 光线步进在分支和循环里读深度图，读的时候算不出该用哪级 mipmap，所以深度图不要 mipmap
         depthTexture.baseTexture.mipmap = PIXI.MIPMAP_MODES.OFF;
@@ -290,6 +306,10 @@ const Scene = (() => {
         renderOnce: () => app.renderer.render(app.stage),
         addLayer,
         getCover: () => ({ ...cover }),
+        /** 裁剪让画面放大的比例，视差强度乘上它，屏幕上的位移才和不裁时一样 */
+        getCropZoom: () => cropZoom,
+        /** 着色器取色的范围 [minX, minY, maxX, maxY] */
+        getCropBounds: () => Shared.parallax.cropBounds(crop),
         getDepthTexture: () => depthTexture,
         getDepthSize,
         getDepthImage: () => depthImage,

@@ -94,10 +94,13 @@ uniform float uStrength;
 uniform float uFocus;
 uniform vec2 uCoverScale;
 uniform vec2 uCoverOffset;
+uniform vec2 uCropMin;
+uniform vec2 uCropMax;
 ${PARALLAX_GLSL}
 void main(void) {
     vec2 baseUV = vTextureCoord * uCoverScale + uCoverOffset;
-    vec2 shownUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), vec2(0.001), vec2(0.999));
+    // 取色限制在裁剪区域内（没有裁剪时是整张图）：视差会取到屏幕外的内容，裁掉的水印不能滑进来
+    vec2 shownUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), uCropMin, uCropMax);
     gl_FragColor = texture2D(uImage, shownUV);
 }
 `;
@@ -146,6 +149,8 @@ uniform sampler2D uDepth;
 uniform vec2 uDepthSize;
 uniform vec2 uCoverScale;
 uniform vec2 uCoverOffset;
+uniform vec2 uCropMin;
+uniform vec2 uCropMax;
 uniform vec2 uMouse;
 uniform float uStrength;
 uniform float uFocus;
@@ -187,7 +192,7 @@ vec3 adjustColor(vec3 rgb) {
 void main(void) {
     // 深度遮挡：场景比元素近的地方把元素挡住，边缘柔和过渡；+0.02 避免贴地时底边自己挡自己
     vec2 baseUV = vScreenUV * uCoverScale + uCoverOffset;
-    vec2 shownUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), vec2(0.001), vec2(0.999));
+    vec2 shownUV = clamp(rayMarchUV(uDepth, uDepthSize, baseUV, uMouse, uFocus, uStrength), uCropMin, uCropMax);
     float sceneDepth = texture2D(uDepth, shownUV).r;
     float vis = smoothstep(-0.03, 0.03, (uElemDepth + 0.02) - sceneDepth);
     // 视频壁纸"不动""整体平移"时没有深度图，不做遮挡

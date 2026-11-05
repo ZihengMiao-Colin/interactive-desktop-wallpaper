@@ -2,8 +2,9 @@
  * unlock-animation.js — 解锁动画的纯逻辑（主进程、设置页、全屏播放页共用）
  *
  * 配置 unlockAnimation：
- *   { enabled, file, name, thumb, duration, fadeInMs, fadeOutMs, sound }
+ *   { enabled, file, name, thumb, duration, fadeInMs, fadeOutMs, sound, crop }
  *   file / thumb 是 userData/unlock_animation/ 里的文件名，name 是原文件名（只用来显示），duration 单位秒。
+ *   crop 是裁剪区域（shared/crop.js），没裁过时是 null。
  *
  * 状态：
  *   idle      没有全屏窗口
@@ -15,10 +16,13 @@
  */
 
 (function (root, factory) {
-    const mod = factory();
+    const cropLib = (typeof module === 'object' && module.exports)
+        ? require('./crop')
+        : root.Shared.crop;
+    const mod = factory(cropLib);
     if (typeof module === 'object' && module.exports) module.exports = mod;
     else (root.Shared = root.Shared || {}).unlockAnimation = mod;
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (cropLib) {
     'use strict';
 
     const DEFAULTS = Object.freeze({
@@ -30,6 +34,7 @@
         fadeInMs: 500,
         fadeOutMs: 700,
         sound: false,
+        crop: null,
     });
 
     /** 淡入淡出时长上限（毫秒） */
@@ -67,6 +72,7 @@
             fadeInMs: fadeMs(v.fadeInMs, DEFAULTS.fadeInMs),
             fadeOutMs: fadeMs(v.fadeOutMs, DEFAULTS.fadeOutMs),
             sound: v.sound === true,
+            crop: cropLib.normalizeCrop(v.crop),
         };
     }
 

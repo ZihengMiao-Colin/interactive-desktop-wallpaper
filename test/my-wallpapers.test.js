@@ -112,3 +112,95 @@ test('formatDuration：分:秒，未知时为空', () => {
     assert.equal(MW.formatDuration(0), '');
     assert.equal(MW.formatDuration(NaN), '');
 });
+
+// ---- 裁剪 ----
+
+const CROP = { x: 0.1, y: 0.2, w: 0.5, h: 0.4 };
+const OTHER_CROP = { x: 0, y: 0, w: 0.5, h: 0.5 };
+
+test('normalizeList：留下合法的裁剪，丢掉坏的，没有裁剪时不写这个键', () => {
+    const [a, b, c] = MW.normalizeList([
+        { path: 'C:/a.jpg', lastUsedAt: 3, crop: CROP },
+        { path: 'C:/b.jpg', lastUsedAt: 2, crop: { x: NaN, y: 0, w: 1, h: 1 } },
+        { path: 'C:/c.mp4', lastUsedAt: 1 },
+    ]);
+    assert.deepEqual(a.crop, CROP);
+    assert.equal('crop' in b, false);
+    assert.equal('crop' in c, false);
+});
+
+test('addEntry：新条目带裁剪；已有的条目给了新裁剪就换，没给就留着', () => {
+    const list = MW.addEntry([], { path: 'C:/a.jpg', type: 'image', crop: CROP }, 1);
+    assert.deepEqual(list[0].crop, CROP);
+    assert.deepEqual(MW.addEntry(list, { path: 'C:/a.jpg', type: 'image', crop: OTHER_CROP }, 2)[0].crop, OTHER_CROP);
+    assert.deepEqual(MW.addEntry(list, { path: 'C:/a.jpg', type: 'image' }, 2)[0].crop, CROP);
+});
+
+test('updateEntry：改裁剪、用 null 清掉，别的字段不动，图片和视频都行', () => {
+    const list = [{ path: 'C:/a.jpg', type: 'image', crop: CROP }, { path: 'C:/v.mp4', type: 'video', effect: 'pan' }];
+    assert.deepEqual(MW.findEntry(MW.updateEntry(list, 'C:/a.jpg', { crop: OTHER_CROP }), 'C:/a.jpg').crop, OTHER_CROP);
+    assert.equal('crop' in MW.findEntry(MW.updateEntry(list, 'C:/a.jpg', { crop: null }), 'C:/a.jpg'), false);
+    assert.deepEqual(MW.findEntry(MW.updateEntry(list, 'C:/a.jpg', { thumb: 't.jpg' }), 'C:/a.jpg').crop, CROP);
+    const video = MW.findEntry(MW.updateEntry(list, 'C:/v.mp4', { crop: CROP }), 'C:/v.mp4');
+    assert.deepEqual(video.crop, CROP);
+    assert.equal(video.effect, 'pan');
+});
+
+test('withCrop：按路径从「我的壁纸」取裁剪，列表里没有裁剪时去掉', () => {
+    const config = { myWallpapers: [{ path: 'C:/a.jpg', type: 'image', crop: CROP }, { path: 'C:/b.jpg', type: 'image' }] };
+    assert.deepEqual(MW.withCrop({ type: 'image', path: 'c:\\A.JPG' }, config), { type: 'image', path: 'c:\\A.JPG', crop: CROP });
+    assert.deepEqual(MW.withCrop({ type: 'image', path: 'C:/b.jpg', crop: CROP }, config), { type: 'image', path: 'C:/b.jpg' });
+    assert.deepEqual(MW.withCrop({ type: 'image', path: 'C:/gallery.jpg' }, config), { type: 'image', path: 'C:/gallery.jpg' });
+});
+
+test('withCrop：当前壁纸从列表移除后再应用一次，裁剪还在，水印不会回来', () => {
+    const image = { currentImage: 'C:/a.jpg', currentImageCrop: { path: 'C:/a.jpg', ...CROP }, myWallpapers: [] };
+    assert.deepEqual(MW.withCrop({ type: 'image', path: 'C:/a.jpg' }, image).crop, CROP);
+    const video = { currentVideo: { path: 'C:/v.mp4', crop: CROP, imageAtTime: '' }, myWallpapers: [] };
+    assert.deepEqual(MW.withCrop({ type: 'video', path: 'C:/v.mp4', effect: 'pan' }, video).crop, CROP);
+    // 换成别的不在列表里的壁纸（默认壁纸）时不沿用
+    assert.equal('crop' in MW.withCrop({ type: 'image', path: 'C:/gallery.jpg' }, image), false);
+});
+
+test('withCrop：列表里的记录优先于当前壁纸的旧裁剪（重新裁剪后马上应用）', () => {
+    const config = {
+        currentImage: 'C:/a.jpg',
+        currentImageCrop: { path: 'C:/a.jpg', ...OTHER_CROP },
+        myWallpapers: [{ path: 'C:/a.jpg', type: 'image', crop: CROP }],
+    };
+    assert.deepEqual(MW.withCrop({ type: 'image', path: 'C:/a.jpg' }, config).crop, CROP);
+});
+
+test('applyPartial：把裁剪记到当前壁纸，从「我的壁纸」移除后还在', () => {
+    const video = MW.applyPartial({}, { type: 'video', path: 'C:/v.mp4', effect: 'pan', sound: false, crop: CROP }, 1);
+    assert.deepEqual(video.currentVideo.crop, CROP);
+
+    const image = MW.applyPartial({}, { type: 'image', path: 'C:/a.jpg', crop: CROP }, 1);
+    assert.deepEqual(image.currentImageCrop, { path: 'C:/a.jpg', ...CROP });
+    assert.equal(image.currentImage, 'C:/a.jpg');
+    assert.deepEqual(MW.resolveCurrent({ ...image, myWallpapers: [] }), { type: 'image', path: 'C:/a.jpg', crop: CROP });
+});
+
+test('applyPartial：没有裁剪时清掉上一张图片的裁剪，视频不写 crop 键', () => {
+    const config = { currentImage: 'C:/a.jpg', currentImageCrop: { path: 'C:/a.jpg', ...CROP } };
+    assert.equal(MW.applyPartial(config, { type: 'image', path: 'C:/b.jpg' }, 1).currentImageCrop, null);
+    assert.equal('crop' in MW.applyPartial(config, { type: 'video', path: 'C:/v.mp4' }, 1).currentVideo, false);
+});
+
+test('resolveCurrent：视频和图片都带裁剪，没有时不写这个键', () => {
+    const currentVideo = { path: 'C:/v.mp4', effect: 'none', crop: CROP, imageAtTime: '' };
+    assert.deepEqual(MW.resolveCurrent({ currentImage: '', currentVideo }).crop, CROP);
+    assert.equal('crop' in MW.resolveCurrent({ currentImage: 'C:/a.jpg' }), false);
+});
+
+test('resolveCurrent：坏的裁剪当没有；图片的裁剪路径对不上时不用（旧版本换过图片）', () => {
+    assert.equal('crop' in MW.resolveCurrent({
+        currentVideo: { path: 'C:/v.mp4', crop: { x: 'a' }, imageAtTime: '' },
+    }), false);
+    assert.equal('crop' in MW.resolveCurrent({
+        currentImage: 'C:/new.jpg', currentImageCrop: { path: 'C:/old.jpg', ...CROP },
+    }), false);
+    assert.deepEqual(MW.resolveCurrent({
+        currentImage: 'C:/a.jpg', currentImageCrop: { path: 'c:\\A.jpg', ...CROP },
+    }).crop, CROP);
+});

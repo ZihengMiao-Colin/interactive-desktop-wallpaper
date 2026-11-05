@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
 const { VIDEO_EXTENSIONS } = require('../../shared/my-wallpapers');
+const { normalizeCrop } = require('../../shared/crop');
 const { saveThumbnail, toFileUrl } = require('../elements/library');
 const { importVideo, removeFiles } = require('./files');
 
@@ -36,7 +37,7 @@ function registerUnlockIpc({ ipcMain, dialog, store, getDialogParent, broadcastC
         return { path: filePath, url: toFileUrl(filePath), name: path.basename(filePath) };
     });
 
-    ipcMain.handle('unlock:setVideo', async (_event, { path: srcPath, thumbDataUrl, duration }) => {
+    ipcMain.handle('unlock:setVideo', async (_event, { path: srcPath, thumbDataUrl, duration, crop }) => {
         const dir = store.getUnlockAnimationDir();
         const previous = current();
         const id = 'video_' + randomUUID();
@@ -44,7 +45,7 @@ function registerUnlockIpc({ ipcMain, dialog, store, getDialogParent, broadcastC
             const file = await importVideo(srcPath, dir, id);
             const thumb = path.basename(saveThumbnail(dir, id, thumbDataUrl));
             store.saveConfig({
-                unlockAnimation: { enabled: true, file, name: path.basename(srcPath), thumb, duration },
+                unlockAnimation: { enabled: true, file, name: path.basename(srcPath), thumb, duration, crop: normalizeCrop(crop) },
             });
         } catch (err) {
             console.error('[UnlockAnimation] 导入视频失败:', err);
@@ -56,9 +57,21 @@ function registerUnlockIpc({ ipcMain, dialog, store, getDialogParent, broadcastC
         return { config: store.getConfig() };
     });
 
+    // 重新裁剪：视频不动，缩略图换一个文件名（地址不变的话设置页会一直显示缓存里的旧图）
+    ipcMain.handle('unlock:setCrop', (_event, { crop, thumbDataUrl }) => {
+        const previous = current();
+        if (!previous.file) return { error: '还没有选择视频' };
+        const dir = store.getUnlockAnimationDir();
+        const thumb = path.basename(saveThumbnail(dir, 'crop_' + randomUUID(), thumbDataUrl));
+        store.saveConfig({ unlockAnimation: { crop: normalizeCrop(crop), thumb } });
+        removeFiles(dir, [previous.thumb]);
+        broadcastConfig();
+        return { config: store.getConfig() };
+    });
+
     ipcMain.handle('unlock:remove', () => {
         const previous = current();
-        store.saveConfig({ unlockAnimation: { enabled: false, file: '', name: '', thumb: '', duration: 0 } });
+        store.saveConfig({ unlockAnimation: { enabled: false, file: '', name: '', thumb: '', duration: 0, crop: null } });
         removeFiles(store.getUnlockAnimationDir(), [previous.file, previous.thumb]);
         broadcastConfig();
         return { config: store.getConfig() };
@@ -68,8 +81,10 @@ function registerUnlockIpc({ ipcMain, dialog, store, getDialogParent, broadcastC
         const { file, thumb } = current();
         const dir = store.getUnlockAnimationDir();
         const inDir = (name) => path.join(dir, name);
+        const exists = !!file && fs.existsSync(inDir(file));
         return {
-            exists: !!file && fs.existsSync(inDir(file)),
+            exists,
+            videoUrl: exists ? toFileUrl(inDir(file)) : null,
             thumbUrl: thumb && fs.existsSync(inDir(thumb)) ? toFileUrl(inDir(thumb)) : null,
         };
     });

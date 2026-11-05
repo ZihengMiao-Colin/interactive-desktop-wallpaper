@@ -11,12 +11,13 @@
 
 const path = require('path');
 const { toFileUrl } = require('../elements/library');
+const { formatQuery } = require('../../shared/crop');
 
 const PAGE = path.join(__dirname, '..', '..', 'renderer', 'unlock-player.html');
 
 /**
  * @param {{BrowserWindow: typeof import('electron').BrowserWindow, screen: import('electron').Screen}} electron
- * @param {{filePath: string, sound: boolean, fadeInMs: number, fadeOutMs: number}} playback
+ * @param {{filePath: string, sound: boolean, fadeInMs: number, fadeOutMs: number, crop?: object}} playback
  * @returns {import('electron').BrowserWindow}
  */
 function createPlayerWindow({ BrowserWindow, screen }, playback) {
@@ -46,6 +47,7 @@ function createPlayerWindow({ BrowserWindow, screen }, playback) {
             fadeInMs: String(playback.fadeInMs),
             fadeOutMs: String(playback.fadeOutMs),
             sound: playback.sound ? '1' : '0',
+            ...(playback.crop ? { crop: formatQuery(playback.crop) } : {}),
         },
     });
     win.showInactive();

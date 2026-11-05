@@ -253,10 +253,14 @@ class AppStore {
 
     /**
      * 保存某个壁纸文件的缩略图（JPEG Data URL），同一个文件总是写到同一张 thumb_<hash>.jpg。
+     * 裁剪后要换内容时传 suffix：地址不变的话，设置窗口会一直显示缓存里的旧图。
+     * @param {string} filePath
+     * @param {string} dataUrl
+     * @param {string} [suffix] - 加在文件名后面
      * @returns {string} 缩略图路径
      */
-    saveWallpaperThumb(filePath, dataUrl) {
-        const thumbPath = path.join(this.getWallpaperThumbsDir(), `thumb_${this._pathHash(filePath)}.jpg`);
+    saveWallpaperThumb(filePath, dataUrl, suffix = '') {
+        const thumbPath = path.join(this.getWallpaperThumbsDir(), `thumb_${this._pathHash(filePath)}${suffix}.jpg`);
         fs.writeFileSync(thumbPath, Buffer.from(String(dataUrl).replace(/^data:[^;]+;base64,/, ''), 'base64'));
         return thumbPath;
     }

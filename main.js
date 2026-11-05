@@ -521,13 +521,15 @@ async function showWallpaperDialog() {
 /**
  * 应用壁纸：记住它（重启后还是这个），并通知壁纸窗口加载。
  * 图片调用前应确保已有深度图缓存；视频的 3D 视差同样要先有深度图。
+ * 裁剪从「我的壁纸」里取，调用的地方不用管，托盘换壁纸也用得上之前裁好的范围。
  * @param {{type: 'image', path: string} | {type: 'video', path: string, effect: string, sound: boolean} | string} descriptor
  *   传字符串时当成图片
  * @returns {boolean}
  */
 function applyWallpaper(descriptor) {
     if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return false;
-    const target = typeof descriptor === 'string' ? { type: 'image', path: descriptor } : descriptor;
+    const requested = typeof descriptor === 'string' ? { type: 'image', path: descriptor } : descriptor;
+    const target = myWallpapers.withCrop(requested, store.getConfig());
     store.saveConfig(myWallpapers.applyPartial(store.getConfig(), target, Date.now()));
     wallpaperWindow.webContents.send('wallpaper:show', target);
     // 设置窗口的图库、我的壁纸要知道"当前"换成了哪个
@@ -586,10 +588,18 @@ function registerIpcHandlers() {
     ipcMain.handle('dialog:selectWallpaper', () => showWallpaperDialog());
 
     // ---- 我的壁纸：加入 / 移除 / 改视频设置 / 补缩略图，改完广播配置 ----
-    ipcMain.handle('myWallpapers:add', (_event, { path: filePath, type, thumbDataUrl, duration }) => {
+    /** 存裁好的缩略图：文件名要变（重新裁剪后地址不变的话，设置窗口会一直显示缓存里的旧图），旧文件删掉 */
+    const replaceThumb = (filePath, thumbDataUrl, oldThumb) => {
+        const thumb = store.saveWallpaperThumb(filePath, thumbDataUrl, '_' + Date.now().toString(36));
+        if (oldThumb !== thumb) store.deleteWallpaperThumb(oldThumb);
+        return thumb;
+    };
+
+    ipcMain.handle('myWallpapers:add', (_event, { path: filePath, type, thumbDataUrl, duration, crop }) => {
         if (myWallpapers.wallpaperType(filePath) !== type) throw new Error('不支持的文件类型');
-        const thumb = thumbDataUrl ? store.saveWallpaperThumb(filePath, thumbDataUrl) : '';
-        const list = myWallpapers.addEntry(store.getConfig().myWallpapers, { path: filePath, type, thumb, duration }, Date.now());
+        const existing = myWallpapers.findEntry(store.getConfig().myWallpapers, filePath);
+        const thumb = thumbDataUrl ? replaceThumb(filePath, thumbDataUrl, existing && existing.thumb) : '';
+        const list = myWallpapers.addEntry(store.getConfig().myWallpapers, { path: filePath, type, thumb, duration, crop }, Date.now());
         store.saveConfig({ myWallpapers: list });
         broadcastConfig();
         return myWallpapers.findEntry(list, filePath);
@@ -616,6 +626,21 @@ function registerIpcHandlers() {
         store.saveConfig({ myWallpapers: list });
         broadcastConfig();
         return myWallpapers.findEntry(list, filePath);
+    });
+    ipcMain.handle('myWallpapers:setCrop', (_event, filePath, crop, thumbDataUrl) => {
+        const entry = myWallpapers.findEntry(store.getConfig().myWallpapers, filePath);
+        if (!entry) return null;
+        const thumb = thumbDataUrl ? replaceThumb(filePath, thumbDataUrl, entry.thumb) : entry.thumb;
+        const list = myWallpapers.updateEntry(store.getConfig().myWallpapers, filePath, { crop, thumb });
+        store.saveConfig({ myWallpapers: list });
+        broadcastConfig();
+        return myWallpapers.findEntry(list, filePath);
+    });
+
+    // ---- 主显示器的大小：裁剪框的比例和"可能会模糊"的提示要用 ----
+    ipcMain.handle('app:getScreenInfo', () => {
+        const { bounds, scaleFactor } = screen.getPrimaryDisplay();
+        return { width: bounds.width, height: bounds.height, scaleFactor };
     });
 
     // ---- 往歌单里添加本地音乐（可以一次选多首），只返回路径，歌名由歌单逻辑从文件名取 ----

@@ -55,15 +55,21 @@ function cleanupUnlockFiles(dir, config) {
  * @param {object} config - unlockAnimation 配置
  * @param {string} dir
  * @param {{preview?: boolean}} [options] - 预览不看开关
- * @returns {{filePath: string, sound: boolean, fadeInMs: number, fadeOutMs: number, durationMs: number} | null}
- *   功能关着或文件不在时返回 null
+ * @returns {{filePath: string, sound: boolean, fadeInMs: number, fadeOutMs: number, durationMs: number, crop?: object} | null}
+ *   功能关着或文件不在时返回 null；没裁过时没有 crop 键
  */
 function resolvePlayback(config, dir, { preview = false } = {}) {
     if (!config.file || (!preview && !config.enabled)) return null;
     const filePath = path.join(dir, config.file);
     if (!fs.existsSync(filePath)) return null;
     const durationMs = Math.round(config.duration * 1000);
-    return { filePath, sound: config.sound, ...fitFades(config.fadeInMs, config.fadeOutMs, durationMs), durationMs };
+    return {
+        filePath,
+        sound: config.sound,
+        ...fitFades(config.fadeInMs, config.fadeOutMs, durationMs),
+        durationMs,
+        ...(config.crop ? { crop: config.crop } : {}),
+    };
 }
 
 module.exports = { importVideo, removeFiles, cleanupUnlockFiles, resolvePlayback };

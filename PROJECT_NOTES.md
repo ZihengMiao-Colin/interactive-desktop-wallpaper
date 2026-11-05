@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-05（解锁动画，见 §9 阶段 14；摆放窗口铺满整个屏幕，见阶段 15；之前是程序不再启动 PowerShell，见阶段 12）
+> 最近更新：2026-11-05（导入时裁剪，见 §9 阶段 16；解锁动画，见阶段 14；摆放窗口铺满整个屏幕，见阶段 15；之前是程序不再启动 PowerShell，见阶段 12）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -19,6 +19,8 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 也可以把本地视频设成壁纸（2026-11-03）：不动 / 3D 视差（整段视频共用一张深度图）/ 整体平移三种效果，可以开声音。用户自己选过的图片和视频都留在壁纸页的「我的壁纸」里。
 
 每次解锁电脑后还可以全屏放一段自己的视频（2026-11-05）：盖住任务栏，淡入淡出，放完回到桌面，见 4.6。
+
+导入自己的图片、视频和解锁视频时可以手动裁剪（2026-11-05）：框的比例固定是屏幕比例，只记住区域，不生成新文件，见 4.7。
 
 在此之上可以叠加：
 - **自定义元素**：用户导入的图片 / GIF / 视频（含绿幕），以及自带的默认元素（两个爆炸）。元素在 Pixi 场景里渲染，和背景一样随鼠标视差，并被更近的背景物体遮挡。
@@ -76,6 +78,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── effects-page.js      "特效"页：天气 + 视频特效
 │   ├── music-page.js        "唱片机"页：播放控制、歌单（添加 / 删除 / 拖动排序 / 点一首播放）、播放顺序、外观
 │   ├── unlock-page.js       "解锁动画"页：选视频、开关、淡入淡出时长、声音、预览
+│   ├── crop-dialog.js       裁剪框：导入壁纸、解锁视频时弹出，只负责让用户选出区域，存到哪里由调用的页面决定
 │   ├── system-page.js       "设置"页：开机自启、深度图缓存、卸载软件（确认框里选要不要删数据）
 │   └── thumbnail.js         导入素材、选壁纸时生成缩略图（顺带检查能不能读、取视频时长）
 ├── renderer/                壁纸页脚本（普通全局脚本，按 index.html 里的顺序加载）
@@ -106,6 +109,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── vinyl-player.js      唱片机纯逻辑：唱片匀加减速、唱臂随进度的角度、桌面点击判断、位置和大小（normalizeLayout / clampCenter）
 │   ├── playlist.js          歌单纯逻辑：旧配置迁移、增删、排序、上一首 / 下一首、播完接哪首
 │   ├── my-wallpapers.js     我的壁纸列表（加入、去重、排序、移除、迁移）、当前壁纸是图片还是视频（resolveCurrent）
+│   ├── crop.js              裁剪区域的纯逻辑：整理配置里的值、框的默认位置、移动、缩放、换比例、比例文字、模糊判断、CSS 和网址格式
 │   ├── unlock-animation.js  解锁动画纯逻辑：配置补全、时长换算、状态转换表（transition）
 │   └── placement-math.js    摆放几何：框坐标 ↔ 屏幕、拖动、缩放、拉伸、旋转、自由变形、透视权重、点击命中、深度取样
 ├── src/
@@ -189,6 +193,16 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 状态转换在 `shared/unlock-animation.js` 的 `transition`，窗口和计时在 `src/unlock-animation/controller.js`。保险：点鼠标在任何状态都能关窗口、解锁后 3 秒加载不好就关、看门狗、窗口崩溃或无响应、收不到解锁事件时查 `powerMonitor.getSystemIdleState`（读到过 `locked` 才生效，同时清掉主进程的锁屏状态，否则壁纸一直停着）。解锁时再查一次该不该放：可能是从远程桌面连进来解锁的。
 - 视频复制到 `userData/unlock_animation/`：和我的壁纸只记路径不同，解锁时用户没法处理文件不见了。
 
+### 4.7 导入时裁剪
+- 裁剪区域 `{ x, y, w, h }` 都是相对原图的比例，不生成新文件，改裁剪不用重新生成深度图。框的比例固定是屏幕比例，默认放在自动裁切的位置。
+- 入口：壁纸页"从电脑选择…"（点取消等于没导入）、「我的壁纸」格子上的裁剪按钮、解锁动画页选视频和"重新裁剪"。三处共用 `settings/crop-dialog.js`。
+- 壁纸：`Shared.parallax.cropCover` 在区域内做 Cover 映射。只改映射不够，视差会取到屏幕外的内容，所以背景、元素、设置页预览的着色器都把取色限制在区域内（`uCropMin` / `uCropMax`，没有裁剪时是原来的 0.001 ~ 0.999）。强度乘 `cropZoom`，屏幕上的位移和不裁时一样。整体平移的 `panCover` 在区域内留余量。
+- 点"确定"时框没动也记下来：否则水印刚好在自动裁切的范围外时，用户看到它被裁掉了，鼠标一动它又滑进来。
+- 当前壁纸的裁剪在应用时抄一份（`currentVideo.crop`、`currentImageCrop`）：壁纸从「我的壁纸」移除后桌面上的裁剪要保留，重启、再点"应用壁纸"都一样。主进程 `applyWallpaper` 用 `withCrop` 取裁剪：先看「我的壁纸」，没有再看当前壁纸，所以托盘换壁纸也用得上。
+- 改的是桌面上正在用的壁纸时马上更新，不用再点"应用壁纸"。这是例外：用户看到水印还在，会以为没成功。
+- 解锁视频：播放页用 CSS `object-view-box` 配合现有的 `object-fit: cover`（Chromium 104 起支持，实测 Electron 28 对 `<video>` 有效）。
+- 缩略图重新裁剪后要换文件名：地址不变的话，设置窗口会一直显示缓存里的旧图。
+
 ---
 
 ## 5. IPC 一览
@@ -203,17 +217,18 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | `cache:*`、`depth:*CacheDir` | R→M | 深度图缓存与目录（`cache:getDepthMap` 对默认壁纸返回自带的深度图） |
 | `config:save` / `config:get` / `config:load` | R→M / M→R | 配置读写 + 广播（壁纸窗口和设置窗口） |
 | `wallpaper:apply` / `wallpaper:show` | R→M / M→R | 应用壁纸：`{ type: 'image', path }` 或 `{ type: 'video', path, effect, sound }`（`apply` 收到字符串当图片）。原来的 `image:new` 换成了 `wallpaper:show` |
-| `myWallpapers:add` / `remove` / `update` / `setThumb` | R→M | 我的壁纸：加入（带缩略图 Data URL 和时长）/ 移除（删缩略图，不删原文件）/ 改视频的效果和声音 / 补缩略图；改完广播配置 |
+| `myWallpapers:add` / `remove` / `update` / `setThumb` / `setCrop` | R→M | 我的壁纸：加入（带缩略图 Data URL、时长和裁剪）/ 移除（删缩略图，不删原文件）/ 改视频的效果和声音 / 补缩略图 / 改裁剪并换缩略图；改完广播配置 |
 | `mouse:move` | M→R | 全局鼠标坐标 |
 | `desktop:click` | M→R | 桌面被单击（坐标相对主显示器）：点中唱片机就播放 / 暂停，否则触发"点击播放"的元素；壁纸暂停或摆放中不发 |
 | `renderer:pause` / `renderer:resume` | M→R | 暂停 / 恢复；带 `{ silent: true }` 时不弹提示。暂停带 `reason`：`covered` 被窗口挡住 / `system` 锁屏睡眠 / `placement` 摆放（决定视频壁纸停不停） |
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | 自定义元素 |
 | `placement:getDraft` / `commit` / `cancel` | R→M | 摆放窗口（草稿是元素 `{ instance, asset }` 或唱片机 `{ kind: 'vinyl', vinyl }`） |
 | `vinyl:startPlacement` | R→M | 打开摆放窗口拖动唱片机 |
-| `unlock:selectVideo` / `setVideo` / `remove` / `getInfo` / `preview` | R→M | 解锁动画：选视频 / 导入（复制文件、打开开关）/ 移除 / 文件在不在和缩略图地址 / 预览。开关、淡入淡出、声音走 `config:save` |
+| `unlock:selectVideo` / `setVideo` / `setCrop` / `remove` / `getInfo` / `preview` | R→M | 解锁动画：选视频 / 导入（复制文件、打开开关）/ 重新裁剪 / 移除 / 文件在不在、视频和缩略图地址 / 预览。开关、淡入淡出、声音走 `config:save` |
 | `unlock:player-event` / `unlock:start` / `unlock:fade-out` | R→M / M→R / M→R | 全屏播放页上报 `ready`、`near-end`、`skip`、`error` / 主进程通知开始播放 / 开始淡出（带时长，声音跟着降） |
 | `vinyl:duck` | M→R | 解锁动画开着声音时，唱片机音量降到 0 / 恢复 |
 | `app:getUninstallInfo` / `app:uninstall` | R→M | 能不能卸载（开发版、找不到卸载程序时不能）/ 打开卸载程序（带 `{ deleteData }`）并退出 |
+| `app:getScreenInfo` | R→M | 主显示器的宽高和缩放比例（裁剪框的比例和"可能会模糊"的提示用） |
 | `renderer:ready`、`app:*` | R→M | 就绪通知、应用控制 |
 
 ---
@@ -226,11 +241,12 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   blurRadiusVersion: 2,   // 边缘平滑默认值从 8 改成 5 的标记：没有它的旧配置里 blurRadius 还是 8 的读成 5
   autoLaunch, currentImage, depthCacheDir,   // hideDebugPanel 已随调试面板删除，旧配置里留着也不读
   // currentImage 只放图片（旧版本 1.1.0 会把它指向的文件整个读成 base64，指向视频会卡住）。当前视频另放：
-  currentVideo: { path, effect: 'none'|'depth'|'pan', sound, imageAtTime } | null,
+  currentImageCrop: { path, x, y, w, h } | null,   // 当前图片的裁剪。currentImage 要保持字符串所以另放；path 对不上 currentImage 时不用
+  currentVideo: { path, effect: 'none'|'depth'|'pan', sound, crop?, imageAtTime } | null,
                 // imageAtTime：应用视频时的 currentImage。和现在的 currentImage 对不上，说明旧版本之后换过图片，
                 // 以图片为准（启动时清掉 currentVideo）。规则在 shared/my-wallpapers.js 的 resolveCurrent
-  myWallpapers: [{ path, type: 'image'|'video', addedAt, lastUsedAt, thumb, duration, effect?, sound? }],
-                // 我的壁纸，按 lastUsedAt 从新到旧；只记路径；thumb 是 wallpaper_thumbs/ 里的缩略图；effect / sound 只有视频有
+  myWallpapers: [{ path, type: 'image'|'video', addedAt, lastUsedAt, thumb, duration, effect?, sound?, crop? }],
+                // 我的壁纸，按 lastUsedAt 从新到旧；只记路径；thumb 是 wallpaper_thumbs/ 里的缩略图；effect / sound 只有视频有；crop 是裁剪区域 { x, y, w, h }（相对原图的比例），没裁过时没有这个键
   myWallpapersVersion: 1, // 迁移标记（不写默认值）：没有它时把当前的用户图片放进我的壁纸，只做一次
   theme: 'dark',          // 设置窗口的界面主题 'dark'|'light'|'system'（不认识的值读成 dark），主进程写进 nativeTheme.themeSource
   vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
@@ -239,7 +255,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
                 // position：四个角或 'custom'（x / y 是唱盘中心在屏幕上的比例位置）；scale 0.5 ~ 2
   weather:      { type, density, speed, parallax },
   videoOverlay: { enabled, presetId, customPath, customName, blendMode, opacity, speed },
-  unlockAnimation: { enabled, file, name, thumb, duration, fadeInMs, fadeOutMs, sound },   // 时长 0 ~ 3000 毫秒，默认 500 / 700；file / thumb 是 unlock_animation/ 里的文件名；没有视频时 enabled 读成 false
+  unlockAnimation: { enabled, file, name, thumb, duration, fadeInMs, fadeOutMs, sound, crop },   // 时长 0 ~ 3000 毫秒，默认 500 / 700；file / thumb 是 unlock_animation/ 里的文件名；没有视频时 enabled 读成 false；crop 没裁过时是 null
   customElements: {
     library:   [{ id: 'user:<uuid>', name, type: 'image'|'animated'|'video', file, thumb, builtin: false, importedAt }],
     instances: [{ id, assetId, visible,
@@ -272,6 +288,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 默认壁纸图库（`wallpapers/`） | ✅ | |
 | 视频壁纸 + 我的壁纸 | ✅ 2026-11-03 | 不动 / 3D 视差 / 整体平移，可开声音；我的壁纸放自己选过的图片和视频，见 §9 阶段 11 |
 | 解锁动画 | ✅ 2026-11-05 | 解锁后全屏放自己的视频，淡入淡出时长可调，见 §9 阶段 14 |
+| 导入时裁剪 | ✅ 2026-11-05 | 自己的图片壁纸、视频壁纸、解锁视频都能手动裁，比例按屏幕锁定，裁掉的部分不会滑进画面，见 §9 阶段 16 |
 | 设置窗口 / 壁纸页界面 | ✅ 2026-10-26 改版，10-31 换成战术终端风格 | 左侧导航分六页、统一控件和 Lucide 图标、实时视差预览；摆放模式、Toast、调试面板同一套样式。10-31：切角、宋体标题配英文小字、夜间 / 日间 / 跟随系统主题，见 §9 阶段 10 |
 | 打包后独立运行 | ✅ v1 | NSIS 安装包，见 §9 阶段 6 |
 | 卸载 | ✅ 2026-10-31 | 设置页"卸载软件…"或 Windows 设置 → 应用，两边都能选要不要删数据，见 §9 阶段 9 |
@@ -314,6 +331,22 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 25. 视频壁纸一直在解码（开了声音、被窗口挡住时也是），比图片壁纸费电；4K 视频更明显，没有转码。
 27. 注入失败的兜底模式没有调 `setBounds`。壁纸窗口的构造参数同样会被裁（实测注入前是 1708×1020），按代码看兜底时一直是这个大小，而摆放窗口已经铺满整个屏幕，两边的位置会对不上（见 §9 阶段 15）。没实测：要让注入失败才走得到这条路。
 28. 摆放窗口盖住任务栏，摆放时看不到任务栏在哪。拖到屏幕最下面那一条（这台电脑上 72 物理像素高）的东西，回到桌面后会被任务栏挡住。唱片机默认的右下角离屏幕底 36px，按工作区算底部有 13px 在任务栏下面，这是壁纸上本来的位置，只是以前摆放窗口里看不出来。
+29. 裁剪后视差时区域的四条边可能有一点拉伸：区域外的内容不能用，只能重复边上的像素。原来图片的左右边本来就这样，裁剪后四条边都可能出现。默认强度下最多十几像素，强度 30、鼠标在屏幕边上时能看到竖条纹。这是在"水印不能滑进来"和"边缘好看"之间选了前者，嫌明显可以改成在区域内再放大一点。
+30. 深度图还是按整张图生成。裁得很小时，屏幕上用到的深度图分辨率变低，视差细节会少一些。
+31. 设置页的预览框比屏幕更扁，预览里看到的比实际桌面少一些（和裁剪之前一样），裁剪框才是准的。没有 WebGL 时的预览不跟裁剪走。
+32. 没有写时长信息的 WebM（比如浏览器 MediaRecorder 录的）在裁剪框里没有时间滑块，只能看开头附近的一帧，裁剪本身不受影响。
+33. 开发机上打包版挂不到桌面层（2026-11-05 发现，怀疑是 360 安全卫士，**还没证实**）：`SetParent` 返回 0，错误码也是 0，走兜底模式（第 9 项：壁纸盖在所有窗口上面，鼠标能穿过去）。不是 1.3.0 引入的：11 月 4 日测试通过的 `dist/test-build` 现在也失败。对照实验（开发机，全新数据目录，每种至少跑一次）：
+
+    | 运行的 exe | 结果 |
+    |---|---|
+    | `electron.exe`（`.` 或打包目录里的内容都试过） | 成功 |
+    | `electron.exe` 末尾加 1 字节 | 成功 |
+    | `electron.exe` 用 rcedit 只改图标 | 失败 |
+    | `electron.exe` 用 rcedit 只改版本信息 | 失败 |
+    | 打包的 exe，改成 ASCII 文件名 | 失败 |
+    | `dist/test-build`、`dist/unlock-test`、`dist/win-unpacked` | 都失败 |
+
+    所以和程序代码、文件名无关，也不是 DPI（两边都是 per-monitor v2，hosting behavior 都是 0，改成 mixed 也没用）或签名（`electron.exe` 也没签名）的问题，只和 exe 被 rcedit 改写过有关。开发机上开着 360 安全卫士（`ZhuDongFangYu` 在运行）。猜测：它认识原版 `electron.exe`（末尾的字节不影响 PE 映像），不让陌生程序把窗口挂到资源管理器的桌面窗口下。要证实得退出 360 或把程序加进信任区后再试一次。
 
 ---
 
@@ -574,6 +607,35 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 摆放窗口现在盖住任务栏（`WindowFromPoint` 量到任务栏那一条是摆放窗口），见 §8 第 28 项。
 
 `npm test` 233 个全过（新增 3 个，用会裁到工作区的假窗口测任务栏在底部和顶部）。没实测：任务栏在顶部或左边的真实窗口、其他分辨率和缩放比例、打包后的安装版。
+
+### ✅ 阶段 16 — 导入时裁剪（2026-11-05）
+
+设计：[docs/superpowers/specs/2026-11-05-import-crop-design.md](docs/superpowers/specs/2026-11-05-import-crop-design.md)，计划：[docs/superpowers/plans/2026-11-05-import-crop.md](docs/superpowers/plans/2026-11-05-import-crop.md)。做法见 4.7。
+
+起因：网上下载的图片角落经常有水印，用户想裁掉；用别的软件裁又不知道屏幕比例，裁完还会被程序再裁一次。裁剪窗口看过两个可拖动的示意图后选了设置窗口弹框，没选全屏拖画面。
+
+实测（2560×1600、缩放 150%；真实程序 + 单独的数据目录 + 调试端口，用真实鼠标事件操作。测试图右下角放一块纯洋红色当水印，直接读着色器输出的像素来数；视差强度 30，鼠标放到四个角和四条边，取最多的一次）：
+
+| 情况 | 画面里的水印像素 |
+|---|---|
+| 图片，不裁（对照） | 10991 |
+| 图片，框的下边紧贴水印 | 0 |
+| 同样的框，把取色限制改回整张图（对照，等于只改 Cover 映射） | 6030 ~ 14610 |
+| 视频，不裁（对照） | 45672 |
+| 视频，框紧贴水印，不动 / 整体平移 | 0 |
+| 视频，3D 视差（框离水印有一段距离） | 0 |
+| 解锁动画预览，不裁（对照，截全屏窗口） | 45195 |
+| 解锁动画预览，裁过 | 0 |
+
+也都实测过：点取消、按 Esc 后列表不变；视频的时间滑块；重新导入同一个文件时框带着原来的裁剪；恢复默认；重新裁「使用中」的壁纸后桌面立刻更新、缩略图换成新文件、旧文件删掉；摆放窗口的 `cover` 和壁纸完全一致；带元素时元素着色器拿到裁剪范围；重启后裁剪还在；默认壁纸的 `cover` 和原来的公式一致、放大比例 1、范围 0.001 ~ 0.999；配置里的裁剪数据全部改坏后照常启动，按没裁过处理。
+
+实测发现并修好的问题：把正在用的壁纸从「我的壁纸」移除后再点"应用壁纸"，裁剪会丢失，水印回来。`withCrop` 原来只看列表，现在列表里没有时看当前壁纸。
+
+着色器和 `parallax-math.js` 只加了裁剪，视差算法没变，安卓版不用跟。
+
+`npm test` 357 个全过（新增 44 个）。没实测：真实锁屏解锁（预览走的是同一个窗口和页面）、真实的系统文件对话框（测试时替换了 `dialog.showOpenDialog`，后面的流程是真的）、走安装程序装出来的版本、真的换显示器（比例变化只有单元测试）。
+
+阶段 13 到 16 和没有公开过的 v1.2.0（阶段 8 到 12）一起作为 **v1.3.0** 发版（2026-11-05），是 v1.1.0 之后第一个公开版本。`package.json` 版本号改为 1.3.0，`npm test` 357 个全过；打包后解出 `app.asar` 和源码比对没有差异；用全新数据目录跑 `dist/win-unpacked`：导入裁剪、打包版 ONNX 生成深度图、应用、解锁预览都正常，水印像素都是 0。但这次打包版没挂到桌面层，见 §8 第 33 项。
 
 ### 阶段 5 — 收尾
 - [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。

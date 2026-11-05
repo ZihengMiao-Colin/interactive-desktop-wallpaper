@@ -2,7 +2,7 @@
  * my-wallpapers-panel.js — 壁纸页的「我的壁纸」：用户自己选过的图片和视频
  *
  * 一直显示，第一格永远是"从电脑选择…"（图片或视频），后面按最近用过的排。
- * 视频左下角标 ▶ 和时长；原文件找不到的格子显示"找不到文件"；悬停右上角的 × 从列表移除（不删原文件）。
+ * 视频左下角标 ▶ 和时长；原文件找不到的格子显示"找不到文件"；悬停右上角有裁剪按钮和 ×（从列表移除，不删原文件）。
  * 只记路径，不复制文件。没有缩略图的条目（升级迁移、托盘加的图片）在这里补生成。
  */
 
@@ -13,11 +13,12 @@
  *   api: object,
  *   onSelect: (entry: object) => void,
  *   onPick: () => void,
+ *   onCrop: (entry: object) => void,
  *   setStatus: (msg: string, cls?: string) => void,
  * }} deps
  * @returns {{ ready: Promise<void>, setSelected: (path: string) => void, setBusy: (busy: boolean) => void }}
  */
-function initMyWallpapersPanel({ api, onSelect, onPick, setStatus }) {
+function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
     const { el } = Controls;
     const MW = Shared.myWallpapers;
     const grid = document.getElementById('mine-grid');
@@ -37,7 +38,7 @@ function initMyWallpapersPanel({ api, onSelect, onPick, setStatus }) {
     function fillThumb(entry) {
         if (thumbTried.has(entry.path)) return;
         thumbTried.add(entry.path);
-        makeThumbnailInfo(api.toFileUrl(entry.path), entry.type)
+        makeThumbnailInfo(api.toFileUrl(entry.path), entry.type, entry.crop)
             .then((info) => api.myWallpapers.setThumb(entry.path, info.dataUrl))
             .catch((err) => console.warn('补生成缩略图失败:', entry.path, err.message));
     }
@@ -92,24 +93,29 @@ function initMyWallpapersPanel({ api, onSelect, onPick, setStatus }) {
             card.appendChild(dur);
         }
 
-        // 移除：按钮里不能再套按钮，用带 role 的 span
-        const remove = el('span', 'rm');
-        remove.setAttribute('role', 'button');
-        remove.tabIndex = 0;
-        remove.title = '从列表里移除（不删原文件）';
-        remove.setAttribute('aria-label', '从列表里移除');
-        remove.appendChild(Icons.svg('x'));
-        const doRemove = (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            if (busy) return;
-            api.myWallpapers.remove(entry.path).catch((err) => setStatus('移除失败：' + err.message, 'error'));
+        // 悬停出现的小按钮：按钮里不能再套按钮，用带 role 的 span
+        const cornerButton = (className, icon, title, label, action) => {
+            const node = el('span', className);
+            node.setAttribute('role', 'button');
+            node.tabIndex = 0;
+            node.title = title;
+            node.setAttribute('aria-label', label);
+            node.appendChild(Icons.svg(icon));
+            const run = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (!busy) action();
+            };
+            node.addEventListener('click', run);
+            node.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') run(e);
+            });
+            return node;
         };
-        remove.addEventListener('click', doRemove);
-        remove.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') doRemove(e);
-        });
-        card.appendChild(remove);
+        if (exists) card.appendChild(cornerButton('cr', 'crop', '裁剪', '裁剪', () => onCrop(entry)));
+        card.appendChild(cornerButton('rm', 'x', '从列表里移除（不删原文件）', '从列表里移除', () => {
+            api.myWallpapers.remove(entry.path).catch((err) => setStatus('移除失败：' + err.message, 'error'));
+        }));
 
         card.appendChild(el('span', 'name', fileName(entry.path)));
         card.addEventListener('click', () => {
