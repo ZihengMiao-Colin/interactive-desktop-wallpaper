@@ -491,6 +491,8 @@ The user installed the test installer `Interactive3DWallpaper-Setup-1.1.1-test.e
 
 Limitation: if injection really fails (say Windows changes the desktop structure again) it still falls back to the mode where the wallpaper covers the icons.
 
+Phases 8 to 12 together become the **v1.2.0** release (2026-11-04): the `package.json` version is now 1.2.0 (it has new features such as video wallpapers, so it is not 1.1.1), `npm test` all 230 passing; after packaging, `app.asar` was extracted and compared with the source with no differences, and compared with the test build the user tried on the affected computer only `package.json` differs; `dist/win-unpacked` was run with a fresh data folder: injection succeeded, no child processes other than the app's own.
+
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.
 
