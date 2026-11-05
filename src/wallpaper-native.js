@@ -40,6 +40,9 @@
  *     → SetWindowPos 之后主动 RedrawWindow 父层。
  *   - 【跨进程 SetParent 卡死】→ 放工作线程 + 限时等待，再回读父窗口判定。
  *   - 【同步调用卡住主进程】→ 发消息的调用全部走工作线程。
+ *   - 【重试留下 WS_CHILD】SetParent 被安全软件拦下时，补上的 WS_CHILD 留在了顶层窗口上。
+ *     → 重试失败就改回原来的样式。
+ *   - 【安全软件拦 SetParent】挂不上时不能盖住用户的程序。→ 见下面的"兜底模式"。
  * ============================================================================
  */
 
@@ -257,6 +260,8 @@ async function attachToDesktop(api, target, delay) {
         console.log(`[WorkerW] Retry with WS_CHILD (style 0x${(style >>> 0).toString(16)})`);
         await api.setStyle(target, (style & ~WS_POPUP) | WS_CHILD);
         attached = await attachWindow(api, target, worker.hwnd);
+        // 还是挂不上就改回去：接下来它要当顶层窗口用，不能留着 WS_CHILD
+        if (!attached) await api.setStyle(target, style);
     }
 
     if (!attached) {
@@ -297,10 +302,93 @@ async function injectToWallpaperLayer(targetHwnd, { api, delay = sleep } = {}) {
     }
 }
 
+// ==================== 兜底模式 ====================
+
+/** 窗口紧贴在它们上面就算到底了 */
+const DESKTOP_CLASSES = new Set(['Progman', 'WorkerW']);
+
+/** 多久看一次壁纸还在不在最底下（毫秒） */
+const BOTTOM_CHECK_MS = 1000;
+
+/**
+ * 窗口比屏幕矮这么多（DIP）。
+ * 盖满显示器的无边框窗口会被系统当成全屏程序：设置窗口（和壁纸同一个线程）在前台、
+ * 后面又没有别的窗口时，任务栏沉到壁纸下面，系统通知也按"全屏中"处理（实测）。
+ * 只要矮一点就不算全屏，这一条通常被任务栏挡着，看不出来。
+ */
+const FULLSCREEN_GAP = 1;
+
+/** 下面没有窗口（"显示桌面"开着时）或者紧贴着桌面，就是到底了 */
+function isAtBottom(api, target) {
+    const below = api.getWindowBelow(target);
+    return !below || DESKTOP_CLASSES.has(api.getClassName(below));
+}
+
+/**
+ * 窗口不在最底下就压回去，窗口关掉后自己停。
+ *
+ * 只压一次不够：壁纸自己不会往上跑，但最小化的窗口会沉到桌面正上方，也就是壁纸下面。
+ * "显示桌面"恢复窗口时不激活它们，它们就一直待在那里，被壁纸盖住。
+ */
+function keepAtBottom(win, api, target) {
+    const check = async () => {
+        if (!isAtBottom(api, target)) await api.sendToBottom(target);
+    };
+    const timer = setInterval(() => {
+        if (win.isDestroyed()) {
+            clearInterval(timer);
+            return;
+        }
+        check().catch((err) => console.error('[WorkerW] Cannot keep window at the bottom:', err.message));
+    }, BOTTOM_CHECK_MS);
+}
+
+/**
+ * 挂不到桌面层时的显示方式：壁纸当普通窗口放在所有程序后面，最多盖住桌面图标。
+ * 放不到最底下就不显示：宁可没有壁纸，也不能挡住用户的程序。
+ *
+ * "显示桌面"开着时系统把桌面提到壁纸上面，这时看到的是系统原来的桌面，关掉就恢复。
+ *
+ * @param {import('electron').BrowserWindow} win
+ * @param {{x: number, y: number, width: number, height: number}} bounds - 显示器的 bounds
+ * @param {object} [options] - 测试时传假接口
+ * @param {object} [options.api] - win32 接口，默认 getWin32()
+ * @returns {Promise<boolean>} 窗口显示出来了没有
+ */
+async function showBehindOtherWindows(win, bounds, { api } = {}) {
+    const target = toHwndNumber(win.getNativeWindowHandle());
+    if (!target) {
+        console.error('[WorkerW] Invalid window handle, wallpaper stays hidden');
+        return false;
+    }
+
+    try {
+        const win32 = api || getWin32();
+
+        // 构造参数里的大小被裁到了工作区，要再 setBounds 才铺满屏幕（见 elements/placement-window.js）
+        win.setBounds({ ...bounds, height: bounds.height - FULLSCREEN_GAP });
+        // 打开鼠标穿透，否则这个铺满屏幕的窗口会把桌面图标的点击 / 右键全部吃掉
+        win.setIgnoreMouseEvents(true);
+
+        // 先放到底再显示，不然会闪一下盖住所有程序
+        await win32.sendToBottom(target);
+        win.showInactive();
+        keepAtBottom(win, win32, target);
+
+        const below = win32.getWindowBelow(target);
+        console.log(`[WorkerW] Fallback: behind other windows, next below: ${below ? describeWindow(win32, below) : 'none'}`);
+        return true;
+    } catch (err) {
+        console.error('[WorkerW] Cannot place window at the bottom, wallpaper stays hidden:', err.message);
+        return false;
+    }
+}
+
 // ==================== 导出 ====================
 
 module.exports = {
     injectToWallpaperLayer,
+    showBehindOtherWindows,
     findWallpaperWorker,
     toHwndNumber,
 };

@@ -195,6 +195,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** 主显示器的大小：{ width, height, scaleFactor }（宽高是 DIP） */
     getScreenInfo: () => ipcRenderer.invoke('app:getScreenInfo'),
 
+    /** 壁纸有没有挂到桌面层：boolean，注入结束才返回 */
+    isOnDesktopLayer: () => ipcRenderer.invoke('app:isOnDesktopLayer'),
+
     // ==================== 应用配置 ====================
 
     /** 保存配置到本地 */

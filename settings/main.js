@@ -37,6 +37,11 @@
     const saver = Shared.configSync.createConfigSaver((partial) => api.saveConfig(partial), 100);
     window.addEventListener('beforeunload', () => saver.flush());
 
+    // 壁纸没挂到桌面层时提示用户。设置窗口打开时注入可能还没结束，这个结果要等注入结束才回来
+    api.isOnDesktopLayer().then((attached) => {
+        document.getElementById('desktop-notice').hidden = attached;
+    });
+
     const { setStatus } = shell;
     const cropDialog = initCropDialog({ api });
     const wallpaperPage = initWallpaperPage({ api, saver, setStatus, setNowUsing: shell.setNowUsing, preview, cropDialog });

@@ -62,10 +62,10 @@ On top of that you can layer:
 │   ├── tokens.css           Color (dark / light) / font / cut-corner variables + .cf cut-corner frame, buttons, toggles, segmented buttons, sliders (incl. depth gradient), status tags, keycaps, .glass frosted panels
 │   ├── fonts/               Bundled fonts and OFL licenses (noto-serif-sc.css is imported by tokens.css)
 │   └── icons.js             Lucide icon sprite (Icons.svg) + slider fill (UIControls.paintRange)
-├── settings.html            Settings window: structure only (left nav + six pages + status toast)
+├── settings.html            Settings window: structure only (left nav + six pages + status toast + the notice shown when the wallpaper cannot attach to the desktop)
 ├── settings/
 │   ├── settings.css         Settings window layout
-│   ├── main.js              Entry: assembles the shell and pages, reads config once and hands it to each page
+│   ├── main.js              Entry: assembles the shell and pages, reads config once and hands it to each page; shows the notice when the wallpaper is not on the desktop layer
 │   ├── shell.js             Page switching, bottom-right toast (setStatus), "In use" card, nav badges
 │   ├── controls.js          Small helpers shared by pages: node builders, sliders, segmented buttons, toggles, buttons, help popovers (open up / down)
 │   ├── depth-preview.js     Live parallax preview (WebGL, same formula as the wallpaper) + image / depth map toggle; can also play videos and show the three effects
@@ -124,7 +124,7 @@ On top of that you can layer:
 │   │   ├── files.js         Importing the video, working out what to play, cleanup
 │   │   ├── ipc.js           unlock:* IPC
 │   │   └── preload.js       Preload for the full-screen window
-│   ├── wallpaper-native.js  WorkerW injection
+│   ├── wallpaper-native.js  WorkerW injection; the fallback mode when it fails (behind all programs, pushed back on a timer)
 │   ├── win32.js             Calls user32.dll through koffi, shared by injection, full-screen detection and desktop clicks
 │   ├── fullscreen-detector.js Full-screen detection
 │   ├── desktop-click-watcher.js Desktop click detection (only on when there are "click to play" elements)
@@ -157,7 +157,7 @@ On top of that you can layer:
 
 ### 4.1 Startup
 1. `app.whenReady` → `new AppStore()` → **migrate old sticker config** → register IPC → create wallpaper window → tray → full-screen detection → power listeners → open the settings window (not when started at login with `--autostart`).
-2. Wallpaper window `ready-to-show`: send `config:load`, start 30fps mouse polling, inject into WorkerW asynchronously.
+2. Wallpaper window `ready-to-show`: send `config:load`, start 30fps mouse polling, inject into WorkerW asynchronously; if that fails, use the fallback mode (see 4.8).
 3. Renderer `start()`: read config → if there is a previous wallpaper, use it (images use their cached depth map, placeholder if not cached; videos see 4.2.1; a missing file falls back to `background.png` with a notice) → `Scene.load` / `Scene.loadVideo` → load custom elements → start the ticker.
 
 ### 4.2 Changing the wallpaper (settings window)
@@ -202,6 +202,14 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 - Unlock video: the player page uses CSS `object-view-box` with the existing `object-fit: cover` (Chromium 104 and later; measured working on `<video>` in Electron 28).
 - A thumbnail needs a new file name after cropping again: with the same address, the settings window keeps showing the cached old image.
 
+### 4.8 When the wallpaper cannot attach to the desktop layer (fallback mode)
+- When injection fails (blocked by 360, for example), `showBehindOtherWindows` (`src/wallpaper-native.js`) shows the wallpaper as a normal window: set the size, let the mouse pass through, `HWND_BOTTOM`, then `showInactive()`. It goes to the bottom before it is shown, so it never flashes over programs. If it cannot reach the bottom it stays hidden: no wallpaper is better than blocking the user.
+- The system pins Progman to the bottom and `HWND_BOTTOM` lands right above it, so the wallpaper sits behind all programs and only covers the desktop icons (which can still be clicked).
+- Once a second it checks what is directly below the wallpaper and pushes it back unless that is a desktop window. Minimized windows sink below the wallpaper, and "Show desktop" restores them without activating them, so without this they would all stay covered.
+- The window is 1 DIP shorter than the screen: Windows treats a borderless window that fills the monitor as a full-screen program, and the taskbar sinks below the wallpaper.
+- The wallpaper window must not be a file dialog's parent (`dialogParent`): the system raises the parent along with the dialog.
+- The settings window reads the result through `app:isOnDesktopLayer` and shows a notice at the top of the content area if the wallpaper is not attached. The call only returns once injection has finished, so it does not matter if the settings window opens first, and no separate push is needed.
+
 ---
 
 ## 5. IPC overview
@@ -230,6 +238,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | `vinyl:duck` | M→R | While the unlock animation has sound, the vinyl volume drops to 0 / comes back |
 | `app:getUninstallInfo` / `app:uninstall` | R→M | Whether uninstalling is possible (not in the dev build or without an uninstaller) / launch the uninstaller (with `{ deleteData }`) and quit |
 | `app:getScreenInfo` | R→M | Primary display size and scale factor (for the crop box ratio and the "may look blurry" hint) |
+| `app:isOnDesktopLayer` | R→M | Whether the wallpaper is attached to the desktop layer; returns once injection has finished (the settings window shows a notice if not) |
 | `renderer:ready`, `app:*` | R→M | Ready notification, app control |
 
 ---
@@ -312,7 +321,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 6. ~~Old textures not freed on wallpaper change~~ ✅ `Scene.load` calls `destroy(true)` on old textures
 7. ~~Always rendering at full frame rate~~ ✅ Idle frame stop: the ticker stops when the mouse is still, parallax has settled, and there are no weather particles or playing videos / animated images (measured 0 frames in 3 idle seconds); with animation the frame rate is capped at 60 (this machine's display is ~240Hz; snow measured 481 → 118 frames in 2 seconds)
 8. ~~Every slider input wrote to disk and broadcast~~ ✅ Settings page and debug panel save throttled (first change sent immediately, then at most once per 100ms; 30 drags measured → 5 broadcasts); the wallpaper only re-applies changed config sections
-9. The fallback mode when injection fails, `moveTop()`, raises the full-screen window above every program.
+9. ~~The fallback mode when injection fails, `moveTop()`, raises the full-screen window above every program~~ ✅ 2026-11-05 The wallpaper now goes behind all programs and stays there, and the settings window shows a notice (see 4.8 and Phase 17)
 10. ~~Single-instance lock taken after `whenReady`~~ ✅ If the lock is not obtained, the startup flow is not registered
 11. ~~Depth cache keyed only on file size~~ ✅ Now size + modification time (old index entries without a modification time still compare size only)
 12. Only the small model is used (user decision). The `modelSize` parameter was removed from `generateDepthMap`.
@@ -332,13 +341,13 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 23. The 3D parallax of a video wallpaper uses a single depth map for the whole video (the frame at 30% of the duration): camera moves and large moving objects won't match it and warp a little when moving. Best for fixed-camera videos; whole-picture pan suits other videos.
 24. "My wallpapers" does not collapse when it grows past one row, so with many entries the default gallery gets pushed far down (the design left this to implementation; not done in this version).
 25. A video wallpaper keeps decoding (also when covered with sound on), so it uses more power than an image wallpaper; more so with 4K video, and there is no transcoding.
-27. The fallback mode for a failed injection does not call `setBounds`. The wallpaper window's constructor size is clipped the same way (measured 1708×1020 before injection), so going by the code it stays that size in fallback mode, while the placement window now fills the whole screen, and positions won't match (see §9 Phase 15). Not measured: that path only runs when injection fails.
+27. ~~The fallback mode for a failed injection does not call `setBounds`~~ ✅ 2026-11-05 Measured: it really did stay 1708×1020 in fallback mode. It now fills the screen, just 1 DIP shorter (1708×1066, see Phase 17 for why), so it differs from the placement window by at most 1 pixel.
 28. The placement window covers the taskbar, so you can't see where the taskbar is while placing. Anything dragged into the bottom strip of the screen (72 physical pixels high on this computer) ends up behind the taskbar on the desktop. The vinyl player's default bottom-right spot is 36px from the bottom of the screen, which by the work area puts its bottom 13px under the taskbar; that has always been its position on the wallpaper, the old placement window just didn't show it.
 29. With a crop, parallax can stretch the four edges of the area a little: content outside the area cannot be used, so edge pixels repeat. The left and right edges of an image already did this; now all four can. At most a dozen or so pixels at the default strength; at strength 30 with the mouse at the screen edge, vertical streaks are visible. This puts "the watermark must not slide in" ahead of clean edges. If it looks too obvious, zoom in a little inside the area instead.
 30. The depth map is still generated from the whole image. With a very small crop, less depth map resolution reaches the screen and parallax detail drops a little.
 31. The settings preview is wider than the screen, so it shows less than the real desktop (same as before cropping); the crop box is what counts. The no-WebGL preview ignores the crop.
 32. A WebM with no duration in its header (for example from the browser's MediaRecorder) has no time slider in the crop box, only a frame near the start. Cropping itself still works.
-33. With 360 Total Security running, packaged builds cannot attach to the desktop layer (found 2026-11-05, confirmed). `SetParent` returns 0 with error code 0, so the fallback mode runs (item 9: the wallpaper sits above all windows, and the mouse passes through it). 1.3.0 did not cause this: `dist/test-build`, which passed on November 4, fails now too. Controlled runs (development machine, 360 running, fresh data folder, each at least once):
+33. With 360 Total Security running, packaged builds cannot attach to the desktop layer (found 2026-11-05, confirmed). `SetParent` returns 0 with error code 0, so the fallback mode runs (in 1.3.0 and earlier the wallpaper sits above all windows and the mouse passes through it; since Phase 17 it sits behind all programs and the settings window shows a notice, see item 34). 1.3.0 did not cause this: `dist/test-build`, which passed on November 4, fails now too. Controlled runs (development machine, 360 running, fresh data folder, each at least once):
 
     | Executable | Result |
     |---|---|
@@ -349,7 +358,13 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
     | Packaged exe with an ASCII file name | fails |
     | `dist/test-build`, `dist/unlock-test`, `dist/win-unpacked` | all fail |
 
-    So it has nothing to do with the app code or file name, and it is not DPI (both sides are per-monitor v2 with hosting behavior 0; switching to mixed does not help) or signing (`electron.exe` is unsigned too). It only depends on rcedit having rewritten the exe. After the user closed 360, with nothing else changed (the `ZhuDongFangYu` service and 360's drivers were still there), `dist/win-unpacked` and `dist/test-build` both worked at once, which confirms 360 was blocking it. The guess: it recognizes the original `electron.exe` (trailing bytes do not change the PE image) and stops unknown programs from parenting a window to Explorer's desktop window. The release notes explain what to do; adding the app to the trusted list has not been tested. Why it passed on November 4 is unknown; 360's rules or state may have been different then.
+    So it has nothing to do with the app code or file name, and it is not DPI (both sides are per-monitor v2 with hosting behavior 0; switching to mixed does not help) or signing (`electron.exe` is unsigned too). It only depends on rcedit having rewritten the exe. After the user closed 360, with nothing else changed (the `ZhuDongFangYu` service and 360's drivers were still there), `dist/win-unpacked` and `dist/test-build` both worked at once, which confirms 360 was blocking it. The guess: it recognizes the original `electron.exe` (trailing bytes do not change the PE image) and stops unknown programs from parenting a window to Explorer's desktop window. It only blocks `SetParent`, not `SetWindowPos` (measured in Phase 17). The release notes explain what to do and the settings window shows a notice; adding the app to the trusted list has not been tested. Why it passed on November 4 is unknown; 360's rules or state may have been different then.
+34. Limits of the fallback mode (item 33):
+    - The desktop icons are covered by the wallpaper: not visible, but still clickable.
+    - While "Show desktop" is on, the system raises the desktop above the wallpaper, so you see the original desktop until it is turned off.
+    - If a window is restored after being minimized but before the wallpaper is pushed back (1 second at most), it can be covered briefly. This did not happen when "Show desktop" was toggled 2.5 seconds apart.
+    - Only measured on this computer's desktop structure (Windows 11, icon layer inside Progman). On Windows 10 and older Windows 11 the icon layer is in a separate WorkerW, so `HWND_BOTTOM` may land below that WorkerW; the wallpaper would then be invisible (without blocking programs). The `[WorkerW] Fallback:` log line says what is directly below the wallpaper.
+    - Not tested: restarting Explorer, changing the resolution, multiple monitors.
 
 ---
 
@@ -639,6 +654,35 @@ The shaders and `parallax-math.js` only gained the crop; the parallax algorithm 
 `npm test`: all 357 pass (44 new). Not measured: a real lock and unlock (the preview uses the same window and page), the real system file dialog (replaced via `dialog.showOpenDialog` in the test; everything after it is real), a copy installed by the installer, actually changing displays (ratio changes only have unit tests).
 
 Phases 13 to 16 and the never-published v1.2.0 (Phases 8 to 12) ship together as **v1.3.0** (2026-11-05), the first public release since v1.1.0. `package.json` is now 1.3.0 and all 357 `npm test` tests pass; `app.asar` matches the source; `dist/win-unpacked` with a fresh data folder: crop on import, depth generation with the packaged ONNX, apply and the unlock preview all work, with 0 watermark pixels. With 360 running, packaged builds do not attach to the desktop layer; with 360 closed they do, see §8 item 33.
+
+### ✅ Phase 17 — No longer blocking programs when the wallpaper cannot attach to the desktop (2026-11-05)
+
+With 360 running, packaged builds cannot attach to the desktop layer (§8 item 33). The old fallback mode, `moveTop()`, put the wallpaper above every program: the mouse passed through it, but the windows below could not be seen.
+
+Research: the packaged build really running in fallback mode, calling `SetWindowPos` in its main process through `--inspect`, with a plain Electron app as the "other windows".
+- 360 does not block `SetWindowPos`. `HWND_BOTTOM` works: the window lands right above Progman and does not end up behind the desktop.
+- Activating, creating, maximizing and closing other windows leaves the Z order alone.
+- But pushing it down once is not enough. Three situations blocked programs in real testing:
+  1. Minimized windows sink to just above Progman, which is below the wallpaper. "Show desktop" restores them without activating them, so they all stayed covered (confirmed by screenshot). Now it checks once a second what is directly below the wallpaper and pushes it back unless that is a desktop window. While "Show desktop" is on, Progman is raised and the wallpaper lands at the true bottom, so when it is turned off all windows are above the wallpaper, with no flash.
+  2. When a file dialog's parent is the wallpaper (changing the wallpaper from the tray with the settings window closed), the system raises the wallpaper along with it, and it stays up after the dialog closes. Now `dialogParent()` passes no parent in fallback mode.
+  3. The settings window and the wallpaper share a thread. With the settings window in the foreground and no other window behind it, the system treats the screen-filling wallpaper as a full-screen program: `SHQueryUserNotificationState` becomes `QUNS_BUSY`, and the taskbar stops being topmost and sinks below the wallpaper. A window 1 DIP shorter than the screen does not count as full screen (controlled run: same steps, 2 became 5 and the taskbar stayed topmost). The taskbar usually covers that bottom strip anyway.
+- Also found: the `WS_CHILD` added by the retry stayed on the top-level window after a failed injection (style `0x54000000`). The original style is now restored on failure.
+
+Changes: `src/win32.js` gains `getWindowBelow` and `sendToBottom`; `src/wallpaper-native.js` gains `showBehindOtherWindows` (see 4.8); `main.js` drops `moveTop()` and gains `dialogParent()` and `app:isOnDesktopLayer`; a notice at the top of the settings content area is visible on every page. It says a security program may have blocked this step, that the computer and files are not affected, and how to recover.
+
+Verification: all 371 `npm test` tests pass (14 new). `dist/win-unpacked` with 360 running (fresh data folder, without the flags that turn off occlusion detection, packaged content compared with the source and identical):
+- Startup: sampling every 5 ms, about 2300 samples over two runs, the wallpaper never covered another window. The window is 1708×1066 with style `0x14000000`, no `WS_CHILD`. The settings window shows the notice, other pages lay out normally, and the notice is still there after closing and reopening the window.
+- Activating other windows and the settings window with real mouse clicks on the title bar, creating, maximizing, restoring after minimizing without activating, closing: the wallpaper stayed right above Progman with all visible windows above it.
+- Minimize all: the wallpaper fills the screen with the taskbar above it; `WindowFromPoint` returns Progman (the mouse passes through); clicking the desktop does not change the Z order.
+- Toggling "Show desktop": the Z order is already right 0.3 seconds after turning it off.
+- Opening a file dialog with the settings window closed no longer raises the wallpaper.
+- While covered by windows, the wallpaper page's `visibilityState` is `hidden`: Chromium stops rendering by itself and resumes when it is exposed. This only happens in fallback mode, where the wallpaper is a top-level window.
+
+Development build (`electron.exe`, not blocked by 360): injection succeeds and no notice is shown.
+
+After the user closed 360 from the tray (the `ZhuDongFangYu` service was still running), same packaged build, fresh data folder: the window attached under WorkerW (whose parent is Progman), `app:isOnDesktopLayer` returned `true`, no notice was shown (confirmed by screenshot), the window was 1708×1068, the file dialog opened and closed normally with the settings window closed, and the log had 0 errors.
+
+Not tested: whether the trusted list helps (360's settings are left alone); see §8 item 34 for the rest.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

@@ -9,7 +9,7 @@ childProcess.spawn = () => {
     throw Object.assign(new Error('spawn EPERM'), { code: 'EPERM' });
 };
 
-const { injectToWallpaperLayer, findWallpaperWorker, toHwndNumber } = require('../src/wallpaper-native');
+const { injectToWallpaperLayer, findWallpaperWorker, toHwndNumber, showBehindOtherWindows } = require('../src/wallpaper-native');
 
 const DESKTOP_ROOT = 0x1000C;
 const SHELL_PID = 100;
@@ -25,6 +25,7 @@ function fakeDesktop(windows, { refuseSetParent = 0 } = {}) {
     return {
         spawnMessages: [],
         repainted: [],
+        bottomCalls: 0,
         findWindow(parent, after, className = null) {
             const siblings = list.filter(w => w.parent === (parent || DESKTOP_ROOT));
             const start = after ? siblings.findIndex(w => w.hwnd === after) + 1 : 0;
@@ -57,6 +58,25 @@ function fakeDesktop(windows, { refuseSetParent = 0 } = {}) {
         },
         async pushToBottomAndRepaint(hwnd, parent) {
             this.repainted.push({ hwnd, parent });
+        },
+        /** 紧挨在下面的窗口：同一层里排在它后面的那个 */
+        getWindowBelow(hwnd) {
+            const siblings = list.filter(w => w.parent === find(hwnd).parent);
+            const next = siblings[siblings.indexOf(find(hwnd)) + 1];
+            return next ? next.hwnd : 0;
+        },
+        /** 实测：系统把 Progman 钉在最底下，HWND_BOTTOM 落到它正上方；Progman 被"显示桌面"提上去时才落到真正的最底下 */
+        async sendToBottom(hwnd) {
+            this.bottomCalls += 1;
+            const moved = list.splice(list.indexOf(find(hwnd)), 1)[0];
+            const last = list.filter(w => w.parent === moved.parent).pop();
+            if (last && last.cls === 'Progman') list.splice(list.indexOf(last), 0, moved);
+            else list.push(moved);
+        },
+        /** 模拟别的窗口落到 hwnd 下面（窗口最小化时就是这样） */
+        sink(other, hwnd) {
+            const moved = list.splice(list.indexOf(find(other)), 1)[0];
+            list.splice(list.indexOf(find(hwnd)) + 1, 0, moved);
         },
     };
 }
@@ -171,4 +191,182 @@ test('Electron 给的 8 字节句柄转成数字', () => {
     const handle = Buffer.alloc(8);
     handle.writeUInt32LE(0x1609e0, 0);
     assert.equal(toHwndNumber(handle), 0x1609e0);
+});
+
+test('SetParent 一直不生效时把窗口样式改回去，不留下 WS_CHILD', async () => {
+    const api = fakeDesktop([...modernDesktop(), { ...self, style: 0x04000000 }], { refuseSetParent: 2 });
+    const before = api.getStyle(self.hwnd);
+    assert.equal(await inject(api), false);
+    assert.equal(api.getStyle(self.hwnd), before);
+});
+
+// ==================== 兜底模式 ====================
+
+const SCREEN = { x: 0, y: 0, width: 1707, height: 1067 };
+const app = { hwnd: 0x50, cls: 'Chrome_WidgetWin_1', pid: OTHER_PID };
+
+/** 假的 BrowserWindow：记下调用顺序，onShow 用来读显示那一刻窗口排在 Z 序哪里 */
+function fakeWindow({ onShow = () => {} } = {}) {
+    const handle = Buffer.alloc(8);
+    handle.writeUInt32LE(self.hwnd, 0);
+    return {
+        calls: [],
+        destroyed: false,
+        getNativeWindowHandle: () => handle,
+        isDestroyed() { return this.destroyed; },
+        setBounds(bounds) { this.calls.push(['setBounds', bounds]); },
+        setIgnoreMouseEvents(ignore) { this.calls.push(['setIgnoreMouseEvents', ignore]); },
+        showInactive() { this.calls.push(['showInactive']); onShow(); },
+        show() { this.calls.push(['show']); },
+        moveTop() { this.calls.push(['moveTop']); },
+    };
+}
+
+/** 兜底模式的桌面：壁纸窗口刚建好时在最上面，下面是别的程序，Progman 在最底下 */
+function fallbackDesktop() {
+    const [progman, ...rest] = modernDesktop();
+    return fakeDesktop([self, app, ...rest, progman]);
+}
+
+const startFallback = (win, api) => showBehindOtherWindows(win, SCREEN, { api });
+
+test('兜底模式：显示之前就放到所有程序后面，不会闪一下盖住它们', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fallbackDesktop();
+    let belowWhenShown = null;
+    const win = fakeWindow({ onShow: () => { belowWhenShown = api.getWindowBelow(self.hwnd); } });
+
+    assert.equal(await startFallback(win, api), true);
+    assert.equal(belowWhenShown, 0x10);
+});
+
+test('兜底模式：不抢焦点，也不提到最上面', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const win = fakeWindow();
+    await startFallback(win, fallbackDesktop());
+    const names = win.calls.map(([name]) => name);
+    assert.ok(names.includes('showInactive'));
+    assert.ok(!names.includes('show'));
+    assert.ok(!names.includes('moveTop'));
+});
+
+test('兜底模式：窗口铺满屏幕，只比屏幕矮 1，不被系统当成全屏程序', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const win = fakeWindow();
+    await startFallback(win, fallbackDesktop());
+    assert.deepEqual(win.calls.find(([name]) => name === 'setBounds'),
+        ['setBounds', { ...SCREEN, height: SCREEN.height - 1 }]);
+});
+
+test('兜底模式：鼠标穿过壁纸，桌面图标还能点', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const win = fakeWindow();
+    await startFallback(win, fallbackDesktop());
+    assert.deepEqual(win.calls.find(([name]) => name === 'setIgnoreMouseEvents'), ['setIgnoreMouseEvents', true]);
+});
+
+test('窗口落到壁纸下面后（"显示桌面"恢复时就是这样），一秒内把壁纸压回去', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fallbackDesktop();
+    await startFallback(fakeWindow(), api);
+
+    api.sink(app.hwnd, self.hwnd);
+    assert.equal(api.getWindowBelow(self.hwnd), app.hwnd);
+
+    t.mock.timers.tick(1000);
+    assert.equal(api.getWindowBelow(self.hwnd), 0x10);
+});
+
+test('已经紧贴桌面时什么也不做', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fallbackDesktop();
+    await startFallback(fakeWindow(), api);
+    const calls = api.bottomCalls;
+
+    t.mock.timers.tick(5000);
+    assert.equal(api.bottomCalls, calls);
+});
+
+test('"显示桌面"开着时桌面在壁纸上面，壁纸下面没有窗口，也什么都不做', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fakeDesktop([...modernDesktop(), app, self]);
+    await startFallback(fakeWindow(), api);
+    const calls = api.bottomCalls;
+    assert.equal(api.getWindowBelow(self.hwnd), 0);
+
+    t.mock.timers.tick(5000);
+    assert.equal(api.bottomCalls, calls);
+});
+
+test('Windows 10 旧结构：下面紧挨着 WorkerW 也算到底了', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fakeDesktop([
+        self,
+        { hwnd: 0x20, cls: 'WorkerW' },
+        { hwnd: 0x22, cls: 'WorkerW' },
+        { hwnd: 0x10, cls: 'Progman' },
+    ]);
+    api.sendToBottom = async () => { api.bottomCalls += 1; };
+    await startFallback(fakeWindow(), api);
+    const calls = api.bottomCalls;
+
+    t.mock.timers.tick(5000);
+    assert.equal(api.bottomCalls, calls);
+});
+
+test('放不到最底下时不显示窗口：宁可没有壁纸，也不能挡住用户的程序', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fallbackDesktop();
+    api.sendToBottom = async () => { throw new Error('boom'); };
+    const win = fakeWindow();
+
+    assert.equal(await startFallback(win, api), false);
+    assert.ok(!win.calls.some(([name]) => name === 'showInactive'));
+});
+
+test('窗口句柄无效时不显示窗口', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const win = fakeWindow();
+    win.getNativeWindowHandle = () => Buffer.alloc(8);
+
+    assert.equal(await startFallback(win, fallbackDesktop()), false);
+    assert.ok(!win.calls.some(([name]) => name === 'showInactive'));
+});
+
+test('定时压回去时出错只记日志，不抛给主进程', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fallbackDesktop();
+    await startFallback(fakeWindow(), api);
+
+    api.sink(app.hwnd, self.hwnd);
+    api.sendToBottom = async () => { throw new Error('boom'); };
+    const logged = t.mock.method(console, 'error', () => {});
+    t.mock.timers.tick(1000);
+    await new Promise(setImmediate);
+    assert.equal(logged.mock.callCount(), 1);
+});
+
+test('读 Z 序时出错只记日志，不抛给主进程', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fallbackDesktop();
+    await startFallback(fakeWindow(), api);
+
+    api.getWindowBelow = () => { throw new Error('boom'); };
+    const logged = t.mock.method(console, 'error', () => {});
+    t.mock.timers.tick(1000);
+    await new Promise(setImmediate);
+    assert.equal(logged.mock.callCount(), 1);
+});
+
+test('窗口关掉后停止检查', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fallbackDesktop();
+    const win = fakeWindow();
+    await startFallback(win, api);
+
+    win.destroyed = true;
+    let reads = 0;
+    api.getWindowBelow = () => { reads += 1; return 0; };
+    t.mock.timers.tick(5000);
+    assert.equal(reads, 0);
 });

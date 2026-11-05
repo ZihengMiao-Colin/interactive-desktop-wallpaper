@@ -17,6 +17,7 @@
 
 const GA_PARENT = 1;
 const GA_ROOT = 2;
+const GW_HWNDNEXT = 2;
 
 const GWL_STYLE = -16;
 const SM_CXSCREEN = 0;
@@ -63,6 +64,7 @@ function load() {
     const IsWindowVisible = user32.func('int __stdcall IsWindowVisible(uintptr_t hwnd)');
     const GetWindowLongW = user32.func('int32_t __stdcall GetWindowLongW(uintptr_t hwnd, int index)');
     const GetAncestor = user32.func('uintptr_t __stdcall GetAncestor(uintptr_t hwnd, uint32_t flags)');
+    const GetWindow = user32.func('uintptr_t __stdcall GetWindow(uintptr_t hwnd, uint32_t cmd)');
     const GetForegroundWindow = user32.func('uintptr_t __stdcall GetForegroundWindow()');
     const GetWindowRect = user32.func('int __stdcall GetWindowRect(uintptr_t hwnd, _Out_ RECT *rect)');
     const GetSystemMetrics = user32.func('int __stdcall GetSystemMetrics(int index)');
@@ -105,6 +107,9 @@ function load() {
         getParentWindow: (hwnd) => GetAncestor(hwnd, GA_PARENT),
         getRootWindow: (hwnd) => GetAncestor(hwnd, GA_ROOT),
 
+        /** @returns {number} Z 序里紧挨在下面的窗口，已经在最底下时是 0 */
+        getWindowBelow: (hwnd) => GetWindow(hwnd, GW_HWNDNEXT),
+
         getForegroundWindow: () => GetForegroundWindow(),
 
         getWindowRect(hwnd) {
@@ -138,6 +143,14 @@ function load() {
 
         setParent: (child, parent) => runAsync(SetParent, child, parent),
         setStyle: (hwnd, style) => runAsync(SetWindowLongW, hwnd, GWL_STYLE, style),
+
+        /**
+         * 把顶层窗口放到所有普通窗口后面，不激活它。
+         * 实测系统把 Progman 钉在最底下，窗口会落到它正上方，不会被桌面盖住；
+         * 只有"显示桌面"把 Progman 提上去的时候，才落到 Progman 下面。
+         */
+        sendToBottom: (hwnd) => runAsync(SetWindowPos, hwnd, HWND_BOTTOM, 0, 0, 0, 0,
+            SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE),
 
         /**
          * 把窗口压到父窗口里的最底层并显示，再让父窗口重绘。

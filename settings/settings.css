@@ -152,6 +152,20 @@ h1, h2, h3 { font-feature-settings: "palt"; }
 .content::-webkit-scrollbar-thumb:hover,
 .playlist::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
+/* 壁纸没挂到桌面层时的提示：只说明情况，不用红色 */
+.desktop-notice {
+    display: flex;
+    gap: 12px;
+    margin: 22px 32px -8px;
+    padding: 13px 18px;
+    color: var(--text-2);
+    font-size: 12.5px;
+    line-height: 1.6;
+}
+.desktop-notice[hidden] { display: none; }
+.desktop-notice svg.i { flex: none; margin-top: 3px; color: var(--warn); }
+.desktop-notice b { display: block; margin-bottom: 2px; color: var(--text); font-weight: 500; }
+
 .page { display: none; padding: 26px 32px 40px; }
 /* 换页：淡入 + 上移一点，表示换了一个地方 */
 .page.on { display: block; animation: page-in 0.24s var(--ease); }

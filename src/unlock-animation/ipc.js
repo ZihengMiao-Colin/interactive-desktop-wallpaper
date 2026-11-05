@@ -19,7 +19,7 @@ const { importVideo, removeFiles } = require('./files');
  * @param {import('electron').IpcMain} deps.ipcMain
  * @param {import('electron').Dialog} deps.dialog
  * @param {import('../store').AppStore} deps.store
- * @param {() => import('electron').BrowserWindow} deps.getDialogParent
+ * @param {() => import('electron').BrowserWindow | null} deps.getDialogParent
  * @param {() => void} deps.broadcastConfig
  * @param {import('./controller').UnlockAnimationController} deps.controller
  */

@@ -46,7 +46,7 @@ log.errorHandler.startCatching();
 Object.assign(console, log.functions);
 
 // ---- 自定义模块 ----
-const { injectToWallpaperLayer } = require('./src/wallpaper-native');
+const { injectToWallpaperLayer, showBehindOtherWindows } = require('./src/wallpaper-native');
 const { createTray, updateTrayMenu } = require('./src/tray-manager');
 const { FullscreenDetector } = require('./src/fullscreen-detector');
 const { DesktopClickWatcher } = require('./src/desktop-click-watcher');
@@ -88,6 +88,13 @@ let wallpaperWindow = null;
 
 /** 设置窗口引用 */
 let settingsWindow = null;
+
+/** 壁纸窗口挂到桌面层了没有。没挂上（兜底模式）时它是普通顶层窗口 */
+let onDesktopLayer = false;
+
+/** 同一个结果，注入结束才完成：设置窗口打开时注入可能还没结束 */
+let reportDesktopLayer;
+const desktopLayerResult = new Promise((resolve) => { reportDesktopLayer = resolve; });
 
 /** 系统托盘引用 */
 let tray = null;
@@ -214,6 +221,9 @@ function createWallpaperWindow() {
         injectToWallpaperLayer(hwnd).then((injected) => {
             if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return;
 
+            onDesktopLayer = injected;
+            reportDesktopLayer(injected);
+
             if (injected) {
                 console.log('[Main] WorkerW injected, window mounted as desktop wallpaper layer');
 
@@ -228,13 +238,7 @@ function createWallpaperWindow() {
             }
 
             console.warn('[Main] WorkerW injection failed, using fallback mode');
-            // Fallback: 普通窗口模式。
-            // 关键：打开鼠标穿透，否则这个铺满屏幕的窗口会把桌面图标的
-            // 点击/右键全部吃掉（用户表现为"桌面图标点不动"）。
-            wallpaperWindow.setAlwaysOnTop(false);
-            wallpaperWindow.setIgnoreMouseEvents(true);
-            wallpaperWindow.show();
-            wallpaperWindow.moveTop();
+            showBehindOtherWindows(wallpaperWindow, screen.getPrimaryDisplay().bounds);
         });
 
         // 开发模式下打开 DevTools
@@ -485,11 +489,20 @@ function createPlacementController() {
 // ==================== 换壁纸 ====================
 
 /**
+ * 文件对话框的父窗口。
+ * 兜底模式下不能用壁纸窗口：系统激活对话框时会把父窗口一起提上来，关掉后也不回去，
+ * 壁纸就盖住用户的程序了（实测，托盘换壁纸、设置窗口又没开的时候走到这里）。
+ */
+function dialogParent() {
+    return settingsWindow || (onDesktopLayer ? wallpaperWindow : null);
+}
+
+/**
  * 弹出选择壁纸图片的对话框。
  * @returns {Promise<string|null>} 选中的图片路径，取消时为 null
  */
 async function showImageDialog() {
-    const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+    const result = await dialog.showOpenDialog(dialogParent(), {
         title: '选择壁纸图片',
         filters: [{ name: '图片文件', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
         properties: ['openFile'],
@@ -503,7 +516,7 @@ async function showImageDialog() {
  */
 async function showWallpaperDialog() {
     const { IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, wallpaperType } = myWallpapers;
-    const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+    const result = await dialog.showOpenDialog(dialogParent(), {
         title: '选择壁纸图片或视频',
         filters: [
             { name: '图片和视频', extensions: [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS] },
@@ -643,9 +656,12 @@ function registerIpcHandlers() {
         return { width: bounds.width, height: bounds.height, scaleFactor };
     });
 
+    // ---- 壁纸挂到桌面层了没有：没挂上时设置窗口显示提示 ----
+    ipcMain.handle('app:isOnDesktopLayer', () => desktopLayerResult);
+
     // ---- 往歌单里添加本地音乐（可以一次选多首），只返回路径，歌名由歌单逻辑从文件名取 ----
     ipcMain.handle('dialog:selectAudioFiles', async () => {
-        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+        const result = await dialog.showOpenDialog(dialogParent(), {
             title: '添加歌曲（可以多选）',
             filters: [
                 { name: '音频文件', extensions: ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'] },
@@ -658,7 +674,7 @@ function registerIpcHandlers() {
 
     // ---- 选择唱片中心封面图片 ----
     ipcMain.handle('dialog:selectCover', async () => {
-        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+        const result = await dialog.showOpenDialog(dialogParent(), {
             title: '选择唱片中心封面图片',
             filters: [
                 { name: '图片文件', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'] },
@@ -679,7 +695,7 @@ function registerIpcHandlers() {
 
     // ---- 选择自定义视频特效文件 ----
     ipcMain.handle('dialog:selectOverlayVideo', async () => {
-        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+        const result = await dialog.showOpenDialog(dialogParent(), {
             title: '选择本地视频特效文件',
             filters: [
                 { name: '视频文件', extensions: ['mp4', 'webm', 'mov', 'mkv'] },
@@ -802,7 +818,7 @@ function registerIpcHandlers() {
     });
 
     ipcMain.handle('depth:selectCacheDir', async () => {
-        const result = await dialog.showOpenDialog(settingsWindow || wallpaperWindow, {
+        const result = await dialog.showOpenDialog(dialogParent(), {
             title: '选择深度图存放文件夹',
             defaultPath: store.getDepthCacheDir(),
             properties: ['openDirectory', 'createDirectory'],
@@ -935,7 +951,7 @@ function registerIpcHandlers() {
         dialog,
         store,
         elementsDir: path.join(ASSET_DIR, 'elements'),
-        getDialogParent: () => settingsWindow || wallpaperWindow,
+        getDialogParent: dialogParent,
         broadcastConfig,
         placement,
     });
@@ -945,7 +961,7 @@ function registerIpcHandlers() {
         ipcMain,
         dialog,
         store,
-        getDialogParent: () => settingsWindow || wallpaperWindow,
+        getDialogParent: dialogParent,
         broadcastConfig,
         controller: unlockAnimation,
     });

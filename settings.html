@@ -34,6 +34,16 @@
 
         <main class="content" id="content">
 
+            <!-- 壁纸没挂到桌面层时才显示（settings/main.js），放在这里所有页面都看得到 -->
+            <aside class="desktop-notice cf" id="desktop-notice" role="status" hidden>
+                <svg class="i"><use href="#i-info"/></svg>
+                <div>
+                    <b>壁纸没能挂到桌面上</b>
+                    <p>可能是安全软件（比如 360）拦下了这一步，电脑和文件都不受影响。现在壁纸放在其他程序后面，桌面图标可能被盖住，但还能点。</p>
+                    <p>想恢复的话，把本程序加入安全软件的信任区，或者退出安全软件，再重新打开本程序。</p>
+                </div>
+            </aside>
+
             <!-- ==================== 壁纸 ==================== -->
             <section class="page on" id="page-wallpaper" aria-label="壁纸">
                 <div class="preview-slot" id="preview-slot-wallpaper">
