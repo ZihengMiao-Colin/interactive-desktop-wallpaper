@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-05 (unlock animation, see §9 Phase 14; the placement window now fills the whole screen, see Phase 15; before that, the app stopped launching PowerShell, see Phase 12)
+> Last updated: 2026-11-05 (cropping on import, see §9 Phase 16; unlock animation, see Phase 14; the placement window now fills the whole screen, see Phase 15; before that, the app stopped launching PowerShell, see Phase 12)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -77,6 +77,7 @@ On top of that you can layer:
 │   ├── effects-page.js      "Effects" page: weather + video effects
 │   ├── music-page.js        "Record player" page: playback controls, playlist (add / delete / drag to reorder / click to play), play order, appearance
 │   ├── unlock-page.js       "Unlock animation" page: pick a video, on / off, fade in and out times, sound, preview
+│   ├── crop-dialog.js       Crop dialog: opens when importing a wallpaper or unlock video, only lets the user pick the area; the calling page decides where to store it
 │   ├── system-page.js       "Settings" page: launch at startup, depth map cache, uninstall (the confirmation dialog asks whether to delete data)
 │   └── thumbnail.js         Generates thumbnails when importing assets and picking wallpapers (also checks the file is readable and reads video duration)
 ├── renderer/                Wallpaper page scripts (plain global scripts, loaded in index.html order)
@@ -107,6 +108,7 @@ On top of that you can layer:
 │   ├── vinyl-player.js      Record player logic: uniform spin-up/down, tonearm angle by progress, desktop click hit test, position and size (normalizeLayout / clampCenter)
 │   ├── playlist.js          Playlist logic: old-config migration, add / remove, reorder, previous / next, what plays after a track ends
 │   ├── my-wallpapers.js     My wallpapers list (add, dedupe, sort, remove, migrate) and whether the current wallpaper is an image or a video (resolveCurrent)
+│   ├── crop.js              Crop area logic: normalizing config values, default position, move, resize, changing ratio, ratio label, blur check, CSS and URL formats
 │   ├── unlock-animation.js  Unlock animation logic: config normalizing, time math, state table (transition)
 │   └── placement-math.js    Placement geometry: box ↔ screen coords, drag, resize, stretch, rotate, free warp, perspective weights, hit testing, depth sampling
 ├── src/
@@ -190,6 +192,16 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 - State transitions live in `transition` in `shared/unlock-animation.js`; the window and timers in `src/unlock-animation/controller.js`. Safety nets: a click closes the window in any state, a video that has not loaded 3 seconds after the unlock closes it, a watchdog, window crash or hang handling, and `powerMonitor.getSystemIdleState` when the unlock event is lost (only after `locked` has been seen; it also clears the main process lock state, otherwise the wallpaper stays paused). The unlock checks again whether to play at all: the session may have been unlocked by connecting over Remote Desktop.
 - The video is copied to `userData/unlock_animation/`: unlike My wallpapers, which only keep paths, nobody can deal with a missing file at the moment of unlocking.
 
+### 4.7 Cropping on import
+- The crop area `{ x, y, w, h }` is a fraction of the original image. No new file is written, and changing the crop does not need a new depth map. The box ratio is always the screen ratio, and it starts where automatic cropping would put it.
+- Entry points: "Choose from computer…" on the Wallpaper page (Cancel means nothing is imported), the crop button on a My wallpapers card, and picking a video or "Crop again" on the Unlock animation page. All three share `settings/crop-dialog.js`.
+- Wallpapers: `Shared.parallax.cropCover` does the Cover mapping inside the area. Changing the mapping alone is not enough, because parallax samples content outside the screen, so the background, element and settings preview shaders all limit sampling to the area (`uCropMin` / `uCropMax`, the old 0.001 to 0.999 when there is no crop). Strength is multiplied by `cropZoom`, so the on-screen shift matches the uncropped one. `panCover` leaves its margin inside the area.
+- "OK" always stores the box, even if it did not move. Otherwise a watermark just outside the automatic crop looks cut off and then slides in when the mouse moves.
+- The current wallpaper keeps its own copy of the crop (`currentVideo.crop`, `currentImageCrop`): after the wallpaper is removed from My wallpapers, the crop on the desktop stays, including after a restart or pressing "Apply wallpaper" again. `applyWallpaper` in the main process gets the crop through `withCrop`: My wallpapers first, then the current wallpaper, so changing the wallpaper from the tray uses it too.
+- Changing the crop of the wallpaper in use updates the desktop at once, without "Apply wallpaper". This is an exception: seeing the watermark still there would look like a failure.
+- Unlock video: the player page uses CSS `object-view-box` with the existing `object-fit: cover` (Chromium 104 and later; measured working on `<video>` in Electron 28).
+- A thumbnail needs a new file name after cropping again: with the same address, the settings window keeps showing the cached old image.
+
 ---
 
 ## 5. IPC overview
@@ -205,6 +217,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | `config:save` / `config:get` / `config:load` | R→M / M→R | Config read/write + broadcast (wallpaper and settings windows) |
 | `wallpaper:apply` / `wallpaper:show` | R→M / M→R | Apply wallpaper: `{ type: 'image', path }` or `{ type: 'video', path, effect, sound }` (`apply` treats a string as an image). The old `image:new` became `wallpaper:show` |
 | `myWallpapers:add` / `remove` / `update` / `setThumb` | R→M | My wallpapers: add (with thumbnail Data URL and duration) / remove (deletes the thumbnail, not the original file) / change a video's effect and sound / backfill a thumbnail; each broadcasts the config |
+| `myWallpapers:setCrop` | R→M | Change the crop and replace the thumbnail. `myWallpapers:add` also takes `crop` |
 | `mouse:move` | M→R | Global mouse coordinates |
 | `desktop:click` | M→R | The desktop was clicked (coords relative to the primary monitor): hitting the record player toggles play / pause, otherwise triggers "click to play" elements; not sent while the wallpaper is paused or placing |
 | `renderer:pause` / `renderer:resume` | M→R | Pause / resume; with `{ silent: true }` no toast is shown. Pause carries a `reason`: `covered` by a window / `system` lock or sleep / `placement` (decides whether a video wallpaper stops) |
@@ -212,9 +225,11 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | `placement:getDraft` / `commit` / `cancel` | R→M | Placement window (the draft is an element `{ instance, asset }` or the record player `{ kind: 'vinyl', vinyl }`) |
 | `vinyl:startPlacement` | R→M | Open the placement window to drag the record player |
 | `unlock:selectVideo` / `setVideo` / `remove` / `getInfo` / `preview` | R→M | Unlock animation: pick a video / import (copy the file, turn the feature on) / remove / whether the file exists and the thumbnail URL / preview. On / off, fades and sound go through `config:save` |
+| `unlock:setCrop` | R→M | Crop the unlock video again. `unlock:setVideo` also takes `crop`; `unlock:getInfo` also returns the video address |
 | `unlock:player-event` / `unlock:start` / `unlock:fade-out` | R→M / M→R / M→R | The full-screen player reports `ready`, `near-end`, `skip`, `error` / the main process starts playback / the fade-out begins (with its duration, the sound follows) |
 | `vinyl:duck` | M→R | While the unlock animation has sound, the vinyl volume drops to 0 / comes back |
 | `app:getUninstallInfo` / `app:uninstall` | R→M | Whether uninstalling is possible (not in the dev build or without an uninstaller) / launch the uninstaller (with `{ deleteData }`) and quit |
+| `app:getScreenInfo` | R→M | Primary display size and scale factor (for the crop box ratio and the "may look blurry" hint) |
 | `renderer:ready`, `app:*` | R→M | Ready notification, app control |
 
 ---
@@ -226,6 +241,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
   parallaxMultiplier: 10, smoothness: 0.08, focusDepth: 0.5, blurRadius: 5,   // parallax strength 5 ~ 30 (older configs above 30 read as 30)
   blurRadiusVersion: 2,   // marks the edge smoothing default change from 8 to 5: older configs without it read blurRadius 8 as 5
   autoLaunch, currentImage, depthCacheDir,   // hideDebugPanel was removed with the debug panel; older configs may still contain it, it is ignored
+  currentImageCrop: { path, x, y, w, h } | null,   // crop of the current image; stored separately because currentImage must stay a string; ignored when path does not match currentImage
   // currentImage only holds images (v1.1.0 reads the file it points to into base64; a video would hang it). The current video is separate:
   currentVideo: { path, effect: 'none'|'depth'|'pan', sound, imageAtTime } | null,
                 // imageAtTime: currentImage when the video was applied. If it no longer matches currentImage, an older version changed
@@ -233,6 +249,8 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
   myWallpapers: [{ path, type: 'image'|'video', addedAt, lastUsedAt, thumb, duration, effect?, sound? }],
                 // My wallpapers, newest lastUsedAt first; paths only; thumb lives in wallpaper_thumbs/; effect / sound only for videos
   myWallpapersVersion: 1, // migration marker (no default): when missing, the current user image is added to My wallpapers, once
+  // myWallpapers entries, currentVideo and unlockAnimation also have crop: { x, y, w, h } as fractions of the original.
+  // Entries and currentVideo have no crop key when uncropped; unlockAnimation.crop is null
   theme: 'dark',          // settings window theme 'dark'|'light'|'system' (unknown values read as dark); main process writes it to nativeTheme.themeSource
   vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
                   playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
@@ -273,6 +291,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | Default wallpaper gallery (`wallpapers/`) | ✅ | |
 | Video wallpapers + My wallpapers | ✅ 2026-11-03 | Still / 3D parallax / whole-picture pan, optional sound; My wallpapers keeps the user's own images and videos, see §9 Phase 11 |
 | Unlock animation | ✅ 2026-11-05 | Your own video plays full screen after unlocking, with adjustable fades, see §9 Phase 14 |
+| Cropping on import | ✅ 2026-11-05 | Your own image wallpapers, video wallpapers and unlock videos can be cropped by hand; the ratio is locked to the screen and cropped-out parts never slide into view, see §9 Phase 16 |
 | Settings window / wallpaper page UI | ✅ redesigned 2026-10-26, restyled as a tactical terminal 10-31 | Six pages in a left nav, unified controls and Lucide icons, live parallax preview; placement mode, Toast and debug panel share the same style. 10-31: cut corners, serif Chinese headings with small English labels, dark / light / follow-system theme, see §9 Phase 10 |
 | Standalone packaged build | ✅ v1 | NSIS installer, see §9 Phase 6 |
 | Uninstall | ✅ 2026-10-31 | Settings page "卸载软件…" or Windows Settings → Apps; both let you choose whether to delete data, see §9 Phase 9 |
@@ -315,6 +334,10 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 25. A video wallpaper keeps decoding (also when covered with sound on), so it uses more power than an image wallpaper; more so with 4K video, and there is no transcoding.
 27. The fallback mode for a failed injection does not call `setBounds`. The wallpaper window's constructor size is clipped the same way (measured 1708×1020 before injection), so going by the code it stays that size in fallback mode, while the placement window now fills the whole screen, and positions won't match (see §9 Phase 15). Not measured: that path only runs when injection fails.
 28. The placement window covers the taskbar, so you can't see where the taskbar is while placing. Anything dragged into the bottom strip of the screen (72 physical pixels high on this computer) ends up behind the taskbar on the desktop. The vinyl player's default bottom-right spot is 36px from the bottom of the screen, which by the work area puts its bottom 13px under the taskbar; that has always been its position on the wallpaper, the old placement window just didn't show it.
+29. With a crop, parallax can stretch the four edges of the area a little: content outside the area cannot be used, so edge pixels repeat. The left and right edges of an image already did this; now all four can. At most a dozen or so pixels at the default strength; at strength 30 with the mouse at the screen edge, vertical streaks are visible. This puts "the watermark must not slide in" ahead of clean edges. If it looks too obvious, zoom in a little inside the area instead.
+30. The depth map is still generated from the whole image. With a very small crop, less depth map resolution reaches the screen and parallax detail drops a little.
+31. The settings preview is wider than the screen, so it shows less than the real desktop (same as before cropping); the crop box is what counts. The no-WebGL preview ignores the crop.
+32. A WebM with no duration in its header (for example from the browser's MediaRecorder) has no time slider in the crop box, only a frame near the start. Cropping itself still works.
 
 ---
 
@@ -575,6 +598,33 @@ The offset depends on position: relative to the screen it grows toward the botto
 - The placement window now covers the taskbar (`WindowFromPoint` on the taskbar strip returns the placement window), see §8 item 28.
 
 `npm test`: all 233 pass (3 new, using a fake window that clips to the work area, with the taskbar at the bottom and at the top). Not measured: a real window with the taskbar at the top or left, other resolutions and scaling, the packaged installer.
+
+### ✅ Phase 16 — Cropping on import (2026-11-05)
+
+Design: [docs/superpowers/specs/2026-11-05-import-crop-design.md](docs/superpowers/specs/2026-11-05-import-crop-design.md), plan: [docs/superpowers/plans/2026-11-05-import-crop.md](docs/superpowers/plans/2026-11-05-import-crop.md). How it works: see 4.7.
+
+Why: images from the web often have a watermark in a corner. Cropping in another program means knowing the screen ratio, and the app would crop again anyway. The crop window was chosen after trying two draggable mockups: a dialog in the settings window, not a full-screen drag.
+
+Measured (2560×1600, 150% scaling; real app, separate data folder, debug port, real mouse events. The test image has a solid magenta block in the bottom right as the watermark, counted from the pixels the shader outputs; parallax strength 30, mouse at the four corners and four edges, worst case):
+
+| Case | Watermark pixels on screen |
+|---|---|
+| Image, no crop (control) | 10991 |
+| Image, bottom of the box right against the watermark | 0 |
+| Same box, sampling limit put back to the whole image (control: only the Cover mapping changed) | 6030 to 14610 |
+| Video, no crop (control) | 45672 |
+| Video, box right against the watermark, still / pan | 0 |
+| Video, 3D parallax (box some distance from the watermark) | 0 |
+| Unlock preview, no crop (control, screenshot of the full-screen window) | 45195 |
+| Unlock preview, cropped | 0 |
+
+Also measured: Cancel and Esc leave the list unchanged; the video time slider; importing the same file again opens the box at its old crop; reset to default; cropping the wallpaper in use updates the desktop at once, the thumbnail gets a new file and the old one is deleted; the placement window's `cover` matches the wallpaper exactly; the element shader gets the crop area; the crop survives a restart; a default wallpaper keeps the original `cover` formula, zoom 1 and bounds 0.001 to 0.999; with all crop data in the config corrupted the app starts normally and treats it as uncropped.
+
+Found and fixed while measuring: removing the wallpaper in use from My wallpapers and pressing "Apply wallpaper" again lost the crop, and the watermark came back. `withCrop` only looked at the list; now it falls back to the current wallpaper.
+
+The shaders and `parallax-math.js` only gained the crop; the parallax algorithm did not change, so the Android version does not need to follow.
+
+`npm test`: all 357 pass (44 new). Not measured: a real lock and unlock (the preview uses the same window and page), the real system file dialog (replaced via `dialog.showOpenDialog` in the test; everything after it is real), the packaged installer, actually changing displays (ratio changes only have unit tests).
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.

@@ -12,6 +12,7 @@ The Android version is at [interactive-phone-wallpaper](https://github.com/Zihen
 - **Video wallpapers**: set a local video (MP4 / WebM, etc.) as the wallpaper, looping; play it as is, with 3D parallax (one depth map for the whole video, best for fixed-camera footage) or panning as a whole with the mouse, with optional sound.
 - **My wallpapers**: images and videos you picked yourself stay on the Wallpaper page, one click to switch back.
 - **Unlock animation**: import a video and it plays full screen (over the taskbar) each time you unlock the computer, with adjustable fade in and fade out. Press Esc or click to skip; when it ends you are back on the desktop. The app has to be running.
+- **Cropping on import**: a crop box opens when you import an image wallpaper, video wallpaper or unlock video. Drag it to choose what stays (for example to cut off a watermark); the ratio is locked to your screen, and anything already imported can be cropped again.
 - **Custom elements**: import images / GIF / animated WebP / APNG / MP4 / WebM, or use the bundled default elements (explosions).
   - Click an element to enter placement mode: drag to move, drag a corner to resize, adjust depth; Enter to confirm, Esc to cancel.
   - Elements move with the mouse together with background at the same depth and are hidden behind closer objects; new elements "stick to the ground" for their depth by default.
