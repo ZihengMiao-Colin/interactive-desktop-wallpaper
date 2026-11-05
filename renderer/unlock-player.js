@@ -1,0 +1,42 @@
+/**
+ * unlock-player.js — 解锁动画的播放页面：放视频，把进度和操作报给主进程
+ *
+ * 页面在锁屏时就加载好，视频停在开头，收到 onStart 才放。黑色背景上把视频从透明变成不透明，
+ * 就是从黑屏淡入。淡出由主进程改窗口透明度，这样能直接露出真实桌面。
+ * 这里不要跑 requestAnimationFrame 循环，否则锁屏期间也在空转。
+ */
+
+'use strict';
+
+(function startPlayer() {
+    const query = new URLSearchParams(location.search);
+    const fadeInMs = Number(query.get('fadeInMs'));
+    const fadeOutMs = Number(query.get('fadeOutMs'));
+    const { fadeOutStartMs } = Shared.unlockAnimation;
+    const video = document.getElementById('video');
+
+    let nearEndSent = false;
+    function reportNearEnd() {
+        if (nearEndSent) return;
+        nearEndSent = true;
+        unlockPlayer.report('near-end');
+    }
+
+    video.muted = query.get('sound') !== '1';
+    video.style.transition = `opacity ${fadeInMs}ms ease-out`;
+
+    video.addEventListener('loadeddata', () => unlockPlayer.report('ready'));
+    video.addEventListener('error', () => unlockPlayer.report('error'));
+    video.addEventListener('ended', reportNearEnd);
+    video.addEventListener('timeupdate', () => {
+        if (video.currentTime * 1000 >= fadeOutStartMs(video.duration * 1000, fadeOutMs)) reportNearEnd();
+    });
+    document.addEventListener('mousedown', () => unlockPlayer.report('skip'));
+
+    unlockPlayer.onStart(() => {
+        video.style.opacity = '1';
+        video.play().catch(() => unlockPlayer.report('error'));
+    });
+
+    video.src = query.get('video');
+})();
