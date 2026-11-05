@@ -53,6 +53,7 @@ const { DesktopClickWatcher } = require('./src/desktop-click-watcher');
 const { AppStore } = require('./src/store');
 const { registerElementsIpc } = require('./src/elements/ipc');
 const { PlacementController } = require('./src/elements/placement-controller');
+const { createFullScreenWindow } = require('./src/elements/placement-window');
 const { upsertInstance, hasClickTriggers } = require('./shared/elements-model');
 const { isClickable: isVinylClickable, normalizeLayout: normalizeVinylLayout } = require('./shared/vinyl-player');
 const { migrateLegacySticker } = require('./src/elements/migrate');
@@ -424,9 +425,7 @@ function forwardDesktopClick() {
  * 打开期间暂停真实壁纸的渲染，避免同时跑两个 WebGL 场景。
  */
 function createPlacementWindow() {
-    const { x, y, width, height } = screen.getPrimaryDisplay().bounds;
-    const win = new BrowserWindow({
-        x, y, width, height,
+    const win = createFullScreenWindow(BrowserWindow, screen.getPrimaryDisplay().bounds, {
         frame: false,
         resizable: false,
         movable: false,

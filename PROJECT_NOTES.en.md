@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-05 (unlock animation, see §9 Phase 14; before that, the app stopped launching PowerShell, see Phase 12)
+> Last updated: 2026-11-05 (unlock animation, see §9 Phase 14; the placement window now fills the whole screen, see Phase 15; before that, the app stopped launching PowerShell, see Phase 12)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -114,6 +114,7 @@ On top of that you can layer:
 │   │   ├── library.js       Asset library: format detection, reading the manifest, import/copy, thumbnails, file URLs
 │   │   ├── ipc.js           elements:* / placement:* IPC
 │   │   ├── placement-controller.js Placement session (guarantees a single window, treats errors as cancel)
+│   │   ├── placement-window.js Creates a window that fills the whole screen (constructor size gets clipped to the work area, so it calls setBounds afterwards)
 │   │   └── migrate.js       Migration of the old "custom sticker" config
 │   ├── unlock-animation/
 │   │   ├── controller.js    Controller: full-screen window lifecycle, timers, skipping, every failure case
@@ -174,7 +175,7 @@ On top of that you can layer:
 - `rayMarchUV` exists in `renderer/shaders.js` (GLSL) and `shared/parallax-math.js` (JS, unit-tested); the algorithm and step parameters must match. The settings preview (`settings/depth-preview.js`) uses it too.
 
 ### 4.4 Custom elements
-- Click an asset in settings → `elements:startPlacement` → the main process opens a full-screen, always-on-top placement window (`index.html?mode=edit`) and silently pauses the wallpaper.
+- Click an asset in settings → `elements:startPlacement` → the main process opens a full-screen, always-on-top placement window (`index.html?mode=edit`, the same size as the wallpaper, covering the taskbar) and silently pauses the wallpaper.
 - Drag / resize / adjust depth in the placement window (new elements default to "auto ground") → Enter or "Confirm" → `placement:commit` → write config → close window → resume the wallpaper and broadcast config.
 - Esc, cancel, closing the window, renderer crash and unresponsiveness are all treated as cancel, so no always-on-top window is left behind.
 
@@ -312,6 +313,8 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 23. The 3D parallax of a video wallpaper uses a single depth map for the whole video (the frame at 30% of the duration): camera moves and large moving objects won't match it and warp a little when moving. Best for fixed-camera videos; whole-picture pan suits other videos.
 24. "My wallpapers" does not collapse when it grows past one row, so with many entries the default gallery gets pushed far down (the design left this to implementation; not done in this version).
 25. A video wallpaper keeps decoding (also when covered with sound on), so it uses more power than an image wallpaper; more so with 4K video, and there is no transcoding.
+27. The fallback mode for a failed injection does not call `setBounds`. The wallpaper window's constructor size is clipped the same way (measured 1708×1020 before injection), so going by the code it stays that size in fallback mode, while the placement window now fills the whole screen, and positions won't match (see §9 Phase 15). Not measured: that path only runs when injection fails.
+28. The placement window covers the taskbar, so you can't see where the taskbar is while placing. Anything dragged into the bottom strip of the screen (72 physical pixels high on this computer) ends up behind the taskbar on the desktop. The vinyl player's default bottom-right spot is 36px from the bottom of the screen, which by the work area puts its bottom 13px under the taskbar; that has always been its position on the wallpaper, the old placement window just didn't show it.
 
 ---
 
@@ -546,6 +549,32 @@ Design: `docs/superpowers/specs/2026-11-05-unlock-animation-design.md`, plan: `d
 - Passed real testing by the user (2026-11-05): Win+L unlock, unlock after closing the lid or sleeping, skipping with Esc and with a click, clicking the taskbar before locking, fades of 0 and 3 seconds, sound with the vinyl player playing. The fallback check read `locked` on every lock.
 - Not tested: PIN, fingerprint and face unlock; external monitors; exclusive full-screen games; the installed build got no real lock test (win-unpacked was tested with simulated events).
 - Known small issues (noted in review, not fixed): locking again mid-animation resumes the wallpaper and pauses it again, so a video wallpaper with sound may blip; hand-edited config turns `true` or arrays into valid but non-default values, and `duration` has no upper limit; if the player page fails to load, the screen stays black for 3 seconds after unlocking; only `createWindow` has a try/catch.
+
+### ✅ Phase 15 — The placement window fills the whole screen (2026-11-05)
+
+While experimenting with the unlock animation we found that the size passed to the `BrowserWindow` constructor gets clipped to the work area (the screen minus the taskbar). The placement window was created this way, and measuring confirmed it was too short; the wallpaper fills the whole screen because `nudgeWallpaperRepaint` calls `setBounds` after injection. Element and vinyl player positions are stored as fractions of the window size, so the same fraction landed in different places in the two windows, and the background was cropped differently too (a different `cover`).
+
+Fix: new `src/elements/placement-window.js`; `createFullScreenWindow` calls `setBounds` right after creating the window, before the page loads, so the first layout is already full-screen. `createPlacementWindow` now uses it. `resizable: false` does not affect `setBounds`.
+
+Measured (2560×1600, 150% scaling, taskbar at the bottom; real app + separate data directory + debugging port, dragging with real mouse events and confirming):
+
+| | Before | After |
+|---|---|---|
+| Wallpaper page size | 1708×1068 | 1708×1068 |
+| Placement window page size | 1708×1020 | 1708×1068 |
+| Placement window `cover.scaleY` (wallpaper: 0.93794) | 0.89578 | 0.93794 |
+| Element dragged to 85% of the window height: lower on the wallpaper than when placed | 61 physical pixels | 0.02 |
+| The same element's offset relative to the background | about 25 physical pixels | 0 |
+| Vinyl player dragged to a custom position: lower on the wallpaper than when placed | 51 physical pixels | 0 |
+| Bottom edge of the vinyl player's default bottom-right spot (wallpaper: 1032) | 984 | 1032 |
+
+The offset depends on position: relative to the screen it grows toward the bottom, reaching about 72 physical pixels at the bottom edge; relative to the background it is largest at the top and bottom (about 36 physical pixels on this 3840×2560 wallpaper) and zero in the middle. Checked against screenshots of the wallpaper and the placement window: the top edge of the element's box was 41 DIP off before and lines up after; the vinyl player's position in the wallpaper screenshot matches what the saved fractions give.
+
+- No migration needed: things placed earlier stay where they are on the wallpaper. The placement window just shows them where they really are now (they used to look too high).
+- Fullscreen detection is unaffected: this window already covered 95.7% of the screen, above the 90% threshold, and `ignorePid` excludes this app anyway.
+- The placement window now covers the taskbar (`WindowFromPoint` on the taskbar strip returns the placement window), see §8 item 28.
+
+`npm test`: all 233 pass (3 new, using a fake window that clips to the work area, with the taskbar at the bottom and at the top). Not measured: a real window with the taskbar at the top or left, other resolutions and scaling, the packaged installer.
 
 ### Phase 5 — Wrap-up
 - [ ] Delete or update `生成深度图.bat` and `requirements.txt`.
