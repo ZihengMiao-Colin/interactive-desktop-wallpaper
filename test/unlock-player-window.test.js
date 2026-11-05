@@ -2,12 +2,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const { createPlayerWindow, refitPlayerWindow } = require('../src/unlock-animation/player-window');
 
 /** 主显示器：2560×1600、缩放 150%（实测数据，DIP） */
 const SCREEN = { x: 0, y: 0, width: 1707, height: 1067 };
 const fakeScreen = { getPrimaryDisplay: () => ({ bounds: SCREEN }) };
-const PLAYBACK = { filePath: 'C:\data\video_a.mp4', sound: false, fadeInMs: 500, fadeOutMs: 700, durationMs: 6000 };
+const PLAYBACK = { filePath: 'C:/data/video_a.mp4', sound: false, fadeInMs: 500, fadeOutMs: 700, durationMs: 6000 };
 
 class FakeBrowserWindow {
     constructor(options) {
@@ -32,7 +34,8 @@ test('窗口选项和 spec 一致', () => {
     assert.equal(o.show, false);
     assert.equal(o.backgroundColor, '#000000');
     assert.equal(o.webPreferences.backgroundThrottling, false);
-    assert.match(o.webPreferences.preload, /unlock-animation[\/]preload\.js$/);
+    assert.ok(fs.existsSync(o.webPreferences.preload));
+    assert.equal(path.basename(path.dirname(o.webPreferences.preload)), 'unlock-animation');
 });
 
 test('建好后先 setBounds 铺满，再置顶、加载、不抢焦点地显示', () => {
@@ -43,7 +46,9 @@ test('建好后先 setBounds 铺满，再置顶、加载、不抢焦点地显示
 });
 
 test('加载的是播放页面', () => {
-    assert.match(make().calls[2][1], /renderer[\/]unlock-player\.html$/);
+    const page = make().calls[2][1];
+    assert.equal(path.basename(page), 'unlock-player.html');
+    assert.ok(fs.existsSync(page));
 });
 
 test('query 带上视频地址、淡入淡出和声音', () => {
