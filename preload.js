@@ -237,6 +237,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => ipcRenderer.removeListener('renderer:pause', handler);
     },
 
+    /** 解锁动画开着声音时，唱片机让路 */
+    onVinylDuck: (callback) => {
+        const handler = (_event, ducked) => callback(ducked);
+        ipcRenderer.on('vinyl:duck', handler);
+        return () => ipcRenderer.removeListener('vinyl:duck', handler);
+    },
+
     onResumeRender: (callback) => {
         const handler = (_event, info) => callback(info || {});
         ipcRenderer.on('renderer:resume', handler);

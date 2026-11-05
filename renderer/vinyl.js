@@ -155,7 +155,7 @@ class VinylPlayerManager {
 
         // 音量（淡入淡出进行中就让它淡到新音量）
         this.volume = config.volume !== undefined ? Math.max(0, Math.min(1, config.volume)) : 0.6;
-        if (!this.fadeTimer) this.audio.volume = this.volume;
+        if (!this.fadeTimer) this.audio.volume = this.currentVolume();
         this.audio.loop = Shared.playlist.loopsCurrent(config);
 
         // 播放状态：只有真的变了（或者换了歌）才走一遍唱臂动作；要放的歌读不出来就直接跳过
@@ -425,6 +425,22 @@ class VinylPlayerManager {
 
     // ==================== 音乐 ====================
 
+    /** 现在该有的音量：解锁动画开着声音时是 0 */
+    currentVolume() {
+        return this.ducked ? 0 : this.volume;
+    }
+
+    /**
+     * 解锁动画开着声音时让路：音量渐变到 0，放完渐变回来。
+     * 只改音量，不碰播放状态和配置，音乐在后台继续走，唱片照转。
+     */
+    setDucked(ducked) {
+        if (this.ducked === ducked) return;
+        this.ducked = ducked;
+        if (this.wantPlaying) this.fadeVolume(null);
+        else if (!this.fadeTimer) this.audio.volume = this.currentVolume();
+    }
+
     startAudio() {
         this.audio.volume = 0;
         this.fadeVolume(null);
@@ -454,7 +470,7 @@ class VinylPlayerManager {
         const start = performance.now();
         this.fadeTimer = setInterval(() => {
             const t = Math.min(1, (performance.now() - start) / FADE_MS);
-            const target = to === null ? this.volume : to;
+            const target = to === null ? this.currentVolume() : to;
             this.audio.volume = from + (target - from) * t;
             if (t < 1) return;
             clearInterval(this.fadeTimer);

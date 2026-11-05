@@ -973,6 +973,8 @@ let isPlacing = false;
 let lastWallpaperSignal = null;
 /** 解锁动画控制器（startApp 里建） */
 let unlockAnimation = null;
+/** 上一次告诉壁纸窗口的"唱片机要让路" */
+let vinylDucked = false;
 
 /**
  * 按摆放、锁屏 / 睡眠、被窗口挡住几种状态，给壁纸窗口发暂停（带原因）或恢复，状态没变不发。
@@ -1006,6 +1008,15 @@ function isRemoteSession() {
     }
 }
 
+/** 动画占着壁纸的状态变了：同步壁纸的暂停，开着声音时让唱片机的音量降到 0 */
+function syncUnlockHold() {
+    syncWallpaperSignal();
+    const ducked = unlockAnimation.ducksMusic;
+    if (ducked === vinylDucked) return;
+    vinylDucked = ducked;
+    if (wallpaperWindow && !wallpaperWindow.isDestroyed()) wallpaperWindow.webContents.send('vinyl:duck', ducked);
+}
+
 function createUnlockAnimation() {
     return new UnlockAnimationController({
         getPlayback: ({ preview = false } = {}) => {
@@ -1017,7 +1028,12 @@ function createUnlockAnimation() {
         registerSkipKey: (onSkip) => globalShortcut.register('Escape', onSkip),
         unregisterSkipKey: () => globalShortcut.unregister('Escape'),
         isSessionLocked: () => powerMonitor.getSystemIdleState(1) === 'locked',
-        onHoldChange: syncWallpaperSignal,
+        onHoldChange: syncUnlockHold,
+        // 没收到 unlock-screen 也要清锁屏状态，否则壁纸一直停着
+        onSessionUnlocked: () => {
+            isScreenLocked = false;
+            syncWallpaperSignal();
+        },
     });
 }
 

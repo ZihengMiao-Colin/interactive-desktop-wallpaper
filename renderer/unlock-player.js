@@ -38,5 +38,17 @@
         video.play().catch(() => unlockPlayer.report('error'));
     });
 
+    // 窗口淡出时声音也跟着降下去，否则按 Esc 跳过时声音会突然断掉，还会和恢复的壁纸声音叠在一起
+    unlockPlayer.onFadeOut((ms) => {
+        if (video.muted || ms <= 0) return;
+        const from = video.volume;
+        const startedAt = performance.now();
+        const timer = setInterval(() => {
+            const t = Math.min(1, (performance.now() - startedAt) / ms);
+            video.volume = from * (1 - t);
+            if (t >= 1) clearInterval(timer);
+        }, 20);
+    });
+
     video.src = query.get('video');
 })();

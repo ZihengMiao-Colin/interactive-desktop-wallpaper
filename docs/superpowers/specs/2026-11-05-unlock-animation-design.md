@@ -165,8 +165,9 @@ unlockAnimation: {
 
 ## 和壁纸的配合
 
-- 主进程加一个 `isUnlockPlaying`，并进 `syncWallpaperSignal` 的 `system`：解锁后壁纸和唱片机继续暂停，动画进入淡出时才恢复。这样不会抢 GPU，声音不会叠在一起，淡出时露出来的桌面已经在动。`nextWallpaperSignal` 不用改。
-- 顺序要注意：`unlock-screen` 的处理里，要先把 `isUnlockPlaying` 设好，再清 `isScreenLocked` 并调 `syncWallpaperSignal`，否则壁纸会先恢复一下又暂停，声音会响一下。
+- 控制器的 `holdsWallpaper` 并进 `syncWallpaperSignal` 的 `system`：解锁后壁纸继续暂停，动画进入淡出时才恢复。这样不会抢 GPU，淡出时露出来的桌面已经在动。`nextWallpaperSignal` 不用改。
+- 唱片机锁屏时本来就不停（暂停路径不碰它），所以单独处理：动画开着声音时，唱片机音量渐变到 0，淡出时渐变回来，只改音量，不碰播放状态和配置。动画静音时音乐照常响。动画的声音在淡出时也跟着降下去。
+- 顺序要注意：`unlock-screen` 的处理里，要先调 `handleUnlock`，再清 `isScreenLocked` 并调 `syncWallpaperSignal`，否则壁纸会先恢复一下又暂停，声音会响一下。
 - `FullscreenDetector` 已经用 `ignorePid` 忽略本程序的窗口，而且窗口不是前台，不用改。
 
 ## 现有代码大概要动的地方
@@ -200,7 +201,7 @@ unlockAnimation: {
 - Win+L 解锁、合盖或睡眠后解锁：全盖住、没闪、焦点还在原来的程序。
 - PIN、指纹、人脸解锁（实验没测）。
 - Esc 跳过、点鼠标跳过（实验没测过点鼠标）。
-- 开声音时有声音，壁纸和唱片机的声音不叠加。
+- 开声音时有声音，壁纸和唱片机的声音不叠加（唱片机让路，放完恢复）。
 - 视频文件被删掉后解锁：不放，正常进桌面。
 - 接外接显示器时，动画放在主显示器上，副显示器不受影响。
 - 打包后的安装版：上面的主要流程再走一遍。

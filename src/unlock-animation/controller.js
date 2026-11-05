@@ -19,6 +19,8 @@ const LOCK_POLL_MS = 1000;
 const UNLOCKED_POLLS = 2;
 /** 淡出时多久改一次透明度（毫秒） */
 const FADE_STEP_MS = 16;
+/** 淡出的兜底：比淡出时长多等这么久（毫秒）。透明度按系统时钟算，时钟往回跳时靠它结束 */
+const FADE_MARGIN_MS = 1000;
 
 /** 播放页面上报的事件 → 状态机事件 */
 const PLAYER_EVENTS = { ready: 'ready', 'near-end': 'nearEnd', skip: 'skip', error: 'error' };
@@ -32,7 +34,8 @@ class UnlockAnimationController {
      * @param {(onSkip: () => void) => boolean} deps.registerSkipKey
      * @param {() => void} deps.unregisterSkipKey
      * @param {() => boolean} deps.isSessionLocked
-     * @param {() => void} deps.onHoldChange - holdsWallpaper 变了
+     * @param {() => void} deps.onHoldChange - holdsWallpaper 或 ducksMusic 变了
+     * @param {() => void} deps.onSessionUnlocked - 没收到 unlock-screen，但确定已经解锁了
      */
     constructor(deps) {
         this._deps = deps;
@@ -55,6 +58,11 @@ class UnlockAnimationController {
         return isActive(this._state);
     }
 
+    /** 动画开着声音：唱片机要让路（唱片机锁屏时不停，所以不能只靠 holdsWallpaper） */
+    get ducksMusic() {
+        return this.holdsWallpaper && this._playback.sound;
+    }
+
     /** lock-screen 时调用。要同步建窗口：睡眠时离 suspend 只有约 90 毫秒 */
     handleLock() {
         this._skipNextUnlock = false;
@@ -71,10 +79,14 @@ class UnlockAnimationController {
     handleUnlock() {
         const skip = this._skipNextUnlock;
         this._skipNextUnlock = false;
+        // 窗口摆好时也要再问一次：可能是从远程桌面连进来解锁的，或者视频在锁屏期间被删了
+        const playback = this._deps.getPlayback();
+        if (!playback) {
+            this._dispatch('abort');
+            return;
+        }
         if (this._state === 'idle') {
             if (skip) return;
-            const playback = this._deps.getPlayback();
-            if (!playback) return;
             this._playback = playback;
         }
         this._dispatch('unlock');
@@ -101,7 +113,11 @@ class UnlockAnimationController {
     handlePlayerEvent(sender, name) {
         if (!this._win || this._win.isDestroyed() || sender !== this._win.webContents) return;
         const event = PLAYER_EVENTS[name];
-        if (event) this._dispatch(event);
+        if (!event) return;
+        const waitingForUnlock = this._state === 'preparing' || this._state === 'ready';
+        this._dispatch(event);
+        // 窗口在锁屏界面下面时点不到：能点到说明已经解锁了，只是没收到事件
+        if (event === 'skip' && waitingForUnlock) this._deps.onSessionUnlocked();
     }
 
     /** 程序退出时调用，不留下置顶窗口 */
@@ -116,6 +132,7 @@ class UnlockAnimationController {
         const { state, actions } = transition(prev, event);
         if (state === prev && actions.length === 0) return;
 
+        console.log(`[UnlockAnimation] ${prev} --${event}--> ${state}`);
         this._state = state;
         if (state === 'idle' && (prev === 'preparing' || prev === 'ready')) this._skipNextUnlock = true;
         for (const action of actions) this._run(action);
@@ -166,6 +183,7 @@ class UnlockAnimationController {
     _fadeOut() {
         const win = this._win;
         const { fadeOutMs } = this._playback;
+        win.webContents.send('unlock:fade-out', fadeOutMs);
         const startedAt = Date.now();
         this._fadeTimer = setInterval(() => {
             const opacity = opacityAt(Date.now() - startedAt, fadeOutMs);
@@ -182,6 +200,8 @@ class UnlockAnimationController {
         } else if (this._state === 'playing') {
             const { durationMs, fadeInMs } = this._playback;
             this._stateTimer = setTimeout(() => this._dispatch('timeout'), watchdogMs(durationMs, fadeInMs));
+        } else if (this._state === 'fadingOut') {
+            this._stateTimer = setTimeout(() => this._dispatch('fadeDone'), this._playback.fadeOutMs + FADE_MARGIN_MS);
         }
 
         this._syncLockPoll();
@@ -215,11 +235,13 @@ class UnlockAnimationController {
         let unlockedPolls = 0;
         this._lockPoll = setInterval(() => {
             if (this._deps.isSessionLocked()) {
+                if (!sawLocked) console.log('[UnlockAnimation] 备用检测读到了已锁定');
                 sawLocked = true;
                 unlockedPolls = 0;
             } else if (sawLocked && ++unlockedPolls >= UNLOCKED_POLLS) {
                 console.warn('[UnlockAnimation] 没收到解锁事件，按查询结果当成解锁了');
-                this._dispatch('unlock');
+                this.handleUnlock();
+                this._deps.onSessionUnlocked();
             }
         }, LOCK_POLL_MS);
     }

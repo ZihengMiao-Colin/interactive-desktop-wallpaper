@@ -238,6 +238,9 @@ function registerIpcListeners() {
         if (!info.silent) UI.showToast('壁纸已恢复', 1500);
     });
 
+    // 解锁动画开着声音时，唱片机的音量降到 0
+    window.electronAPI.onVinylDuck((ducked) => vinylManager.setDucked(ducked));
+
     // 点击桌面：点中唱片机就播放 / 暂停（唱片机在最上层，点中了就不再传给元素），否则触发"点击播放"的元素
     window.electronAPI.onDesktopClick(({ x, y }) => {
         if (renderPaused) return;

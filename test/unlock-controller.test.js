@@ -39,6 +39,7 @@ function setup(t, overrides = {}) {
         unregisterSkipKey: () => { calls.unregister++; },
         isSessionLocked: () => session.locked,
         onHoldChange: () => { calls.hold++; },
+        onSessionUnlocked: () => {},
         ...overrides,
     });
     return { c, wins, calls, session };
@@ -247,6 +248,7 @@ test('窗口崩溃、无响应、被关掉都回到 idle', (t) => {
             unregisterSkipKey() {},
             isSessionLocked: () => true,
             onHoldChange() {},
+            onSessionUnlocked() {},
         });
         play({ c, wins });
         emit(wins[0]);
@@ -322,6 +324,81 @@ test('预览时没有视频返回 false', (t) => {
     const { c, wins } = setup(t, { getPlayback: () => null });
     assert.equal(c.preview(), false);
     assert.equal(wins.length, 0);
+});
+
+test('动画开声音时要唱片机让路，淡出时恢复', (t) => {
+    const s = setup(t, { getPlayback: () => ({ ...PLAYBACK, sound: true }) });
+    const { c, wins } = s;
+    assert.equal(c.ducksMusic, false);
+    play(s);
+    assert.equal(c.ducksMusic, true);
+    c.handlePlayerEvent(wins[0].webContents, 'near-end');
+    assert.equal(c.ducksMusic, false);
+});
+
+test('动画静音时唱片机不用让路', (t) => {
+    const s = setup(t);
+    play(s);
+    assert.equal(s.c.ducksMusic, false);
+});
+
+test('备用检测判定解锁时通知主进程，壁纸才能恢复', (t) => {
+    let notified = 0;
+    const { c, wins, session } = setup(t, { onSessionUnlocked: () => { notified++; } });
+    c.handleLock();
+    c.handlePlayerEvent(wins[0].webContents, 'ready');
+    t.mock.timers.tick(1000);
+    session.locked = false;
+    t.mock.timers.tick(2000);
+    assert.equal(c.state, 'playing');
+    assert.equal(notified, 1);
+});
+
+test('等解锁时能点到窗口：说明已经解锁了，通知主进程', (t) => {
+    let notified = 0;
+    const { c, wins } = setup(t, { onSessionUnlocked: () => { notified++; } });
+    c.handleLock();
+    c.handlePlayerEvent(wins[0].webContents, 'ready');
+    c.handlePlayerEvent(wins[0].webContents, 'skip');
+    assert.equal(notified, 1);
+});
+
+test('放的时候点鼠标不用通知主进程', (t) => {
+    let notified = 0;
+    const s = setup(t, { onSessionUnlocked: () => { notified++; } });
+    play(s);
+    s.c.handlePlayerEvent(s.wins[0].webContents, 'skip');
+    assert.equal(notified, 0);
+});
+
+test('解锁时已经不该放了（远程连进来、文件被删）：关窗口，不放', (t) => {
+    let allowed = true;
+    const { c, wins } = setup(t, { getPlayback: () => (allowed ? PLAYBACK : null) });
+    c.handleLock();
+    c.handlePlayerEvent(wins[0].webContents, 'ready');
+    allowed = false;
+    c.handleUnlock();
+    assert.equal(c.state, 'idle');
+    assert.equal(wins[0].isDestroyed(), true);
+    assert.deepEqual(wins[0].webContents.sent, []);
+});
+
+test('淡出开始时通知页面，声音跟着降下去', (t) => {
+    const s = setup(t);
+    play(s);
+    s.c.handlePlayerEvent(s.wins[0].webContents, 'near-end');
+    assert.deepEqual(s.wins[0].webContents.sent, ['unlock:start', 'unlock:fade-out']);
+});
+
+test('淡出时系统时钟往回跳也能结束', (t) => {
+    const s = setup(t);
+    play(s);
+    s.c.handlePlayerEvent(s.wins[0].webContents, 'near-end');
+    // 时钟不再往前走，透明度就一直算不到 0，只能靠定时器（不受系统时钟影响）结束
+    t.mock.method(Date, 'now', () => 0);
+    t.mock.timers.tick(1700);
+    assert.equal(s.c.state, 'idle');
+    assert.equal(s.wins[0].isDestroyed(), true);
 });
 
 test('dispose 销毁窗口、注销按键', (t) => {
