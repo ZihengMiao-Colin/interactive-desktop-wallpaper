@@ -5,17 +5,26 @@
  *   myWallpapers: [Entry]   用户自己选过的图片和视频，按 lastUsedAt 从新到旧排，path 兼作 id
  *     图片：{ path, type: 'image', addedAt, lastUsedAt, thumb, duration }
  *     视频：再加 effect（'none' 不动 | 'depth' 3D 视差 | 'pan' 整体平移）和 sound
+ *     裁过的条目还有 crop（见 shared/crop.js），没裁过的没有这个键
  *   currentImage: 当前的图片壁纸路径（只放图片：旧版本会把它指向的文件整个读成 base64）
- *   currentVideo: { path, effect, sound, imageAtTime } 当前的视频壁纸。
+ *   currentImageCrop: { path, x, y, w, h } | null 当前图片的裁剪。currentImage 必须是字符串，所以另放；
+ *     path 和 currentImage 对不上时不用（旧版本换过图片）。
+ *   currentVideo: { path, effect, sound, crop?, imageAtTime } 当前的视频壁纸。
  *     imageAtTime 是应用视频时的 currentImage；之后旧版本换过图片的话两者对不上，以图片为准。
+ *   当前壁纸的裁剪在应用时抄一份：壁纸从「我的壁纸」移除后，桌面上的裁剪要保留，重启也一样。
  */
 
 (function (root, factory) {
-    const mod = factory();
+    const crop = (typeof module === 'object' && module.exports)
+        ? require('./crop')
+        : root.Shared.crop;
+    const mod = factory(crop);
     if (typeof module === 'object' && module.exports) module.exports = mod;
     else (root.Shared = root.Shared || {}).myWallpapers = mod;
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (cropLib) {
     'use strict';
+
+    const { normalizeCrop } = cropLib;
 
     const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'bmp'];
     const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'm4v', 'mkv'];
@@ -59,6 +68,8 @@
             entry.effect = MOTIONS.includes(raw.effect) ? raw.effect : 'none';
             entry.sound = raw.sound === true;
         }
+        const crop = normalizeCrop(raw.crop);
+        if (crop) entry.crop = crop;
         return entry;
     }
 
@@ -79,8 +90,8 @@
         return normalizeList(list).find((e) => samePath(e.path, filePath)) || null;
     }
 
-    /** 加入一条：已有的只更新 lastUsedAt（缩略图和时长给了才换），没有的加在最前 */
-    function addEntry(list, { path, type, thumb, duration }, now) {
+    /** 加入一条：已有的只更新 lastUsedAt（缩略图、时长和裁剪给了才换），没有的加在最前 */
+    function addEntry(list, { path, type, thumb, duration, crop }, now) {
         const current = normalizeList(list);
         const existing = current.find((e) => samePath(e.path, path));
         if (existing) {
@@ -89,9 +100,10 @@
                 lastUsedAt: now,
                 ...(thumb ? { thumb } : {}),
                 ...(duration ? { duration } : {}),
+                ...(crop ? { crop } : {}),
             })));
         }
-        return normalizeList([{ path, type, addedAt: now, lastUsedAt: now, thumb, duration }, ...current]);
+        return normalizeList([{ path, type, addedAt: now, lastUsedAt: now, thumb, duration, crop }, ...current]);
     }
 
     /** 标记为刚用过（应用壁纸时） */
@@ -101,13 +113,14 @@
         return normalizeList(current.map((e) => (samePath(e.path, filePath) ? { ...e, lastUsedAt: now } : e)));
     }
 
-    /** 改效果、声音、缩略图、时长；不改排序。不认识的效果、图片的效果和声音都忽略 */
+    /** 改效果、声音、缩略图、时长、裁剪（null 清掉）；不改排序。不认识的效果、图片的效果和声音都忽略 */
     function updateEntry(list, filePath, patch) {
         return normalizeList(normalizeList(list).map((e) => {
             if (!samePath(e.path, filePath)) return e;
             const next = { ...e };
             if (typeof patch.thumb === 'string') next.thumb = patch.thumb;
             if (Number.isFinite(patch.duration)) next.duration = patch.duration;
+            if (patch.crop !== undefined) next.crop = patch.crop;
             if (e.type === 'video') {
                 if (MOTIONS.includes(patch.effect)) next.effect = patch.effect;
                 if (typeof patch.sound === 'boolean') next.sound = patch.sound;
@@ -132,7 +145,12 @@
     /** 两个路径都为空，或者指向同一个文件 */
     const sameOrBothEmpty = (a, b) => (!a && !b) || samePath(a, b);
 
-    /** 当前桌面上的壁纸：{ type: 'image', path } | { type: 'video', path, effect, sound } | null */
+    /** 有裁剪时才写这个键：没裁过的壁纸和以前的数据长得一样 */
+    const cropField = (crop) => (crop ? { crop } : {});
+
+    /**
+     * 当前桌面上的壁纸：{ type: 'image', path, crop? } | { type: 'video', path, effect, sound, crop? } | null
+     */
     function resolveCurrent(config) {
         const c = config || {};
         const video = c.currentVideo;
@@ -142,27 +160,53 @@
                 path: video.path,
                 effect: MOTIONS.includes(video.effect) ? video.effect : 'none',
                 sound: video.sound === true,
+                ...cropField(normalizeCrop(video.crop)),
             };
         }
-        return c.currentImage ? { type: 'image', path: c.currentImage } : null;
+        if (!c.currentImage) return null;
+        const saved = c.currentImageCrop;
+        const crop = saved && samePath(saved.path, c.currentImage) ? normalizeCrop(saved) : null;
+        return { type: 'image', path: c.currentImage, ...cropField(crop) };
     }
 
     /** 应用一张壁纸时要写进配置的部分 */
     function applyPartial(config, descriptor, now) {
         const c = config || {};
         const myWallpapers = touchEntry(c.myWallpapers, descriptor.path, now);
+        const crop = normalizeCrop(descriptor.crop);
         if (descriptor.type === 'video') {
             return {
                 currentVideo: {
                     path: descriptor.path,
                     effect: MOTIONS.includes(descriptor.effect) ? descriptor.effect : 'none',
                     sound: descriptor.sound === true,
+                    ...cropField(crop),
                     imageAtTime: c.currentImage || '',
                 },
                 myWallpapers,
             };
         }
-        return { currentImage: descriptor.path, currentVideo: null, myWallpapers };
+        return {
+            currentImage: descriptor.path,
+            currentImageCrop: crop ? { path: descriptor.path, ...crop } : null,
+            currentVideo: null,
+            myWallpapers,
+        };
+    }
+
+    /**
+     * 给要应用的壁纸带上它的裁剪：先看「我的壁纸」里的记录。
+     * 列表里没有时，它可能是刚被移除的当前壁纸（还选中着，可以再点"应用壁纸"），这时按桌面上的裁剪，
+     * 否则水印会回来；别的情况（比如默认壁纸）没有裁剪。
+     * @param {object} descriptor
+     * @param {object} config - 完整配置
+     */
+    function withCrop(descriptor, config) {
+        const { crop: _ignored, ...rest } = descriptor;
+        const entry = findEntry(config.myWallpapers, descriptor.path);
+        if (entry) return { ...rest, ...cropField(entry.crop) };
+        const current = resolveCurrent(config);
+        return { ...rest, ...cropField(current && samePath(current.path, descriptor.path) ? current.crop : null) };
     }
 
     /** 秒 → "分:秒"，未知时为空 */
@@ -187,6 +231,7 @@
         migrateFromCurrentImage,
         resolveCurrent,
         applyPartial,
+        withCrop,
         formatDuration,
     };
 });

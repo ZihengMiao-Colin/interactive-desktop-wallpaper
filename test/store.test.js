@@ -329,3 +329,14 @@ test('解锁动画的文件目录在数据目录下，不存在时创建', () =>
     assert.equal(unlockDir, path.join(dir, 'unlock_animation'));
     assert.ok(fs.existsSync(unlockDir));
 });
+
+test('saveWallpaperThumb：带后缀时存成另一个文件（重新裁剪后地址要变，浏览器才不用旧缓存）', () => {
+    const { store } = storeWithConfig();
+    const dataUrl = 'data:image/jpeg;base64,YWJj';
+    const plain = store.saveWallpaperThumb('C:/v/x.mp4', dataUrl);
+    const versioned = store.saveWallpaperThumb('C:/v/x.mp4', dataUrl, '_abc');
+    assert.notEqual(versioned, plain);
+    assert.equal(path.dirname(versioned), path.dirname(plain));
+    assert.match(path.basename(versioned), /^thumb_[^.]+_abc\.jpg$/);
+    assert.ok(fs.existsSync(versioned));
+});

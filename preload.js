@@ -180,7 +180,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // ==================== 我的壁纸 ====================
 
     myWallpapers: {
-        /** 加入（已有的提到最前）：{ path, type, thumbDataUrl?, duration? } → 条目 */
+        /** 加入（已有的提到最前）：{ path, type, thumbDataUrl?, duration?, crop? } → 条目 */
         add: (item) => ipcRenderer.invoke('myWallpapers:add', item),
         /** 从列表移除（不删原文件，删它的缩略图）→ 是否删了 */
         remove: (filePath) => ipcRenderer.invoke('myWallpapers:remove', filePath),
@@ -188,7 +188,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         update: (filePath, patch) => ipcRenderer.invoke('myWallpapers:update', filePath, patch),
         /** 补存缩略图（不改排序）→ 条目 */
         setThumb: (filePath, thumbDataUrl) => ipcRenderer.invoke('myWallpapers:setThumb', filePath, thumbDataUrl),
+        /** 改裁剪并换上裁好的缩略图 → 条目 */
+        setCrop: (filePath, crop, thumbDataUrl) => ipcRenderer.invoke('myWallpapers:setCrop', filePath, crop, thumbDataUrl),
     },
+
+    /** 主显示器的大小：{ width, height, scaleFactor }（宽高是 DIP） */
+    getScreenInfo: () => ipcRenderer.invoke('app:getScreenInfo'),
 
     // ==================== 应用配置 ====================
 
@@ -327,11 +332,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     unlockAnimation: {
         /** 选视频：{ canceled: true } 或 { path, url, name } */
         selectVideo: () => ipcRenderer.invoke('unlock:selectVideo'),
-        /** 导入视频（{ path, thumbDataUrl, duration }）：{ config } 或 { error } */
+        /** 导入视频（{ path, thumbDataUrl, duration, crop? }）：{ config } 或 { error } */
         setVideo: (input) => ipcRenderer.invoke('unlock:setVideo', input),
+        /** 重新裁剪（{ crop, thumbDataUrl }）：{ config } 或 { error } */
+        setCrop: (input) => ipcRenderer.invoke('unlock:setCrop', input),
         /** 移除视频：{ config } */
         remove: () => ipcRenderer.invoke('unlock:remove'),
-        /** { exists, thumbUrl } */
+        /** { exists, videoUrl, thumbUrl } */
         getInfo: () => ipcRenderer.invoke('unlock:getInfo'),
         /** 预览，返回是否开始了 */
         preview: () => ipcRenderer.invoke('unlock:preview'),

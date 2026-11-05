@@ -17,6 +17,8 @@ function createElementShader(texture, depthTexture) {
         uScreenSize: new Float32Array([1, 1]),
         uCoverScale: new Float32Array([1, 1]),
         uCoverOffset: new Float32Array([0, 0]),
+        uCropMin: new Float32Array([0.001, 0.001]),
+        uCropMax: new Float32Array([0.999, 0.999]),
         uMouse: new Float32Array([0, 0]),
         uStrength: 0,
         uFocus: 0.5,
