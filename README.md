@@ -52,7 +52,7 @@ npm run build
 npm test
 ```
 
-素材预处理脚本（`tools/`）和 Python 版深度图（`generate_depth_map.py`）用项目内的 `venv/`（装有 onnxruntime / numpy / pillow）：
+素材预处理脚本（`tools/`）和 Python 版深度图（`generate_depth_map.py`）用项目内的 `venv/`（装有 onnxruntime / numpy / pillow，版本见 `requirements.txt`，重新建 venv 的命令也写在里面）：
 
 ```bash
 venv/Scripts/python.exe -m unittest tools/test_prepare_builtin_element.py
@@ -96,3 +96,12 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 - **动图**：用 Chromium 自带的 WebCodecs `ImageDecoder` 解码，不依赖第三方库。
 - **界面**：战术终端风格（切角面板、宋体标题配英文小字），样式全在 `ui/tokens.css` 的 CSS 变量里。字体自带，都是 SIL OFL 授权：思源宋体（Noto Serif SC）、Saira、JetBrains Mono，来自 [Fontsource](https://fontsource.org/)。
 - **数据**：配置在 `%APPDATA%/interactive-desktop-wallpaper/config.json`；导入的素材复制到同目录的 `custom_elements/`，原文件挪走也不影响。
+
+## 许可
+
+代码用 [MIT 许可证](LICENSE)。下面这些不在 MIT 范围内：
+
+- 默认壁纸（`wallpapers/`）：来自 Pexels 和 Pixabay，按各自网站的许可证使用，每张的作者写在 `wallpapers/manifest.json` 的 `credit` 里。
+- 视频素材（`overlay/`、`elements/`）。
+- 字体（`ui/fonts/`）：SIL OFL 1.1，许可证文件在同一目录。
+- 深度模型 Depth Anything V2 Small（不在仓库里，安装包里带了）：Apache-2.0。

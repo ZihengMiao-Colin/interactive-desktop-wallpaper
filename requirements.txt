@@ -1,18 +1,17 @@
-# ===========================================================================
-# 深度图生成工具 — Python 依赖
-# ===========================================================================
-# 安装方式: pip install -r requirements.txt
-# ===========================================================================
+# -*- coding: utf-8 -*-
+# 上面这行不能删：中文 Windows 上 pip 默认按 GBK 读这个文件，读到中文注释会报错。
+#
+# tools/ 下的素材脚本、Python 测试和 generate_depth_map.py 用的依赖。
+# 应用本身不用 Python：深度图由 onnxruntime-node 生成（src/depth/）。
+#
+# 版本和项目内的 venv/（Python 3.11.9）一致。重新建 venv：
+#   py -3.11 -m venv venv
+#   venv/Scripts/python.exe -m pip install -r requirements.txt
+#
+# 另外：
+#   - tools/prepare_builtin_element.py 要用 ffmpeg / ffprobe，需要在 PATH 里。
+#   - export_onnx.py（重新导出 ONNX 模型）还要 torch、transformers、onnx，平时用不到，没有列进来。
 
-torch>=2.0.0
-torchvision>=0.15.0
-transformers>=4.45.0
-Pillow>=9.0.0
-numpy>=1.24.0
-huggingface_hub>=0.20.0
-
-# 可选：加速推理
-# accelerate>=0.27.0
-
-# 可选：ONNX 运行时（如果使用 ONNX 版本模型）
-# onnxruntime>=1.16.0
+onnxruntime==1.31.0
+numpy==2.4.6
+pillow==12.3.0

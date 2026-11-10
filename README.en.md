@@ -52,7 +52,7 @@ Produces `dist/Interactive3DWallpaper-Setup-<version>.exe` (an NSIS installer; t
 npm test
 ```
 
-Asset preprocessing scripts (`tools/`) and the Python depth-map generator (`generate_depth_map.py`) use the in-project `venv/` (with onnxruntime / numpy / pillow):
+Asset preprocessing scripts (`tools/`) and the Python depth-map generator (`generate_depth_map.py`) use the in-project `venv/` (with onnxruntime / numpy / pillow; versions are in `requirements.txt`, which also has the commands to rebuild the venv):
 
 ```bash
 venv/Scripts/python.exe -m unittest tools/test_prepare_builtin_element.py
@@ -96,3 +96,12 @@ For architecture details, known issues and the development plan, see [PROJECT_NO
 - **Animated images**: decoded with Chromium's built-in WebCodecs `ImageDecoder`, no third-party library.
 - **UI**: tactical-terminal style (cut-corner panels, serif Chinese headings with small English labels); all styling lives in CSS variables in `ui/tokens.css`. Fonts are bundled, all under the SIL OFL: Noto Serif SC, Saira and JetBrains Mono, from [Fontsource](https://fontsource.org/).
 - **Data**: config lives in `%APPDATA%/interactive-desktop-wallpaper/config.json`; imported assets are copied into `custom_elements/` in the same folder, so moving the original files does not break anything.
+
+## License
+
+The code is under the [MIT License](LICENSE). The following are not covered by it:
+
+- Default wallpapers (`wallpapers/`): from Pexels and Pixabay, used under those sites' licenses; each photo's author is in the `credit` field of `wallpapers/manifest.json`.
+- Video assets (`overlay/`, `elements/`).
+- Fonts (`ui/fonts/`): SIL OFL 1.1, with the license files in the same folder.
+- The Depth Anything V2 Small depth model (not in the repo, bundled in the installer): Apache-2.0.

@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-05（导入时裁剪，见 §9 阶段 16；解锁动画，见阶段 14；摆放窗口铺满整个屏幕，见阶段 15；之前是程序不再启动 PowerShell，见阶段 12）
+> 最近更新：2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -147,7 +147,9 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ├── dev/                     浏览器预览用的假配置和示例 GIF
 ├── build/installer.nsh      NSIS 自定义脚本：卸载向导的"同时删除我的数据"勾选框、删数据、删开机自启
 ├── test/                    Node 单元测试
-├── generate_depth_map.py / export_onnx.py / 生成深度图.bat   Python 版深度图（tools/prepare_wallpapers.py 在用；应用里已换成 src/depth/）
+├── generate_depth_map.py / export_onnx.py   Python 版深度图（tools/prepare_wallpapers.py 在用；应用里已换成 src/depth/）
+├── requirements.txt         venv 里的 Python 依赖（版本锁定；第一行的编码声明不能删，见 §9 阶段 5）
+├── LICENSE                  MIT，只管代码；素材、字体、模型的许可见 README"许可"一节
 ├── background.png / background2.png / depth_map.png   默认素材
 └── default wallpaper/       （在 .gitignore 里）默认壁纸的原图，图库素材由它生成，可以删除
 ```
@@ -331,7 +333,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 16. ~~天气 canvas 没按 DPR 缩放~~ ✅
 17. ~~mediump 精度~~ ✅ 改为 highp
 18. 视频素材都进了 git：`overlay/` 139MB（`old1.mp4` 53.7MB 推到 GitHub 会有警告）。素材继续增多的话考虑 Git LFS。
-19. `生成深度图.bat`、`requirements.txt` 仍按 torch 路线写。
+19. ~~`生成深度图.bat`、`requirements.txt` 仍按 torch 路线写~~ ✅ 2026-11-10 bat 删了，`requirements.txt` 改成 venv 实际用的依赖（见阶段 5）。
 22. 深度图后处理现在有两份实现：应用里的 `src/depth/processing.js` 和 `generate_depth_map.py`（`tools/prepare_wallpapers.py` 生成默认壁纸深度图时用）。改算法要两边一起改，`test/depth-processing.test.js` 里有 Pillow 生成的对照数据。
 20. 自定义元素：摆放模式只处理主显示器；动图最多解码 600 帧；元素多了以后没有数量上限提示。
 21. 天气粒子画在单独的 Canvas 2D 图层上，盖在整张壁纸上面，不会被近处的物体挡住（想要"雪落在树后面"得把天气挪进 Pixi 场景做深度遮挡）。光斑的光源固定在左上角，可能和壁纸里实际的光线方向不一致。
@@ -685,8 +687,10 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 
 这版是在 worktree 里打的包（先 `npm ci`，再把 `depth_anything_v2_small_ir9.onnx` 复制进来），和主目录上一次的打包逐个比对：除了上面的代码，只有换行符不同；少了 `resources/app-update.yml`，因为 worktree 的 `.git` 是文件，electron-builder 认不出仓库地址，程序没有自动更新，用不到；`app.asar` 里多了一段 940KB 没被引用的 `node_modules` 内容（Pixi 的许可证和 `punycode` 等开源代码，electron-builder 写重复了），不影响运行。
 
-### 阶段 5 — 收尾
-- [ ] 删掉或更新 `生成深度图.bat`、`requirements.txt`。
+### ✅ 阶段 5 — 收尾（2026-11-10）
+- [x] 删掉 `生成深度图.bat`：应用自己能生成深度图，它还在选早就没有的 base / large 模型。
+- [x] `requirements.txt` 改成 venv 实际装的 onnxruntime / numpy / pillow，版本锁定成和 venv 一样（`pip install --dry-run --no-index -r requirements.txt` 核对过）。第一行的 `# -*- coding: utf-8 -*-` 不能删：中文 Windows 上 pip 默认按 GBK 读这个文件，读到中文注释会报 `UnicodeDecodeError`（原来的文件也有这个问题）。ffmpeg 和 `export_onnx.py` 要的 torch 写在注释里。
+- [x] 补 `LICENSE`（MIT，和 `package.json` 一致）。README 加了"许可"一节：默认壁纸、视频素材、字体、深度模型不在 MIT 范围内。
 
 ### ✅ 阶段 6 — v1 打包（2026-10-27 完成）
 发布前检查：`npm test` 121 个全过，三组 Python 测试全过；用全新数据目录启动（模拟新用户）、打开设置窗口切完六个页面、正常退出，都没有报错，也没有残留 PowerShell 进程。功能上可以定为 v1，但当时的打包配置打不出能用的程序，于是做了下面这些。
@@ -734,10 +738,11 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 5. 正式公开：`gh release edit v<版本> --draft=false --latest`。草稿阶段 tag 还不存在，公开时 GitHub 才创建；之后 `git fetch --tags` 同步到本地。
 
 公开分发相关（v1.0.0 已公开，下面几条仍然成立）：
-- 默认壁纸 10 张来自 Pixabay、7 张来自 Pexels，两家的许可证都限制在"壁纸类平台"上再分发，附带在免费壁纸应用里算不算属于灰色地带；要正式推广时考虑换成自己的图或授权更宽松的图。`overlay/`、`elements/` 视频没有记录来源。
+- 默认壁纸 9 张来自 Pixabay、8 张来自 Pexels（其中 1 张在 Pexels 上的作者账号叫 Pixabay，以前算成了 Pixabay），两家的许可证都限制在"壁纸类平台"上再分发，附带在免费壁纸应用里算不算属于灰色地带；要正式推广时考虑换成自己的图或授权更宽松的图。`overlay/`、`elements/` 视频没有记录来源。
 - 没有代码签名，别人运行会看到 SmartScreen 提示。
 - Electron 28 已停止安全更新。只加载本地页面，风险低，v1 可以不动。
-- `package.json` 写了 `"license": "MIT"`，但仓库里没有 `LICENSE` 文件。
+- ~~`package.json` 写了 `"license": "MIT"`，但仓库里没有 `LICENSE` 文件~~ ✅ 2026-11-10 补上了，README 写明了哪些不在 MIT 范围内。
+- 安装包带的 Depth Anything V2 Small 模型是 Apache-2.0，转发时要附上它的许可证文本，安装包里现在没有。下次打包时把许可证文本一起放进去。
 - 唱片机封面 `coverPath` 指向 `default wallpaper/`（已加进 `.gitignore`）里的一张图，删这个目录前先换封面。
 
 ---
