@@ -13,11 +13,11 @@ The Android version is at [interactive-phone-wallpaper](https://github.com/Zihen
 - **My wallpapers**: images and videos you picked yourself stay on the Wallpaper page, one click to switch back.
 - **Unlock animation**: import a video and it plays full screen (over the taskbar) each time you unlock the computer, with adjustable fade in and fade out. Press Esc or click to skip; when it ends you are back on the desktop. The app has to be running.
 - **Cropping on import**: a crop box opens when you import an image wallpaper, video wallpaper or unlock video. Drag it to choose what stays (for example to cut off a watermark); the ratio is locked to your screen, and anything already imported can be cropped again.
-- **Custom elements**: import images / GIF / animated WebP / APNG / MP4 / WebM, or use the bundled default elements (explosions).
+- **Custom elements**: import images / GIF / animated WebP / APNG / MP4 / WebM.
   - Click an element to enter placement mode: drag to move, drag a corner to resize, adjust depth; Enter to confirm, Esc to cancel.
   - Elements move with the mouse together with background at the same depth and are hidden behind closer objects; new elements "stick to the ground" for their depth by default.
   - Green-screen keying, loop / interval playback, opacity, show / hide; multiple elements at once.
-- **Other decorations**: vinyl record player (a playlist of local music with list loop / repeat one / shuffle / play in order; drag it anywhere), full-screen video effects (rain, snow, old film), weather particles.
+- **Other decorations**: vinyl record player (a playlist of local music with list loop / repeat one / shuffle / play in order; drag it anywhere), full-screen video effects (using a video you import), weather particles.
 - **Desktop integration**: injected into the WorkerW layer below the desktop icons; pauses automatically for full-screen apps, lock screen and sleep; tray menu, launch at startup.
 
 ## Running
@@ -81,8 +81,7 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 | `settings.html`, `settings/` | Settings window |
 | `ui/` | Styles shared by the settings window and the wallpaper page (colors, fonts, cut-corner controls), icons and bundled fonts (`ui/fonts/`) |
 | `shared/` | Pure logic shared by the main process, renderer and tests |
-| `elements/` | Default element assets and `manifest.json` |
-| `overlay/` | Full-screen video effect assets |
+| `elements/` | `manifest.json` for default elements (no bundled assets at the moment) |
 | `generate_depth_map.py` | Python depth-map generator (used by `tools/prepare_wallpapers.py`; the app uses `src/depth/`, with identical results) |
 | `test/`, `tools/`, `dev/` | Tests, asset preprocessing scripts, browser preview data |
 
@@ -101,7 +100,6 @@ For architecture details, known issues and the development plan, see [PROJECT_NO
 
 The code is under the [MIT License](LICENSE). The following are not covered by it:
 
-- Default wallpapers (`wallpapers/`): from Pexels and Pixabay, used under those sites' licenses; each photo's author is in the `credit` field of `wallpapers/manifest.json`.
-- Video assets (`overlay/`, `elements/`).
+- Default wallpapers (`wallpapers/`): 2 images, both CC0 (the authors have waived their copyright), one from Pexels and one from Pixabay; the authors are in the `credit` field of `wallpapers/manifest.json`.
 - Fonts (`ui/fonts/`): SIL OFL 1.1, with the license files in the same folder.
 - The Depth Anything V2 Small depth model (not in the repo, bundled in the installer): Apache-2.0.

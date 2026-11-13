@@ -78,9 +78,22 @@ function listedInGalleryManifest(imagePath) {
 }
 
 /**
+ * v1.3.1 及更早版本带过、后来移除的默认壁纸（文件名，小写）。
+ * 这些图的许可证不允许当壁纸分发，只留下了 CC0 的两张，见 PROJECT_NOTES §9"公开分发相关"。
+ */
+const REMOVED_FILES = new Set([
+    'lake-forest.jpg', 'mountain-reflection.jpg', 'glacier-lake.jpg', 'arch-bridge.jpg',
+    'sunset-path.jpg', 'pastel-mountains.jpg', 'distant-mountains.jpg', 'coast-sunset.jpg',
+    'snow-forest.jpg', 'milky-way-pier.jpg', 'cat.jpg', 'white-horse.jpg', 'macaw.jpg',
+    'eye.jpg', 'wire-fence.jpg',
+]);
+
+/**
  * 配置里记着的壁纸路径如果指向别处的同一张默认壁纸，换成当前图库里的：
  *   - 另一份图库里的图：开发目录和安装目录各有一份图库、共用同一份配置。
  *     那份图库还在时看它的 manifest.json；已经删了就按 wallpapers 目录名和文件名认。
+ *   - 已经移除的默认壁纸（REMOVED_FILES），升级后文件不在了：换成图库第一张，
+ *     不然会退回自带的 background.png 并提示"找不到文件"。
  *   - 旧版本直接用 `default wallpaper/` 里的原图当壁纸，那个文件不在了的话按原文件名认。
  * @param {string} imagePath - 配置里记着的壁纸路径
  * @param {GalleryEntry[]} gallery
@@ -98,6 +111,7 @@ function migrateLegacyImagePath(imagePath, gallery, exists = fs.existsSync) {
     if (fromOtherGallery) {
         const entry = gallery.find((e) => path.basename(e.file).toLowerCase() === base);
         if (entry) return entry.file;
+        if (!found && REMOVED_FILES.has(base) && gallery.length) return gallery[0].file;
     }
 
     if (found) return imagePath;

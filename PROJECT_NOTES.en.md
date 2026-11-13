@@ -2,14 +2,14 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-10 (wrap-up: added `LICENSE` and cleaned up the Python dependencies, see §9 Phase 5; before that, v1.3.1: the wallpaper no longer covers other programs when it can't attach to the desktop layer, see Phase 17; cropping on import, see Phase 16)
+> Last updated: 2026-11-13 (deleted built-in assets with unclear licensing: only the 2 CC0 default wallpapers remain, and all built-in video effects and explosion elements are gone, see Phase 18; the license check is under "Public distribution notes" in §9); 2026-11-10 (wrap-up: added `LICENSE` and cleaned up the Python dependencies, see §9 Phase 5; before that, v1.3.1: the wallpaper no longer covers other programs when it can't attach to the desktop layer, see Phase 17; cropping on import, see Phase 16)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
 **Current scope**
 - **Desktop only**. The Android version is a separate repository, [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper) (locally `C:\Users\24418\Desktop\2\Wallpaper3D phone`), brought to 1.1.0 on 2026-10-29. It ports this project's parallax shader (`renderer/shaders.js`), parallax math, idle-frame logic, throttled config saving and depth-map post-processing (`src/depth/processing.js`); keep both sides in sync when changing these files (the mapping is in the Android project's `PROJECT_NOTES.md`).
 - 2026-10-27: the existing feature set was declared **v1** and packaged (replacing the 10-25 decision of "no packaging for now"): `npm run build` produces an NSIS installer, the installed build was tested, and it was published the same day as v1.0.0 on GitHub Releases. The process and future release steps are in §9 Phase 6.
-- Effect video assets (`overlay/`, `elements/`) are committed to git.
+- Effect video assets (`overlay/`, `elements/`) are committed to git. (On 2026-11-13 all these videos were deleted because their sources could not be established; see Phase 18.)
 
 ---
 
@@ -22,7 +22,7 @@ A local video can also be set as the wallpaper (2026-11-03), with three effects:
 After each unlock a video of your own can also play full screen (2026-11-05): it covers the taskbar, fades in and out, and ends on the desktop, see 4.6.
 
 On top of that you can layer:
-- **Custom elements**: user-imported images / GIFs / videos (including green screen), plus bundled default elements (two explosions). Elements are rendered in the Pixi scene, follow the mouse parallax like the background, and are occluded by closer background objects.
+- **Custom elements**: user-imported images / GIFs / videos (including green screen). There used to be two bundled explosion elements; they were deleted on 2026-11-13, so there are no built-in elements now. Elements are rendered in the Pixi scene, follow the mouse parallax like the background, and are occluded by closer background objects.
 - Vinyl record player (local music), full-screen video effects (screen blend / green screen), Canvas weather particles.
 
 ---
@@ -135,11 +135,11 @@ On top of that you can layer:
 │   │   └── png.js           8-bit grayscale PNG encoder
 │   ├── store.js             config.json / depth cache / custom_elements folder / My wallpapers thumbnails (wallpaper_thumbs) / uninstall list
 │   ├── uninstaller.js       Uninstall from the settings page: find the uninstaller in the install folder and launch it with the delete-data choice
-│   ├── gallery.js           Default wallpaper gallery: read manifest, look up by path, migrate old paths
+│   ├── gallery.js           Default wallpaper gallery: read manifest, look up by path, migrate old paths (including deleted default wallpapers)
+│   ├── removed-assets.js    Deleted built-in video effects and explosion elements: clean up references in old configs at startup
 │   └── tray-manager.js      Tray menu
-├── elements/                Default elements: manifest.json + cropped *_cut.mp4 + thumbnails (original bomb*.mp4 kept)
+├── elements/                Default elements: only manifest.json, with an empty list (the explosion videos were deleted on 2026-11-13)
 ├── wallpapers/              Default wallpaper gallery: manifest.json + images + depth/ + thumbs/
-├── overlay/                 Full-screen video effect assets
 ├── tools/prepare_builtin_element.py  Default green-screen element preprocessing (crop / scale / thumbnail)
 ├── tools/desktop-diagnose.bat       Collects troubleshooting info (system, window hierarchy, log) into a txt on the Desktop when the wallpaper will not attach to the desktop layer
 ├── tools/prepare_wallpapers.py       Default wallpaper gallery asset generation (downscale / thumbnail / depth map; `--depth-only` recomputes depth maps only)
@@ -297,7 +297,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | Pause on full screen / lock | ✅ | Custom element videos and interval timers pause too |
 | Tray, launch at startup | ✅ | Tray "Change wallpaper": applies directly if cached, otherwise generates in the settings window and then applies |
 | Vinyl player / video effects / weather particles | ✅ | Weather rewritten on 2026-10-26 (pre-rendered textures, depth of field, realistic shapes and falling motion) |
-| **Custom element system** | ✅ | Image / GIF / animated webp / apng / mp4 / webm; two default explosions; placement mode (resize, stretch, rotate, flip, free warp); depth occlusion; interval playback; click playback; green-screen keying; recolor |
+| **Custom element system** | ✅ | Image / GIF / animated webp / apng / mp4 / webm (the two bundled explosions were deleted on 2026-11-13); placement mode (resize, stretch, rotate, flip, free warp); depth occlusion; interval playback; click playback; green-screen keying; recolor |
 | Custom stickers | ♻️ Removed | Replaced by custom elements; old config migrates automatically |
 | Default wallpaper gallery (`wallpapers/`) | ✅ | |
 | Video wallpapers + My wallpapers | ✅ 2026-11-03 | Still / 3D parallax / whole-picture pan, optional sound; My wallpapers keeps the user's own images and videos, see §9 Phase 11 |
@@ -335,7 +335,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 15. ~~`hideDebugPanel` defaults to hidden when unset~~ ✅ 2026-11-03 the debug panel was removed entirely (`index.html`, `style.css`, `renderer/main.js`, default config). Reason: on the wallpaper page it was shown by default and only hidden once the main process sent the config, so it flashed in the top-right of the desktop right after launch. Parallax settings are on the settings window's "Parallax" page; the browser preview no longer has the panel either.
 16. ~~Weather canvas not scaled for DPR~~ ✅
 17. ~~mediump precision~~ ✅ Switched to highp
-18. All video assets are in git: `overlay/` is 139MB (`old1.mp4` at 53.7MB triggers a warning when pushed to GitHub). Consider Git LFS if assets keep growing.
+18. ~~All video assets are in git: `overlay/` is 139MB (`old1.mp4` at 53.7MB triggers a warning when pushed to GitHub). Consider Git LFS if assets keep growing.~~ All video assets were deleted on 2026-11-13, but they are still in the git history, so the repository does not get smaller.
 19. ~~`生成深度图.bat` and `requirements.txt` are still written for the torch route~~ ✅ 2026-11-10 the bat is deleted and `requirements.txt` now lists what the venv actually uses (see Phase 5).
 22. Depth map post-processing now has two implementations: the app's `src/depth/processing.js` and `generate_depth_map.py` (used by `tools/prepare_wallpapers.py` to generate default wallpaper depth maps). Algorithm changes must be made in both; `test/depth-processing.test.js` has reference data generated by Pillow.
 20. Custom elements: placement mode only handles the primary monitor; animated images decode at most 600 frames; no warning when the number of elements grows large.
@@ -393,7 +393,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 - [x] Frame rate cap of 60 (`MAX_FPS` in `renderer/parallax-scene.js`), so animation no longer renders at the full refresh rate on high-refresh displays.
 
 ### Phase 4 — Other new features (scope fixed 2026-10-26, done in this order)
-1. [x] Default wallpaper gallery: `wallpapers/` (17 images with depth maps and thumbnails; `manifest.json` records the Chinese name, source and original file name), a collapsible "Default wallpapers" panel in the settings "Wallpaper management" (collapsed by default; after the UI redesign it became a tiled grid below the "Wallpaper" page). Assets are generated from the originals by `tools/prepare_wallpapers.py`; just rerun it after improving the depth algorithm. The originals folder `default wallpaper/` is untouched and uncommitted and can be deleted; once deleted, an old current-wallpaper path is automatically switched at startup to the same image in the gallery.
+1. [x] Default wallpaper gallery: `wallpapers/` (17 images, cut down to 2 on 2026-11-13 because of licensing, see Phase 18; with depth maps and thumbnails; `manifest.json` records the Chinese name, source and original file name), a collapsible "Default wallpapers" panel in the settings "Wallpaper management" (collapsed by default; after the UI redesign it became a tiled grid below the "Wallpaper" page). Assets are generated from the originals by `tools/prepare_wallpapers.py`; just rerun it after improving the depth algorithm. The originals folder `default wallpaper/` is untouched and uncommitted and can be deleted; once deleted, an old current-wallpaper path is automatically switched at startup to the same image in the gallery.
 2. [x] Depth map quality + depth map preview in settings.
    - No edge-preserving filter: the wallpaper moves pixels by depth, and the sharper the depth edges, the more easily the image tears when moving; an image-guided edge-preserving filter was tried and also left speckles in the depth map.
    - Current post-processing (`postprocess_depth` in `generate_depth_map.py`): upscale the model output to the output size in floating point → dilate near contours outward by the "blur influence radius" → Gaussian smoothing (approximated with a triple box filter). The whole transition band falls on the background side, so subject outlines stay intact when moving and the stretching lands on the background. The "Edge smoothing" slider is the Gaussian σ (in output depth map pixels); the dilation distance is derived from it (`blur_support`).
@@ -690,6 +690,28 @@ Phase 17 ships as **v1.3.1** (2026-11-05). The v1.3.0 draft was never made publi
 
 This build was made in a worktree (`npm ci` first, then `depth_anything_v2_small_ir9.onnx` copied in). Compared file by file with the previous build in the main folder: apart from the code above, only line endings differ. `resources/app-update.yml` is gone because a worktree's `.git` is a file, so electron-builder cannot find the repository address; the app has no auto-updater and does not use it. `app.asar` also holds 940KB of unreferenced `node_modules` content (Pixi's license, `punycode` and other open-source code, written twice by electron-builder), which has no effect at runtime.
 
+### ✅ Phase 18 — Deleted built-in assets with unclear licensing (2026-11-13)
+Background: the user noticed that the image sites' licenses do not allow their images to be used in wallpaper software. A photo-by-photo check (see "Public distribution notes" in §9) found only 2 of the 17 default wallpapers are CC0, and the sources of the 10 bundled videos could not be traced. The user decided to delete the non-compliant wallpapers and all the videos, and not add replacements for now.
+
+Default wallpapers:
+- [x] Deleted 15 images from `wallpapers/` along with their depth maps and thumbnails; `manifest.json` now lists only 雪山镜湖 (snowy peaks over a lake) and 银河 (Milky Way). A new user's first launch defaults to 雪山镜湖.
+- [x] After an upgrade, if the current wallpaper is one of the deleted ones (the file is gone), startup switches it to the first gallery image instead of falling back to `background.png` with a "file not found" notice. The deleted file names are listed in `REMOVED_FILES` in `src/gallery.js`; this only applies under a `wallpapers` folder and only when the file is gone, so same-named images in the user's own folders are unaffected.
+- [x] `tools/prepare_wallpapers.py` already works from the manifest and needed no change; only the example ids in its usage text were updated.
+
+Videos:
+- [x] Deleted the 8 video effects in `overlay/` (light rain, heavy rain, three snow effects, old film grain, projector scratches, vintage light leaks) and the two explosions in `elements/` (original videos, `*_cut.mp4`, thumbnails). The `overlay/` folder is gone, so it was removed from `extraResources` in `package.json`; `elements/manifest.json` stays with an empty list, for adding assets later with `tools/prepare_builtin_element.py`.
+- [x] The main process `overlay:getPresets` returns an empty list (a comment explains how to add presets back). Video effects now only offer "Your own video": the `videoOverlay.presetId` default changed from `snow2` to `custom`; the settings page hides the whole preset area when there are no presets, and turning the switch on without an imported video prompts the user to import one first.
+- [x] `renderer/video-overlay.js` no longer falls back to `snow2` when a preset is missing (that would now be `undefined`, and the old code would throw); it treats it as having nothing to play. `_applyPlaybackProps` and `resume` handle this case too.
+- [x] Upgrading users: `cleanupRemovedBuiltins` in `src/removed-assets.js` checks the config at startup. If the video effect uses a deleted preset, it switches to the user's own video if one was imported, otherwise it turns the video effect off. Elements placed on the wallpaper from `builtin:bomb1` / `builtin:bomb2` are removed, so the list doesn't keep "asset missing" entries.
+- [x] `dev/dev-config.json` (the fake config for the browser preview) no longer has the explosion element; the placement draft uses the sample GIF instead.
+
+Verification: all 377 `npm test` tests pass. Ran the dev build with fresh data directories:
+- For a new user the gallery shows 2 images and the current wallpaper is 雪山镜湖.
+- With the deleted `wallpapers/lake-forest.jpg` written into the config beforehand, startup switched it to 雪山镜湖, and the log shows no fallback to `background.png`.
+- With `snow2` turned on and a `builtin:bomb1` element placed in the config beforehand: after startup the video effect is `custom` and off, and the element is gone; the effects page hides the preset area (`display: none`), and the elements page shows only "Add asset"; in the wallpaper window, turning the video effect on, pausing, resuming, changing the opacity and switching to a missing preset all ran without errors and set no video source.
+
+Not done: the git history and the v1.3.1 and earlier installers still contain the deleted images and videos; no replacement assets were added.
+
 ### ✅ Phase 5 — Wrap-up (2026-11-10)
 - [x] Deleted `生成深度图.bat` (the "generate depth map" batch file): the app generates depth maps itself, and the bat still offered base / large models that have long been gone.
 - [x] `requirements.txt` now lists what the venv actually has installed — onnxruntime / numpy / pillow — pinned to the venv's versions (checked with `pip install --dry-run --no-index -r requirements.txt`). Don't remove the `# -*- coding: utf-8 -*-` first line: on Chinese Windows pip reads the file as GBK by default and fails with `UnicodeDecodeError` on the Chinese comments (the old file had the same problem). ffmpeg and the torch needed by `export_onnx.py` are mentioned in comments.
@@ -712,7 +734,7 @@ Fixed along the way before release:
 - [x] Exiting a full-screen app, waking and unlocking all go through `resumeWallpaper()`: rendering does not resume while a full-screen app is still open or an element is being placed.
 - [x] Launch at startup: during development it includes the project folder (previously it opened Electron's default page at boot); query and set use the same arguments.
 - [x] Logging: `electron-log` writes to `logs/main.log` in the data folder, including every window's console output. Removed the unused `electron-store`.
-- [x] A new user's first launch defaults to the first gallery image (湖光山色, a lake-and-mountain scene) instead of the 1366×768 `background.png`.
+- [x] A new user's first launch defaults to the first gallery image (湖光山色, a lake-and-mountain scene, at the time; 雪山镜湖, snowy peaks over a lake, since 2026-11-13) instead of the 1366×768 `background.png`.
 - [x] File URLs for custom videos use `Host.fileUrl` (paths containing `#` open too).
 - [x] `author` changed to ZihengMiao; old builds in `dist/` cleaned out.
 
@@ -741,7 +763,14 @@ Steps for future releases:
 5. Make it public: `gh release edit v<version> --draft=false --latest`. The tag doesn't exist during the draft stage; GitHub creates it on publish. Then `git fetch --tags` to sync it locally.
 
 Public distribution notes (v1.0.0 is public; these still hold):
-- Of the default wallpapers, 9 are from Pixabay and 8 from Pexels (one of the Pexels photos is by an account named Pixabay, which used to be counted as Pixabay). Both licenses restrict redistribution on "wallpaper-type platforms"; whether bundling them in a free wallpaper app counts is a grey area. Consider replacing them with your own images or more permissively licensed ones before promoting it seriously. The `overlay/` and `elements/` videos have no recorded source.
+- Default wallpaper licenses (each photo page checked on 2026-11-12, against both sites' terms dated 2026-10-20): originally 9 were from Pixabay and 8 from Pexels. Both sites' terms prohibit distributing images "as is" as wallpapers (only resizing, cropping or recoloring still counts as "as is"), and the Pexels license page also says not to redistribute on other wallpaper platforms, so it is not a grey area. On 2026-11-13 the other 15 were deleted (Phase 18), leaving only the 2 CC0 ones:
+  - `milky-way` (Pixabay 2695569): published 2017-08-30. Section 4 of the Pixabay terms says works published before 2019-01-09 are CC0.
+  - `snowy-peaks-lake` (Pexels 459225): uploaded in 2017 by the Pexels account named Pixabay. The page data lists the license as CC0, but the page itself only shows "Free".
+  - The 15 deleted ones (8 from Pixabay published 2020–2025, 7 under the Pexels license) are still in the git history and the v1.3.1 and earlier installers.
+- The video assets (8 in `overlay/`, 2 in `elements/`) had no recorded source and were all deleted on 2026-11-13 (Phase 18); they are still in the git history and the v1.3.1 and earlier installers. When adding videos in future, record the download URL and confirm the license allows distribution with the app. What was found before deleting them (the user remembered they may have come from wallhaven or Mixkit):
+  - wallhaven only has still images, no videos. Its images are user-uploaded, and the site itself says copyright stays with the original owners.
+  - Mixkit's Stock Video Free License allows downloading, modifying and distributing, with no attribution required; the limits are in its User Terms (no selling items without altering them, no using them to build a stock library or a similar service). Videos confirmed to be Mixkit free videos can ship with the app.
+  - Nothing in the file metadata proves any of them came from Mixkit. `snow2` and `snow3` were transcoded by Vimeo (Vimeo Artax), so they may be from Pexels or Pixabay (both used to host videos on Vimeo), which would make them the same problem as the deleted images. `old1`, `old3`, `rain2` and `bomb2` are 2560×1440 and were re-encoded with ffmpeg 5.1, which does not look like Mixkit's original files.
 - No code signing, so others will see a SmartScreen prompt.
 - Electron 28 no longer receives security updates. It only loads local pages, so the risk is low and v1 can leave it.
 - ~~`package.json` says `"license": "MIT"`, but the repo has no `LICENSE` file~~ ✅ 2026-11-10 added; the README says what is not covered by MIT.

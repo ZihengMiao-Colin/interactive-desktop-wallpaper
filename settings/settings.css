@@ -983,6 +983,9 @@ input[type=range].hue::-webkit-slider-runnable-track {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 16px 12px;
 }
+/* 没有自带视频时整块收起，下面的"自己的视频"顶上来 */
+.presets[hidden] { display: none; }
+.presets[hidden] + .list { margin-top: 0; }
 .preset .th {
     position: relative;
     display: block;

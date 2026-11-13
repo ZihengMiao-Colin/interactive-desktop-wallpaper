@@ -427,7 +427,7 @@ class AppStore {
             // 3. 视频特效覆盖层（支持滤色/绿幕抠图）
             videoOverlay: {
                 enabled: false,             // 是否开启视频覆盖特效
-                presetId: 'snow2',          // 预设 ID: 'rain1' | 'rain2' | 'snow1' | 'snow2' | 'snow3' | 'old1' | 'old2' | 'old3' | 'custom'
+                presetId: 'custom',         // 'custom' = 自己导入的视频；自带预设 2026-11-13 都删掉了（见 src/removed-assets.js）
                 customPath: '',             // 本地导入视频文件路径
                 customName: '',             // 本地导入视频文件名
                 blendMode: 'auto',          // 混合模式: 'auto' | 'screen' | 'chroma'

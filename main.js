@@ -64,6 +64,7 @@ const { cleanupUnlockFiles, resolvePlayback } = require('./src/unlock-animation/
 const { registerUnlockIpc } = require('./src/unlock-animation/ipc');
 const { getWin32 } = require('./src/win32');
 const { loadGallery, findGalleryEntry, migrateLegacyImagePath } = require('./src/gallery');
+const { cleanupRemovedBuiltins } = require('./src/removed-assets');
 const myWallpapers = require('./shared/my-wallpapers');
 const { nextWallpaperSignal } = require('./shared/frame-pacing');
 const { findDepthModel, generateDepthPng } = require('./src/depth/generator');
@@ -73,7 +74,7 @@ const { findUninstaller, launchUninstaller } = require('./src/uninstaller');
 // ==================== 资源位置 ====================
 
 /**
- * 自带素材（overlay/、elements/、wallpapers/）所在目录：
+ * 自带素材（elements/、wallpapers/；overlay/ 现在没有视频）所在目录：
  * 打包后在安装目录的 resources/ 下（asar 外面，视频才能正常拖进度、循环），开发时就是项目目录。
  */
 const ASSET_DIR = app.isPackaged ? process.resourcesPath : __dirname;
@@ -714,83 +715,10 @@ function registerIpcHandlers() {
     });
 
     // ---- 获取内置视频特效列表 ----
-    ipcMain.handle('overlay:getPresets', async () => {
-        const overlayDir = path.join(ASSET_DIR, 'overlay');
-        return [
-            {
-                id: 'rain1',
-                title: '细雨蒙蒙',
-                desc: '窗前微雨 · 宁静舒适',
-                mode: 'screen',
-                modeName: '滤色混合',
-                path: path.join(overlayDir, 'rain1.mp4'),
-                thumb: path.join(overlayDir, 'rain1_thumb.jpg'),
-            },
-            {
-                id: 'rain2',
-                title: '暴雨倾盆',
-                desc: '2K高清大雨 · 沉浸感强',
-                mode: 'screen',
-                modeName: '滤色混合',
-                path: path.join(overlayDir, 'rain2.mp4'),
-                thumb: path.join(overlayDir, 'rain2_thumb.jpg'),
-            },
-            {
-                id: 'snow1',
-                title: '唯美落雪',
-                desc: '轻柔雪花 · 浪漫冬日',
-                mode: 'screen',
-                modeName: '滤色混合',
-                path: path.join(overlayDir, 'snow1.mp4'),
-                thumb: path.join(overlayDir, 'snow1_thumb.jpg'),
-            },
-            {
-                id: 'snow2',
-                title: '纯净落雪',
-                desc: '绿幕抠图 · 真实雪景',
-                mode: 'chroma',
-                modeName: '绿幕抠图',
-                path: path.join(overlayDir, 'snow2.mp4'),
-                thumb: path.join(overlayDir, 'snow2_thumb.jpg'),
-            },
-            {
-                id: 'snow3',
-                title: '漫天大雪',
-                desc: '密集风雪 · 寒冬飘舞',
-                mode: 'screen',
-                modeName: '滤色混合',
-                path: path.join(overlayDir, 'snow3.mp4'),
-                thumb: path.join(overlayDir, 'snow3_thumb.jpg'),
-            },
-            {
-                id: 'old1',
-                title: '老电影胶片',
-                desc: '复古胶片颗粒 · 怀旧质感',
-                mode: 'screen',
-                modeName: '滤色混合',
-                path: path.join(overlayDir, 'old1.mp4'),
-                thumb: path.join(overlayDir, 'old1_thumb.jpg'),
-            },
-            {
-                id: 'old2',
-                title: '放映机划痕',
-                desc: '经典黑白划痕 · 复古放映',
-                mode: 'screen',
-                modeName: '滤色混合',
-                path: path.join(overlayDir, 'old2.mp4'),
-                thumb: path.join(overlayDir, 'old2_thumb.jpg'),
-            },
-            {
-                id: 'old3',
-                title: '复古光斑',
-                desc: '暖调光斑闪烁 · 电影氛围',
-                mode: 'screen',
-                modeName: '滤色混合',
-                path: path.join(overlayDir, 'old3.mp4'),
-                thumb: path.join(overlayDir, 'old3_thumb.jpg'),
-            },
-        ];
-    });
+    // 自带的视频特效 2026-11-13 全部删掉了（来源说不清，见 src/removed-assets.js），现在只能用自己导入的视频。
+    // 以后要加：视频放进 overlay/，在 package.json 的 extraResources 里加回 overlay，
+    // 这里返回 { id, title, desc, mode: 'screen' | 'chroma', modeName, path, thumb }（path、thumb 用 ASSET_DIR 拼绝对路径）
+    ipcMain.handle('overlay:getPresets', async () => []);
 
     // ---- 保存深度图到缓存 ----
     ipcMain.handle('cache:saveDepthMap', async (_event, { imagePath, depthDataUrl }) => {
@@ -1186,7 +1114,7 @@ function startApp() {
     const migratedImage = migrateLegacyImagePath(currentImage, gallery);
     if (migratedImage !== currentImage) {
         store.saveConfig({ currentImage: migratedImage });
-        console.log('[Main] 当前壁纸已换成图库里的同一张:', migratedImage);
+        console.log('[Main] 当前壁纸已换成当前图库里的:', migratedImage);
     }
     // 当前视频记下的 imageAtTime 也要跟着换，否则和换过的 currentImage 对不上，视频会被当成"旧版本换过图片"
     const { currentVideo } = store.getConfig();
@@ -1201,6 +1129,12 @@ function startApp() {
     if (store.getConfig().currentVideo && (!resolved || resolved.type !== 'video')) {
         store.saveConfig({ currentVideo: null });
         console.log('[Main] 当前图片在别的版本里换过，不再用上次的视频壁纸');
+    }
+    // 删掉的自带视频特效、爆炸元素：旧配置里还在用的话换掉 / 去掉
+    const removedPatch = cleanupRemovedBuiltins(store.getConfig());
+    if (removedPatch) {
+        store.saveConfig(removedPatch);
+        console.log('[Main] 已清理配置里删掉的自带素材:', Object.keys(removedPatch).join(', '));
     }
     // 第一次运行还没选过壁纸：用图库第一张（自带深度图）。
     // 应用视频时 currentImage 可能是空的，这时不能补，否则 imageAtTime 就对不上了

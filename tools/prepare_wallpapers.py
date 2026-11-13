@@ -11,7 +11,7 @@ prepare_wallpapers.py — 生成默认壁纸图库的素材
 
 用法：
     venv/Scripts/python.exe tools/prepare_wallpapers.py --source "default wallpaper"
-    venv/Scripts/python.exe tools/prepare_wallpapers.py --source "default wallpaper" --only cat lake-forest
+    venv/Scripts/python.exe tools/prepare_wallpapers.py --source "default wallpaper" --only milky-way snowy-peaks-lake
     venv/Scripts/python.exe tools/prepare_wallpapers.py --depth-only
 
 依赖：Pillow、numpy、onnxruntime（与 generate_depth_map.py 相同）。

@@ -20,7 +20,7 @@ class VideoOverlayManager {
 
         this.config = {
             enabled: false,
-            presetId: 'snow2',
+            presetId: 'custom',
             customPath: '',
             customName: '',
             blendMode: 'auto',
@@ -28,18 +28,9 @@ class VideoOverlayManager {
             speed: 1.0,
         };
 
-        // 浏览器预览用的默认表（相对页面）；Electron 里换成主进程给的绝对路径，
-        // 打包后视频在 resources/overlay，不在 app.asar 里的页面旁边
-        this.presets = {
-            'rain1': { mode: 'screen', path: 'overlay/rain1.mp4' },
-            'rain2': { mode: 'screen', path: 'overlay/rain2.mp4' },
-            'snow1': { mode: 'screen', path: 'overlay/snow1.mp4' },
-            'snow2': { mode: 'chroma', path: 'overlay/snow2.mp4' },
-            'snow3': { mode: 'screen', path: 'overlay/snow3.mp4' },
-            'old1':  { mode: 'screen', path: 'overlay/old1.mp4' },
-            'old2':  { mode: 'screen', path: 'overlay/old2.mp4' },
-            'old3':  { mode: 'screen', path: 'overlay/old3.mp4' },
-        };
+        // 自带预设由主进程给（绝对路径，打包后视频在 resources/overlay）。
+        // 2026-11-13 起没有自带视频了，这张表是空的，只能用自己导入的视频
+        this.presets = {};
         this.presetsReady = false;
         this._loadPresets();
 
@@ -225,7 +216,9 @@ class VideoOverlayManager {
             if (mode === 'auto') mode = 'screen';
             return { path: this.config.customPath, mode: mode };
         }
-        const preset = this.presets[this.config.presetId] || this.presets['snow2'];
+        // 预设不存在（没导入视频、或者是删掉的旧预设）：没有可播的视频
+        const preset = this.presets[this.config.presetId];
+        if (!preset) return null;
         let mode = this.config.blendMode;
         if (mode === 'auto') mode = preset.mode;
         return { path: preset.path, mode: mode };
@@ -291,6 +284,7 @@ class VideoOverlayManager {
 
         const opacity = (this.config.opacity !== undefined) ? this.config.opacity : 0.85;
         const info = this._resolveCurrentVideo();
+        if (!info) return;
         if (info.mode === 'chroma' && this.canvas) {
             this.canvas.style.opacity = opacity;
         } else {
@@ -360,6 +354,7 @@ class VideoOverlayManager {
         this.isPaused = false;
         if (this.config.enabled && this.video) {
             const info = this._resolveCurrentVideo();
+            if (!info) return;
             this.video.play().catch(() => {});
             if (info.mode === 'chroma') {
                 this._startChromaLoop();
