@@ -13,11 +13,11 @@ Windows 桌面上的伪 3D 视差动态壁纸：选一张图片，AI 自动生�
 - **我的壁纸**：自己选过的图片和视频都留在壁纸页，一点就能换回来。
 - **解锁动画**：导入一段视频，每次解锁电脑后全屏播放（盖住任务栏），淡入淡出时长可调，按 Esc 或点鼠标可以跳过，放完回到桌面。程序要在运行才能播放。
 - **导入时裁剪**：导入图片壁纸、视频壁纸和解锁视频时弹出裁剪框，拖框决定留下哪一块（比如裁掉水印），比例自动按屏幕锁定；已经导入的也能重新裁。
-- **自定义元素**：导入图片 / GIF / 动态 WebP / APNG / MP4 / WebM，或使用自带的默认元素（爆炸）。
+- **自定义元素**：导入图片 / GIF / 动态 WebP / APNG / MP4 / WebM。
   - 点元素进入摆放模式：拖动移动、拖动角点缩放、调深度，Enter 确认、Esc 取消。
   - 元素随鼠标和同深度的背景一起移动，被更近的物体遮挡；新元素默认"贴地"取深度。
   - 支持绿幕抠像、循环 / 间隔播放、不透明度、显示 / 隐藏，可以同时放多个。
-- **其他装饰**：黑胶唱片机（本地音乐歌单，可列表循环 / 单曲循环 / 随机 / 顺序播放，位置可以随意拖）、全屏视频特效（雨、雪、老电影）、天气粒子。
+- **其他装饰**：黑胶唱片机（本地音乐歌单，可列表循环 / 单曲循环 / 随机 / 顺序播放，位置可以随意拖）、全屏视频特效（用自己导入的视频）、天气粒子。
 - **桌面集成**：注入到桌面图标下方的 WorkerW 层；全屏应用、锁屏、睡眠时自动暂停；托盘菜单、开机自启。
 
 ## 运行
@@ -81,8 +81,7 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 | `settings.html`、`settings/` | 设置窗口 |
 | `ui/` | 设置窗口和壁纸页共用的样式（颜色、字体、切角控件）、图标和自带字体（`ui/fonts/`） |
 | `shared/` | 主进程、渲染进程和测试共用的纯逻辑 |
-| `elements/` | 默认元素素材与 `manifest.json` |
-| `overlay/` | 全屏视频特效素材 |
+| `elements/` | 默认元素的 `manifest.json`（现在没有自带素材） |
 | `generate_depth_map.py` | Python 版深度图生成（`tools/prepare_wallpapers.py` 用；应用里用的是 `src/depth/`，结果一致） |
 | `test/`、`tools/`、`dev/` | 测试、素材预处理脚本、浏览器预览数据 |
 
@@ -101,7 +100,6 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 
 代码用 [MIT 许可证](LICENSE)。下面这些不在 MIT 范围内：
 
-- 默认壁纸（`wallpapers/`）：来自 Pexels 和 Pixabay，按各自网站的许可证使用，每张的作者写在 `wallpapers/manifest.json` 的 `credit` 里。
-- 视频素材（`overlay/`、`elements/`）。
+- 默认壁纸（`wallpapers/`）：2 张，都是 CC0（作者已放弃版权），分别来自 Pexels 和 Pixabay，作者写在 `wallpapers/manifest.json` 的 `credit` 里。
 - 字体（`ui/fonts/`）：SIL OFL 1.1，许可证文件在同一目录。
 - 深度模型 Depth Anything V2 Small（不在仓库里，安装包里带了）：Apache-2.0。

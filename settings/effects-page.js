@@ -54,7 +54,7 @@ function initEffectsPage({ api, saver, setStatus }) {
     const speedVal = document.getElementById('video-speed-val');
 
     let presets = [];
-    let currentPresetId = 'snow2';
+    let currentPresetId = 'custom';
     let customVideoPath = '';
     let customVideoName = '';
 
@@ -64,6 +64,8 @@ function initEffectsPage({ api, saver, setStatus }) {
     }
 
     function renderPresets() {
+        // 现在没有自带视频（2026-11-13 删掉了），整个预设区域收起来，只剩"自己的视频"
+        presetsGrid.hidden = presets.length === 0;
         presetsGrid.replaceChildren(...presets.map((preset) => {
             const card = el('button', 'preset' + (preset.id === currentPresetId ? ' on' : ''));
             card.type = 'button';
@@ -97,7 +99,9 @@ function initEffectsPage({ api, saver, setStatus }) {
     enabled.addEventListener('change', () => {
         showEnabled(enabled.checked);
         saver.save({ videoOverlay: { enabled: enabled.checked } });
-        setStatus(enabled.checked ? '已开启视频特效' : '已关闭视频特效');
+        const nothingToPlay = currentPresetId === 'custom' ? !customVideoPath : !presets.some((p) => p.id === currentPresetId);
+        if (enabled.checked && nothingToPlay) setStatus('已开启视频特效，先导入一个视频');
+        else setStatus(enabled.checked ? '已开启视频特效' : '已关闭视频特效');
     });
 
     function useCustom() {

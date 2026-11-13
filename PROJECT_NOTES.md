@@ -2,13 +2,13 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
+> 最近更新：2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
 - 只做**电脑端**。Android 版是单独的仓库 [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper)（本地 `C:\Users\24418\Desktop\2\Wallpaper3D phone`），2026-10-29 做到 1.1.0，移植了本项目的视差着色器（`renderer/shaders.js`）、视差数学、停帧、配置节流和深度图后处理（`src/depth/processing.js`）。改这些文件时记得两边同步，对应关系见安卓版的 `PROJECT_NOTES.md`。
 - 2026-10-27：现有功能定为 **v1** 并完成打包（取代 10-25 的"暂不考虑打包"）：`npm run build` 出 NSIS 安装包，安装版已实测，同一天以 v1.0.0 发布到 GitHub Releases。过程和以后的发版步骤见 §9 阶段 6。
-- 特效视频素材（`overlay/`、`elements/`）进 git。
+- 特效视频素材（`overlay/`、`elements/`）进 git。（2026-11-13 这些视频因为来源说不清全部删掉了，见阶段 18。）
 
 ---
 
@@ -23,7 +23,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 导入自己的图片、视频和解锁视频时可以手动裁剪（2026-11-05）：框的比例固定是屏幕比例，只记住区域，不生成新文件，见 4.7。
 
 在此之上可以叠加：
-- **自定义元素**：用户导入的图片 / GIF / 视频（含绿幕），以及自带的默认元素（两个爆炸）。元素在 Pixi 场景里渲染，和背景一样随鼠标视差，并被更近的背景物体遮挡。
+- **自定义元素**：用户导入的图片 / GIF / 视频（含绿幕）。原来还有两个自带的爆炸元素，2026-11-13 删掉了，现在没有自带元素。元素在 Pixi 场景里渲染，和背景一样随鼠标视差，并被更近的背景物体遮挡。
 - 黑胶唱片机（本地音乐）、全屏视频特效（滤色 / 绿幕）、Canvas 天气粒子。
 
 ---
@@ -136,11 +136,11 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   │   └── png.js           8 位灰度 PNG 编码
 │   ├── store.js             config.json / 深度缓存 / custom_elements 目录 / 我的壁纸缩略图（wallpaper_thumbs）/ 卸载清单
 │   ├── uninstaller.js       设置页卸载：找安装目录里的卸载程序，带上删不删数据的参数打开它
-│   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移
+│   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移（含删掉的默认壁纸）
+│   ├── removed-assets.js    删掉的自带视频特效和爆炸元素：启动时清理旧配置里的引用
 │   └── tray-manager.js      托盘菜单
-├── elements/                默认元素：manifest.json + 裁剪后的 *_cut.mp4 + 缩略图（原始 bomb*.mp4 保留）
+├── elements/                默认元素：只有 manifest.json，列表是空的（爆炸视频 2026-11-13 删掉了）
 ├── wallpapers/              默认壁纸图库：manifest.json + 图片 + depth/ + thumbs/
-├── overlay/                 全屏视频特效素材
 ├── tools/prepare_builtin_element.py  默认绿幕元素预处理（裁剪 / 缩放 / 缩略图）
 ├── tools/desktop-diagnose.bat       壁纸挂不上桌面层时收集排查信息（系统、窗口层级、日志），结果放在桌面的 txt 里
 ├── tools/prepare_wallpapers.py       默认壁纸图库素材生成（缩图 / 缩略图 / 深度图；`--depth-only` 只重算深度图）
@@ -294,7 +294,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 全屏 / 锁屏暂停 | ✅ | 自定义元素的视频和间隔计时也会暂停 |
 | 托盘、开机自启 | ✅ | 托盘"更换壁纸"：有缓存直接应用，没有就在设置窗口生成后自动应用 |
 | 黑胶唱片机 / 视频特效 / 天气粒子 | ✅ | 天气 2026-10-26 重写（贴图预渲染、景深、真实形状和飘落方式） |
-| **自定义元素系统** | ✅ | 图片 / GIF / 动态 webp / apng / mp4 / webm；默认两个爆炸；摆放模式（缩放、拉伸、旋转、翻转、自由变形）；深度遮挡；间隔播放；点击播放；抠绿幕；变色 |
+| **自定义元素系统** | ✅ | 图片 / GIF / 动态 webp / apng / mp4 / webm（自带的两个爆炸 2026-11-13 删掉了）；摆放模式（缩放、拉伸、旋转、翻转、自由变形）；深度遮挡；间隔播放；点击播放；抠绿幕；变色 |
 | 自定义贴纸 | ♻️ 已移除 | 被自定义元素取代，旧配置自动迁移 |
 | 默认壁纸图库（`wallpapers/`） | ✅ | |
 | 视频壁纸 + 我的壁纸 | ✅ 2026-11-03 | 不动 / 3D 视差 / 整体平移，可开声音；我的壁纸放自己选过的图片和视频，见 §9 阶段 11 |
@@ -332,7 +332,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 15. ~~`hideDebugPanel` 没配置时默认隐藏~~ ✅ 2026-11-03 调试面板整个删了（`index.html`、`style.css`、`renderer/main.js`、默认配置）。原因：壁纸页里它默认是显示的，要等主进程发来配置才隐藏，刚打开软件时会在桌面右上角闪出来。视差参数在设置页"视差"页调；浏览器预览也不再有这个面板。
 16. ~~天气 canvas 没按 DPR 缩放~~ ✅
 17. ~~mediump 精度~~ ✅ 改为 highp
-18. 视频素材都进了 git：`overlay/` 139MB（`old1.mp4` 53.7MB 推到 GitHub 会有警告）。素材继续增多的话考虑 Git LFS。
+18. ~~视频素材都进了 git：`overlay/` 139MB（`old1.mp4` 53.7MB 推到 GitHub 会有警告）。素材继续增多的话考虑 Git LFS。~~ 2026-11-13 视频素材都删掉了，但 git 历史里还在，仓库体积不会变小。
 19. ~~`生成深度图.bat`、`requirements.txt` 仍按 torch 路线写~~ ✅ 2026-11-10 bat 删了，`requirements.txt` 改成 venv 实际用的依赖（见阶段 5）。
 22. 深度图后处理现在有两份实现：应用里的 `src/depth/processing.js` 和 `generate_depth_map.py`（`tools/prepare_wallpapers.py` 生成默认壁纸深度图时用）。改算法要两边一起改，`test/depth-processing.test.js` 里有 Pillow 生成的对照数据。
 20. 自定义元素：摆放模式只处理主显示器；动图最多解码 600 帧；元素多了以后没有数量上限提示。
@@ -390,7 +390,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - [x] 帧率上限 60（`renderer/parallax-scene.js` 的 `MAX_FPS`），高刷新率屏幕上有动画时不再按刷新率满帧渲染。
 
 ### 阶段 4 — 其他新功能（2026-10-26 确定范围，按此顺序做）
-1. [x] 默认壁纸图库：`wallpapers/`（17 张，带深度图和缩略图，`manifest.json` 记录中文名、来源和原文件名），设置页"壁纸管理"里可折叠的"默认壁纸"面板（默认收起；界面改版后改成"壁纸"页下方平铺）。素材由 `tools/prepare_wallpapers.py` 从原图生成，改进深度图算法后重跑即可。原图目录 `default wallpaper/` 未改动、未提交，可以删除；删掉后旧的当前壁纸路径会在启动时自动换成图库里的同一张。
+1. [x] 默认壁纸图库：`wallpapers/`（17 张，2026-11-13 因授权问题删到 2 张，见阶段 18；带深度图和缩略图，`manifest.json` 记录中文名、来源和原文件名），设置页"壁纸管理"里可折叠的"默认壁纸"面板（默认收起；界面改版后改成"壁纸"页下方平铺）。素材由 `tools/prepare_wallpapers.py` 从原图生成，改进深度图算法后重跑即可。原图目录 `default wallpaper/` 未改动、未提交，可以删除；删掉后旧的当前壁纸路径会在启动时自动换成图库里的同一张。
 2. [x] 深度图质量 + 设置页深度图预览。
    - 没有用保边滤波：壁纸是按深度挪像素的，深度图边缘越锐利，移动时越容易撕开；用原图引导的保边滤波试过，还会在深度图里留下斑点。
    - 现在的后处理（`generate_depth_map.py` 的 `postprocess_depth`）：模型输出用浮点放大到输出尺寸 → 近处轮廓向外扩"模糊影响半径"那么多 → 高斯平滑（三次均值滤波逼近）。过渡带整个落在背景一侧，主体轮廓移动时保持完整，拉伸落到背景上。"边缘平滑"滑块是高斯的 σ（按输出深度图像素计），外扩距离由它算出（`blur_support`）。
@@ -687,6 +687,28 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 
 这版是在 worktree 里打的包（先 `npm ci`，再把 `depth_anything_v2_small_ir9.onnx` 复制进来），和主目录上一次的打包逐个比对：除了上面的代码，只有换行符不同；少了 `resources/app-update.yml`，因为 worktree 的 `.git` 是文件，electron-builder 认不出仓库地址，程序没有自动更新，用不到；`app.asar` 里多了一段 940KB 没被引用的 `node_modules` 内容（Pixi 的许可证和 `punycode` 等开源代码，electron-builder 写重复了），不影响运行。
 
+### ✅ 阶段 18 — 删掉授权说不清的自带素材（2026-11-13）
+起因：用户发现图片网站的许可证不允许把图用在壁纸软件里。逐张核对后（见 §9"公开分发相关"），17 张默认壁纸里只有 2 张是 CC0。自带的 10 个视频查不到来源。用户决定把不符合的壁纸和全部视频都删掉，暂时不补新素材。
+
+默认壁纸：
+- [x] `wallpapers/` 删掉 15 张图和对应的深度图、缩略图，`manifest.json` 只剩雪山镜湖、银河。新用户第一次启动默认用雪山镜湖。
+- [x] 老用户升级后，如果当前壁纸是删掉的那几张（文件已经不在了），启动时换成图库第一张，不会退回 `background.png` 再提示找不到文件。删掉的文件名列在 `src/gallery.js` 的 `REMOVED_FILES` 里；只处理 `wallpapers` 目录下、并且文件已经不在的情况，用户自己文件夹里的同名图片不受影响。
+- [x] `tools/prepare_wallpapers.py` 本身是按 manifest 处理的，不用改，只把说明里的示例 id 换成了现有的。
+
+视频：
+- [x] 删掉 `overlay/` 的 8 个视频特效（细雨、暴雨、三种雪、老电影胶片、放映机划痕、复古光斑）和 `elements/` 的两个爆炸（原始视频、`*_cut.mp4`、缩略图）。`overlay/` 目录没了，`package.json` 的 `extraResources` 去掉它；`elements/manifest.json` 留着，列表为空，以后用 `tools/prepare_builtin_element.py` 加素材时还用它。
+- [x] 主进程 `overlay:getPresets` 返回空列表（注释里写了以后怎么加回来）。视频特效只剩"自己的视频"：`videoOverlay.presetId` 默认值从 `snow2` 改成 `custom`；设置页没有预设时整块预设区收起来，没导入视频就打开开关时提示先导入。
+- [x] `renderer/video-overlay.js` 找不到预设时不再退回 `snow2`（现在会是 `undefined`，原来的写法会报错），当作没有可播的视频；`_applyPlaybackProps`、`resume` 也处理了这种情况。
+- [x] 老用户升级：`src/removed-assets.js` 的 `cleanupRemovedBuiltins` 在启动时检查配置。视频特效用的是删掉的预设时，导入过自己的视频就换成它，没有就关掉视频特效；壁纸上用 `builtin:bomb1` / `builtin:bomb2` 摆的元素直接去掉，免得列表里留着"素材已丢失"。
+- [x] `dev/dev-config.json`（浏览器预览用的假配置）去掉爆炸元素，摆放草稿改用示例 GIF。
+
+验证：`npm test` 377 个全过。用全新的数据目录启动开发版：
+- 新用户的图库显示 2 张，当前壁纸是雪山镜湖。
+- 预先在配置里写上已删除的 `wallpapers/lake-forest.jpg`，启动后换成了雪山镜湖，日志里也没有退回 `background.png`。
+- 预先在配置里开着 `snow2`、壁纸上摆一个 `builtin:bomb1`：启动后视频特效变成 `custom` 并关掉，元素被去掉；特效页预设区收起（`display: none`），元素页只剩"添加素材"；在壁纸窗口里对视频特效依次开启、暂停、恢复、改透明度、切到不存在的预设，都没有报错，也没有设置视频源。
+
+没做：git 历史和 v1.3.1 及更早的安装包里仍有删掉的图片和视频；没有补新素材。
+
 ### ✅ 阶段 5 — 收尾（2026-11-10）
 - [x] 删掉 `生成深度图.bat`：应用自己能生成深度图，它还在选早就没有的 base / large 模型。
 - [x] `requirements.txt` 改成 venv 实际装的 onnxruntime / numpy / pillow，版本锁定成和 venv 一样（`pip install --dry-run --no-index -r requirements.txt` 核对过）。第一行的 `# -*- coding: utf-8 -*-` 不能删：中文 Windows 上 pip 默认按 GBK 读这个文件，读到中文注释会报 `UnicodeDecodeError`（原来的文件也有这个问题）。ffmpeg 和 `export_onnx.py` 要的 torch 写在注释里。
@@ -709,7 +731,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - [x] 全屏应用退出、唤醒、解锁时统一走 `resumeWallpaper()`：全屏应用还开着、或正在摆放元素时不恢复渲染。
 - [x] 开机自启：开发时带上项目目录（原来开机会打开 Electron 的默认页），查询和设置用同一组参数。
 - [x] 日志：`electron-log` 写到数据目录的 `logs/main.log`，包括各窗口的控制台输出。删掉没用的 `electron-store`。
-- [x] 新用户第一次启动默认用图库第一张（湖光山色），不再是 1366×768 的 `background.png`。
+- [x] 新用户第一次启动默认用图库第一张（当时是湖光山色，2026-11-13 起是雪山镜湖），不再是 1366×768 的 `background.png`。
 - [x] 自定义视频的 file URL 改用 `Host.fileUrl`（路径带 `#` 也能打开）。
 - [x] `author` 改为 ZihengMiao；`dist/` 旧构建已清掉。
 
@@ -738,7 +760,14 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 5. 正式公开：`gh release edit v<版本> --draft=false --latest`。草稿阶段 tag 还不存在，公开时 GitHub 才创建；之后 `git fetch --tags` 同步到本地。
 
 公开分发相关（v1.0.0 已公开，下面几条仍然成立）：
-- 默认壁纸 9 张来自 Pixabay、8 张来自 Pexels（其中 1 张在 Pexels 上的作者账号叫 Pixabay，以前算成了 Pixabay），两家的许可证都限制在"壁纸类平台"上再分发，附带在免费壁纸应用里算不算属于灰色地带；要正式推广时考虑换成自己的图或授权更宽松的图。`overlay/`、`elements/` 视频没有记录来源。
+- 默认壁纸授权（2026-11-12 逐张核对了作品页，对照的是两家 2026-10-20 版条款）：原来 9 张来自 Pixabay、8 张来自 Pexels。两家条款都禁止把图片"原样"当壁纸分发（只缩放、裁剪、调色也算原样），Pexels 许可页还写明不能在其他壁纸平台上再分发，所以带在安装包和仓库里发出去不合规，不算灰色地带。2026-11-13 删掉了其余 15 张（阶段 18），只留下 CC0 的 2 张：
+  - `milky-way`（Pixabay 2695569）：2017-08-30 发布。Pixabay 条款第 4 条规定 2019-01-09 之前发布的作品是 CC0。
+  - `snowy-peaks-lake`（Pexels 459225）：Pexels 上叫 Pixabay 的账号 2017 年上传，页面数据里 license 是 CC0，但页面上只显示 Free。
+  - 删掉的 15 张（Pixabay 8 张是 2020–2025 年发布的，Pexels 7 张用的是 Pexels 许可）还在 git 历史和 v1.3.1 及更早的安装包里。
+- 视频素材（`overlay/` 8 个、`elements/` 2 个）没有记录来源，2026-11-13 全部删掉了（阶段 18），git 历史和 v1.3.1 及更早的安装包里还有。以后再加视频，要记下下载网址，并确认许可证允许随软件分发。删之前查到的情况（用户记得可能来自 wallhaven 或 Mixkit）：
+  - wallhaven 只有静态图片，没有视频。它的图是用户上传的，网站自己说版权归原作者。
+  - Mixkit 的 Stock Video Free License 允许下载、修改、分发，不要求署名；限制写在它的 User Terms 里（不能不加改动就出售、不能拿去做图库或同类服务）。能确认是 Mixkit 免费视频的，可以随软件分发。
+  - 文件元数据里没有能证明来自 Mixkit 的信息。`snow2`、`snow3` 是 Vimeo 转码的（Vimeo Artax），可能来自 Pexels 或 Pixabay（这两家的视频以前放在 Vimeo 上），那样就和删掉的图片是同一个问题。`old1`、`old3`、`rain2`、`bomb2` 是 2560×1440、用 ffmpeg 5.1 重新编码过的，不像 Mixkit 的原始文件。
 - 没有代码签名，别人运行会看到 SmartScreen 提示。
 - Electron 28 已停止安全更新。只加载本地页面，风险低，v1 可以不动。
 - ~~`package.json` 写了 `"license": "MIT"`，但仓库里没有 `LICENSE` 文件~~ ✅ 2026-11-10 补上了，README 写明了哪些不在 MIT 范围内。

@@ -52,10 +52,6 @@
     ],
     "extraResources": [
       {
-        "from": "overlay",
-        "to": "overlay"
-      },
-      {
         "from": "elements",
         "to": "elements",
         "filter": [

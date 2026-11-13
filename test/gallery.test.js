@@ -88,14 +88,31 @@ test('migrateLegacyImagePath：用户自己 wallpapers 文件夹里的同名图�
     assert.equal(migrateLegacyImagePath(current[0].file, current), current[0].file);
 });
 
-test('项目自带的图库能读出 17 张壁纸，图片、深度图、缩略图都在', () => {
+test('migrateLegacyImagePath：已移除的默认壁纸文件不在了，换成图库第一张', () => {
+    const current = loadGallery(galleryDir([cat, lake]));
+    const removed = 'C:\\Program Files\\互动3D壁纸\\resources\\wallpapers\\lake-forest.jpg';
+    assert.equal(migrateLegacyImagePath(removed, current, () => false), current[0].file);
+    // 大小写不同也认
+    assert.equal(migrateLegacyImagePath(removed.replace('lake-forest', 'Lake-Forest'), current, () => false), current[0].file);
+});
+
+test('migrateLegacyImagePath：同名图片不在 wallpapers 目录、文件还在、或图库为空时不动', () => {
+    const current = loadGallery(galleryDir([cat]));
+    const own = 'C:\\pics\\lake-forest.jpg';
+    assert.equal(migrateLegacyImagePath(own, current, () => false), own);
+    const stillThere = 'D:\\stuff\\wallpapers\\lake-forest.jpg';
+    assert.equal(migrateLegacyImagePath(stillThere, current, () => true), stillThere);
+    const removed = 'C:\\old\\wallpapers\\lake-forest.jpg';
+    assert.equal(migrateLegacyImagePath(removed, [], () => false), removed);
+});
+
+test('项目自带的图库只有 2 张 CC0 壁纸，图片、深度图、缩略图都在', () => {
     const g = loadGallery(path.join(__dirname, '..', 'wallpapers'));
-    assert.equal(g.length, 17);
+    assert.deepEqual(g.map((e) => e.id), ['snowy-peaks-lake', 'milky-way']);
     for (const e of g) {
         assert.ok(fs.existsSync(e.file), e.file);
         assert.ok(fs.existsSync(e.depth), e.depth);
         assert.ok(e.thumb && fs.existsSync(e.thumb), e.id);
         assert.ok(e.name && e.origin, e.id);
     }
-    assert.equal(new Set(g.map((e) => e.id)).size, 17, 'id 不重复');
 });
