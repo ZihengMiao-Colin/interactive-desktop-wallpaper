@@ -327,8 +327,8 @@ function stopMousePolling() {
 /** 设置窗口标题栏的颜色（和 ui/tokens.css 的 --ink / --text-2 / --bg 一致），按当前是深色还是浅色取 */
 function settingsChromeColors() {
     return nativeTheme.shouldUseDarkColors
-        ? { color: '#0b0d0f', symbolColor: '#9099a1', background: '#0f1214' }
-        : { color: '#dde1e4', symbolColor: '#535d66', background: '#e6e9eb' };
+        ? { color: '#141516', symbolColor: '#b1b1b1', background: '#0f0f10' }
+        : { color: '#eef0f1', symbolColor: '#626262', background: '#f5f5f5' };
 }
 
 /**

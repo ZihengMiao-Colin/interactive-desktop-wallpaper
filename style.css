@@ -39,26 +39,31 @@ body > canvas {
 .loading-card {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 14px 22px 14px 18px;
+    gap: 12px;
+    padding: 10px 22px 10px 12px;
 }
 
-/* 加载：菱形外框慢慢转，中间一块主色 */
+/* 加载：中间一枚空心菱形，另一枚从它身上扩散淡出 */
 #loading-spinner {
     position: relative;
-    width: 16px;
-    height: 16px;
-    margin: 4px;
-    border: 2px solid var(--text);
-    transform: rotate(45deg);
-    animation: loading-dia 2.4s var(--ease) infinite;
+    width: 32px;
+    height: 32px;
+    flex: none;
 }
-#loading-spinner::after { content: ''; position: absolute; inset: 3px; background: var(--accent); }
+#loading-spinner i {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--accent-text);
+    transform: rotate(45deg);
+}
+#loading-spinner i + i { opacity: 0; animation: loading-ripple 1.2s cubic-bezier(.2, .6, .4, 1) infinite; }
 
-@keyframes loading-dia {
-    0% { transform: rotate(45deg); }
-    50% { transform: rotate(225deg); }
-    100% { transform: rotate(405deg); }
+@keyframes loading-ripple {
+    0% { width: 16px; height: 16px; opacity: 0.9; }
+    100% { width: 28px; height: 28px; opacity: 0; }
 }
 
 #loading-text {
@@ -76,17 +81,17 @@ body > canvas {
     z-index: 99999;
     display: flex;
     align-items: center;
-    padding: 10px 18px 10px 16px;
+    padding: 10px 18px 10px 14px;
+    /* 左边一条主色。border-image 让色条和细框直角拼接，角上不会斜接出小斜边 */
+    border-left-width: var(--bar);
+    border-image: linear-gradient(to right, var(--accent) 4px, var(--line-strong) 4px) 1 1 1 4;
     font-family: var(--font);
     font-size: 13px;
     opacity: 0;
-    transform: translateX(-50%) translateY(16px);
+    transform: translateX(-50%) translateY(8px);
     pointer-events: none;
-    transition: opacity 0.3s, transform 0.3s;
+    transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
 }
-
-/* 左边一条主色竖条（画在磨砂底那一层上） */
-#status-toast { --glass-bg: linear-gradient(var(--accent), var(--accent)) left / 3px 100% no-repeat, color-mix(in srgb, var(--bg) 82%, transparent); }
 
 #status-toast.visible {
     opacity: 1;
@@ -105,11 +110,11 @@ body > canvas {
     gap: 10px;
     max-width: min(560px, 80vw);
     padding: 22px 28px;
+    /* 顶上一条红色 + 四边细框（直角拼接） */
     border: 1px solid var(--line-strong);
-    border-top: 3px solid var(--danger);
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    border-top-width: 3px;
+    border-image: linear-gradient(var(--danger) 3px, var(--line-strong) 3px) 3 1 1 1;
+    background: var(--surface);
     box-shadow: var(--shadow-3);
     color: var(--text);
     font-family: var(--font);
@@ -596,7 +601,8 @@ body > canvas {
 #placement-scale {
     min-width: 32px;
     color: var(--text);
-    font: 500 11.5px/1 var(--f-mono);
+    font: 600 12px/1 var(--f-data);
+    font-variant-numeric: tabular-nums;
     text-align: right;
 }
 
@@ -636,7 +642,7 @@ body > canvas {
 }
 
 .placement-btn:hover {
-    background: var(--raised);
+    background: var(--hover);
     color: var(--text);
 }
 
@@ -653,19 +659,18 @@ body > canvas {
     color: var(--warp);
 }
 
-/* 确认：右下单切角的主色按钮，和设置窗口的主按钮一样 */
-.placement-btn.primary {
+/* 确认：黑白反转的按钮，和设置窗口里"应用壁纸""确定"一样 */
+.placement-btn.contrast {
     padding: 0 14px;
-    background: var(--grain), var(--accent);
-    color: var(--accent-ink);
+    background: var(--inv);
+    color: var(--bg);
     font-weight: 700;
-    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
 }
 
-.placement-btn.primary:hover { background: var(--grain), var(--accent-hover); }
+.placement-btn.contrast:hover { background: var(--text-2); color: var(--bg); }
 
 /* 系统关了动画效果：去掉界面浮层的动画（唱片机、天气这些壁纸内容本身的动画不动） */
 @media (prefers-reduced-motion: reduce) {
-    #loading-spinner { animation: none; }
+    #loading-spinner i + i { animation: none; }
     #status-toast { transition: none; }
 }
