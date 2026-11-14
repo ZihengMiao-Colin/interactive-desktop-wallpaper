@@ -18,25 +18,25 @@
     <div class="shell">
         <!-- ==================== 左侧导航 ==================== -->
         <nav class="sidebar" aria-label="设置分类">
-            <button type="button" class="nav-item on" data-page="wallpaper"><svg class="i"><use href="#i-image"/></svg><span class="nav-t">壁纸<small class="en">Wallpaper</small></span></button>
-            <button type="button" class="nav-item" data-page="parallax"><svg class="i"><use href="#i-layers"/></svg><span class="nav-t">视差<small class="en">Parallax</small></span></button>
-            <button type="button" class="nav-item" data-page="elements"><svg class="i"><use href="#i-shapes"/></svg><span class="nav-t">元素<small class="en">Elements</small></span><span class="badge" data-badge="elements"></span></button>
-            <button type="button" class="nav-item" data-page="effects"><svg class="i"><use href="#i-sparkles"/></svg><span class="nav-t">特效<small class="en">Effects</small></span></button>
-            <button type="button" class="nav-item" data-page="music"><svg class="i"><use href="#i-disc-3"/></svg><span class="nav-t">唱片机<small class="en">Vinyl</small></span></button>
-            <button type="button" class="nav-item" data-page="unlock"><svg class="i"><use href="#i-lock-open"/></svg><span class="nav-t">解锁动画<small class="en">Unlock</small></span></button>
+            <button type="button" class="nav-item on" data-page="wallpaper"><svg class="i"><use href="#i-image"/></svg><span class="nav-t">壁纸</span></button>
+            <button type="button" class="nav-item" data-page="parallax"><svg class="i"><use href="#i-layers"/></svg><span class="nav-t">视差</span></button>
+            <button type="button" class="nav-item" data-page="elements"><svg class="i"><use href="#i-shapes"/></svg><span class="nav-t">元素</span><span class="badge" data-badge="elements"></span></button>
+            <button type="button" class="nav-item" data-page="effects"><svg class="i"><use href="#i-sparkles"/></svg><span class="nav-t">特效</span></button>
+            <button type="button" class="nav-item" data-page="music"><svg class="i"><use href="#i-disc-3"/></svg><span class="nav-t">唱片机</span></button>
+            <button type="button" class="nav-item" data-page="unlock"><svg class="i"><use href="#i-lock-open"/></svg><span class="nav-t">解锁动画</span></button>
             <div class="nav-spacer"></div>
-            <button type="button" class="now-using cf" id="now-using" title="查看当前壁纸" hidden>
+            <button type="button" class="now-using panel" id="now-using" title="查看当前壁纸" hidden>
                 <img id="now-using-thumb" alt="">
                 <span><small>正在使用</small><b id="now-using-name"></b></span>
             </button>
-            <button type="button" class="nav-item" data-page="system"><svg class="i"><use href="#i-settings"/></svg><span class="nav-t">设置<small class="en">System</small></span></button>
+            <button type="button" class="nav-item" data-page="system"><svg class="i"><use href="#i-settings"/></svg><span class="nav-t">设置</span></button>
         </nav>
 
         <main class="content" id="content">
 
             <!-- 壁纸没挂到桌面层时才显示（settings/main.js），放在这里所有页面都看得到 -->
-            <aside class="desktop-notice cf" id="desktop-notice" role="status" hidden>
-                <svg class="i"><use href="#i-info"/></svg>
+            <aside class="desktop-notice" id="desktop-notice" role="status" hidden>
+                <span class="hz" aria-hidden="true"></span>
                 <div>
                     <b>壁纸没能挂到桌面上</b>
                     <p>可能是安全软件（比如 360）拦下了这一步，电脑和文件都不受影响。现在壁纸放在其他程序后面，桌面图标可能被盖住，但还能点。</p>
@@ -73,7 +73,7 @@
                 </div>
 
                 <!-- 深度图状态 + 生成 / 应用 -->
-                <div class="depth-bar cf">
+                <div class="depth-bar panel">
                     <!-- 选中视频时才显示：效果和声音（settings/wallpaper-page.js） -->
                     <div class="video-ctrl" id="video-ctrl" hidden>
                         <span class="label">效果</span>
@@ -91,7 +91,7 @@
                         <!-- 鼠标移上去（或 Tab 选中）立刻显示用法，不用等系统 title 提示 -->
                         <span class="help" tabindex="0" role="button" aria-label="边缘平滑是什么" aria-describedby="blur-help">
                             <svg class="i"><use href="#i-circle-help"/></svg>
-                            <span class="help-pop cf" id="blur-help" role="tooltip">
+                            <span class="help-pop" id="blur-help" role="tooltip">
                                 <b>边缘平滑是什么？</b>
                                 <span>程序会先算出画面里每个地方离你有多远（这张"远近图"就是深度图），移动鼠标时近处和远处错开移动，看起来就有立体感。</span>
                                 <span>这个数值管的是近处物体（人、树、建筑）和后面背景交界的地方：</span>
@@ -106,14 +106,14 @@
                     </div>
                     <div class="depth-actions">
                         <button type="button" class="btn" id="btn-generate-depth" disabled><svg class="i"><use href="#i-wand-sparkles"/></svg>生成深度图</button>
-                        <button type="button" class="btn primary" id="btn-apply-wallpaper" disabled><svg class="i"><use href="#i-check"/></svg>应用壁纸</button>
+                        <button type="button" class="btn contrast" id="btn-apply-wallpaper" disabled><svg class="i"><use href="#i-check"/></svg>应用壁纸</button>
                     </div>
                 </div>
 
                 <!-- 我的壁纸：从电脑选择 + 自己选过的图片和视频（settings/my-wallpapers-panel.js） -->
                 <div class="group mine" id="mine-group">
                     <div class="group-head">
-                        <h2>我的壁纸</h2><span class="en">Mine</span>
+                        <h2>我的壁纸</h2>
                         <span class="count" id="mine-count"></span>
                         <span class="hint" id="mine-hint">你自己的图片和视频</span>
                     </div>
@@ -123,7 +123,7 @@
                 <!-- 默认壁纸图库 -->
                 <div class="group">
                     <div class="group-head">
-                        <h2 id="gallery-title">默认壁纸</h2><span class="en">Gallery</span>
+                        <h2 id="gallery-title">默认壁纸</h2>
                         <span class="count" id="gallery-count"></span>
                         <span class="hint" id="gallery-hint">自带深度图，选中后直接应用</span>
                     </div>
@@ -144,7 +144,7 @@
                     </div>
                 </div>
                 <div class="preview-slot compact" id="preview-slot-parallax"><i class="brk" aria-hidden="true"></i></div>
-                <div class="list cf">
+                <div class="list panel">
                     <div class="row">
                         <div class="row-label"><div class="t">视差强度</div><div class="d">越大，近处和远处错开得越多</div></div>
                         <div class="row-ctrl">
@@ -182,19 +182,19 @@
                 </div>
                 <div class="group first">
                     <div class="group-head">
-                        <h2>素材库</h2><span class="en">Library</span>
+                        <h2>素材库</h2>
                         <span class="hint">点一下进入摆放：拖动移动，角点缩放，Enter 确认，Esc 取消</span>
                     </div>
                     <div class="assets" id="elements-assets"></div>
                 </div>
                 <div class="group">
                     <div class="group-head">
-                        <h2>壁纸上的元素</h2><span class="en">On wallpaper</span>
+                        <h2>壁纸上的元素</h2>
                         <span class="count" id="elements-count"></span>
                     </div>
                     <div class="md">
-                        <div class="inst-list cf" id="elements-instance-list"></div>
-                        <div class="detail cf" id="elements-detail"></div>
+                        <div class="inst-list panel" id="elements-instance-list"></div>
+                        <div class="detail panel" id="elements-detail"></div>
                     </div>
                 </div>
             </section>
@@ -209,16 +209,16 @@
                 </div>
 
                 <div class="group first">
-                    <div class="group-head"><h2>天气</h2><span class="en">Weather</span></div>
+                    <div class="group-head"><h2>天气</h2></div>
                     <div class="weather" id="weather-grid">
-                        <button type="button" class="wt cf on" data-weather="none"><svg class="i"><use href="#i-ban"/></svg>无<span class="en">Off</span></button>
-                        <button type="button" class="wt cf" data-weather="rain"><svg class="i"><use href="#i-cloud-rain"/></svg>细雨<span class="en">Rain</span></button>
-                        <button type="button" class="wt cf" data-weather="snow"><svg class="i"><use href="#i-snowflake"/></svg>落雪<span class="en">Snow</span></button>
-                        <button type="button" class="wt cf" data-weather="sakura"><svg class="i"><use href="#i-flower-2"/></svg>落樱<span class="en">Sakura</span></button>
-                        <button type="button" class="wt cf" data-weather="leaves"><svg class="i"><use href="#i-leaf"/></svg>枫叶<span class="en">Maple</span></button>
-                        <button type="button" class="wt cf" data-weather="sunlight"><svg class="i"><use href="#i-sun"/></svg>光斑<span class="en">Sunbeam</span></button>
+                        <button type="button" class="wt on" data-weather="none"><svg class="i"><use href="#i-ban"/></svg>无</button>
+                        <button type="button" class="wt" data-weather="rain"><svg class="i"><use href="#i-cloud-rain"/></svg>细雨</button>
+                        <button type="button" class="wt" data-weather="snow"><svg class="i"><use href="#i-snowflake"/></svg>落雪</button>
+                        <button type="button" class="wt" data-weather="sakura"><svg class="i"><use href="#i-flower-2"/></svg>落樱</button>
+                        <button type="button" class="wt" data-weather="leaves"><svg class="i"><use href="#i-leaf"/></svg>枫叶</button>
+                        <button type="button" class="wt" data-weather="sunlight"><svg class="i"><use href="#i-sun"/></svg>光斑</button>
                     </div>
-                    <div class="list cf">
+                    <div class="list panel">
                         <div class="row">
                             <div class="row-label"><div class="t">密度</div></div>
                             <div class="row-ctrl">
@@ -245,13 +245,13 @@
 
                 <div class="group">
                     <div class="group-head">
-                        <h2>视频特效</h2><span class="en">Video overlay</span>
+                        <h2>视频特效</h2>
                         <span class="hint">盖在整张壁纸上的一层视频</span>
                         <div class="end"><label class="switch" title="开启视频特效"><input type="checkbox" id="video-overlay-enabled"><span></span></label></div>
                     </div>
                     <div class="video-area" id="video-area">
                         <div class="presets" id="video-presets-grid"></div>
-                        <div class="list cf">
+                        <div class="list panel">
                             <div class="row">
                                 <div class="row-label"><div class="t">自己的视频</div><div class="d" id="video-custom-name">还没有导入，支持 MP4 / WebM</div></div>
                                 <div class="row-ctrl">
@@ -299,7 +299,7 @@
                         <label class="switch" title="显示唱片机"><input type="checkbox" id="vinyl-enabled"><span></span></label>
                     </div>
                 </div>
-                <div class="player cf">
+                <div class="player panel halftone">
                     <div class="disc"><span class="disc-cover" id="vinyl-disc-cover"></span></div>
                     <div class="player-text">
                         <span class="en">Current track</span>
@@ -316,7 +316,7 @@
                 <!-- 歌单：拖动排序，点一首直接播放（settings/music-page.js） -->
                 <div class="group">
                     <div class="group-head">
-                        <h2>歌单</h2><span class="en">Playlist</span>
+                        <h2>歌单</h2>
                         <span class="count" id="playlist-count"></span>
                         <span class="hint">拖动调整顺序，点一首直接播放</span>
                         <div class="end">
@@ -326,7 +326,7 @@
                     <div class="playlist" id="vinyl-playlist"></div>
                 </div>
 
-                <div class="list cf">
+                <div class="list panel">
                     <div class="row">
                         <div class="row-label"><div class="t">播放顺序</div><div class="d" id="vinyl-play-mode-desc"></div></div>
                         <div class="row-ctrl">
@@ -386,7 +386,7 @@
                         <label class="switch" title="解锁时播放动画"><input type="checkbox" id="unlock-enabled" disabled><span></span></label>
                     </div>
                 </div>
-                <div class="list cf">
+                <div class="list panel">
                     <div class="row">
                         <img class="unlock-thumb" id="unlock-thumb" alt="" hidden>
                         <div class="row-label"><div class="t" id="unlock-video-name">还没有选择视频</div><div class="d" id="unlock-video-duration">选一段视频，解锁后全屏播放</div></div>
@@ -424,7 +424,7 @@
 
             <section class="page" id="page-system" aria-label="设置">
                 <div class="page-head"><div><h1>设置<span class="en">System</span></h1></div></div>
-                <div class="list cf">
+                <div class="list panel">
                     <div class="row">
                         <div class="row-label"><div class="t">界面主题</div><div class="d">只换这个设置窗口的颜色，摆放元素时的工具条保持深色</div></div>
                         <div class="row-ctrl">
@@ -442,10 +442,10 @@
                 </div>
                 <div class="group">
                     <div class="group-head">
-                        <h2>深度图缓存</h2><span class="en">Depth cache</span>
+                        <h2>深度图缓存</h2>
                         <span class="hint">你自己的图片生成的深度图存在这里</span>
                     </div>
-                    <div class="list cf">
+                    <div class="list panel">
                         <div class="row">
                             <div class="row-label"><div class="t">存放位置</div></div>
                             <div class="row-ctrl"><button type="button" class="path" id="depth-dir-path" title="点击在文件资源管理器中打开">读取中…</button></div>
@@ -464,8 +464,8 @@
                     </div>
                 </div>
                 <div class="group">
-                    <div class="group-head"><h2>卸载</h2><span class="en">Uninstall</span></div>
-                    <div class="list cf">
+                    <div class="group-head"><h2>卸载</h2></div>
+                    <div class="list panel">
                         <div class="row">
                             <div class="row-label"><div class="t">卸载软件</div><div class="d" id="uninstall-desc">从电脑上删掉互动3D壁纸，可以选择要不要一起删掉你的数据</div></div>
                             <div class="row-ctrl"><button type="button" class="btn sm danger" id="btn-uninstall"><svg class="i"><use href="#i-trash-2"/></svg>卸载软件…</button></div>
@@ -477,50 +477,57 @@
     </div>
 
     <!-- 卸载确认（设置页"卸载软件…"） -->
-    <dialog class="confirm" id="uninstall-dialog" aria-labelledby="uninstall-title">
-        <span class="hz" aria-hidden="true"></span>
-        <p class="eyebrow en">Confirm uninstall</p>
-        <h2 id="uninstall-title">卸载互动3D壁纸</h2>
-        <p>接下来会打开卸载程序，软件随后退出。在卸载程序里点"下一步"才会开始卸载；点"取消"什么都不会变。</p>
-        <label class="confirm-option">
-            <input type="checkbox" id="uninstall-delete-data">
-            <span>
-                <b>同时删除我的数据</b>
-                <small>各项设置、导入的元素、生成的深度图。你电脑里原来的图片和音乐不会删。</small>
-            </span>
-        </label>
-        <div class="confirm-actions">
-            <button type="button" class="btn ghost" id="uninstall-cancel" autofocus>取消</button>
+    <!-- 弹窗都是三段：标题栏 / 正文 / 底栏。有风险的（.risky）标题栏左边是警示斜纹 -->
+    <dialog class="dlg risky" id="uninstall-dialog" aria-labelledby="uninstall-title">
+        <div class="dlg-head">
+            <span class="hz" aria-hidden="true"></span>
+            <h2 id="uninstall-title">卸载互动3D壁纸</h2>
+            <span class="dlg-code">Confirm uninstall</span>
+        </div>
+        <div class="dlg-body">
+            <p>接下来会打开卸载程序，软件随后退出。在卸载程序里点"下一步"才会开始卸载；点"取消"什么都不会变。</p>
+            <label class="confirm-option">
+                <input type="checkbox" id="uninstall-delete-data">
+                <span>
+                    <b>同时删除我的数据</b>
+                    <small>各项设置、导入的元素、生成的深度图。你电脑里原来的图片和音乐不会删。</small>
+                </span>
+            </label>
+        </div>
+        <div class="dlg-foot">
+            <button type="button" class="btn" id="uninstall-cancel" autofocus>取消</button>
             <button type="button" class="btn danger" id="uninstall-confirm"><svg class="i"><use href="#i-trash-2"/></svg>继续卸载</button>
         </div>
     </dialog>
 
     <!-- 裁剪框（settings/crop-dialog.js）：导入壁纸、解锁视频时弹出 -->
-    <dialog class="confirm crop-dialog" id="crop-dialog" aria-labelledby="crop-title">
-        <div class="crop-head">
+    <dialog class="dlg crop-dialog" id="crop-dialog" aria-labelledby="crop-title">
+        <div class="dlg-head">
             <h2 id="crop-title">裁剪画面</h2>
             <span class="crop-name" id="crop-name"></span>
         </div>
-        <div class="crop-stage" id="crop-stage">
-            <div class="crop-box" id="crop-box">
-                <i class="crop-handle nw" data-corner="nw"></i>
-                <i class="crop-handle ne" data-corner="ne"></i>
-                <i class="crop-handle sw" data-corner="sw"></i>
-                <i class="crop-handle se" data-corner="se"></i>
+        <div class="dlg-body">
+            <div class="crop-stage" id="crop-stage">
+                <div class="crop-box" id="crop-box">
+                    <i class="crop-handle nw" data-corner="nw"></i>
+                    <i class="crop-handle ne" data-corner="ne"></i>
+                    <i class="crop-handle sw" data-corner="sw"></i>
+                    <i class="crop-handle se" data-corner="se"></i>
+                </div>
             </div>
+            <label class="crop-time" id="crop-time" hidden>
+                <span>换一帧看</span>
+                <input type="range" id="crop-time-slider" min="0" max="1" step="0.01" value="0">
+                <span class="value" id="crop-time-value">0:00</span>
+            </label>
         </div>
-        <label class="crop-time" id="crop-time" hidden>
-            <span>换一帧看</span>
-            <input type="range" id="crop-time-slider" min="0" max="1" step="0.01" value="0">
-            <span class="value" id="crop-time-value">0:00</span>
-        </label>
-        <div class="crop-foot">
-            <span class="chip accent" id="crop-ratio"></span>
+        <div class="dlg-foot crop-foot">
+            <span class="chip" id="crop-ratio"></span>
             <span class="chip warn" id="crop-lowres" hidden><svg class="i"><use href="#i-info"/></svg>比屏幕分辨率小，可能会模糊</span>
             <span class="crop-spacer"></span>
             <button type="button" class="btn sm ghost" id="crop-reset">恢复默认</button>
-            <button type="button" class="btn sm ghost" id="crop-cancel">取消</button>
-            <button type="button" class="btn sm primary" id="crop-confirm" autofocus>确定</button>
+            <button type="button" class="btn sm" id="crop-cancel">取消</button>
+            <button type="button" class="btn sm contrast" id="crop-confirm" autofocus>确定</button>
         </div>
     </dialog>
 

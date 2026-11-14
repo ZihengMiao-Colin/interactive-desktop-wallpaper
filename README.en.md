@@ -79,7 +79,7 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 | `main.js`, `preload.js`, `src/` | Electron main process, IPC, WorkerW injection, full-screen detection, config storage, depth-map generation (`src/depth/`), custom element library and placement window |
 | `index.html`, `renderer/` | Wallpaper page (also the placement window): Pixi scene, shaders, custom element layer, placement mode |
 | `settings.html`, `settings/` | Settings window |
-| `ui/` | Styles shared by the settings window and the wallpaper page (colors, fonts, cut-corner controls), icons and bundled fonts (`ui/fonts/`) |
+| `ui/` | Styles shared by the settings window and the wallpaper page (colors, fonts, base controls), icons and bundled fonts (`ui/fonts/`) |
 | `shared/` | Pure logic shared by the main process, renderer and tests |
 | `elements/` | `manifest.json` for default elements (no bundled assets at the moment) |
 | `generate_depth_map.py` | Python depth-map generator (used by `tools/prepare_wallpapers.py`; the app uses `src/depth/`, with identical results) |
@@ -93,7 +93,7 @@ For architecture details, known issues and the development plan, see [PROJECT_NO
 - **Ray marching**: each pixel searches from the nearest layer to the farthest for the first surface it hits, so near objects cover the background behind them as they move instead of being stretched into ghost copies (approach based on [depthy](https://github.com/panrafal/depthy)).
 - **Depth occlusion**: each element pixel is compared against the depth of the background content actually shown at that pixel, so occlusion edges follow foreground objects as the mouse moves.
 - **Animated images**: decoded with Chromium's built-in WebCodecs `ImageDecoder`, no third-party library.
-- **UI**: tactical-terminal style (cut-corner panels, serif Chinese headings with small English labels); all styling lives in CSS variables in `ui/tokens.css`. Fonts are bundled, all under the SIL OFL: Noto Serif SC, Saira and JetBrains Mono, from [Fontsource](https://fontsource.org/).
+- **UI**: terminal style in black, white and gray with a cyan accent (square panels, a color bar plus a thin frame, serif Chinese page titles with a few small English labels); all styling lives in CSS variables in `ui/tokens.css`. Fonts are bundled, both under the SIL OFL: Noto Serif SC and Saira, from [Fontsource](https://fontsource.org/).
 - **Data**: config lives in `%APPDATA%/interactive-desktop-wallpaper/config.json`; imported assets are copied into `custom_elements/` in the same folder, so moving the original files does not break anything.
 
 ## License

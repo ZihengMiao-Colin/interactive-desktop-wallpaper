@@ -18,14 +18,14 @@
     <!-- ==================== 加载提示 ==================== -->
     <!-- 深度图生成/加载时显示，完成后隐藏 -->
     <div id="loading-overlay">
-        <div class="loading-card glass">
-            <div id="loading-spinner"></div>
+        <div class="loading-card float">
+            <div id="loading-spinner" aria-hidden="true"><i></i><i></i></div>
             <div id="loading-text">正在加载壁纸…</div>
         </div>
     </div>
 
     <!-- ==================== 状态提示（Electron 环境） ==================== -->
-    <div id="status-toast" class="glass"></div>
+    <div id="status-toast" class="float"></div>
 
     <!-- ==================== 视频特效覆盖层 (滤色 / WebGL绿幕抠图) ==================== -->
     <video id="overlay-video" loop muted playsinline style="display: none;"></video>
@@ -75,7 +75,7 @@
     <!-- ==================== 摆放模式：自定义元素 / 唱片机（仅摆放窗口使用） ==================== -->
     <!-- 摆放唱片机时 #placement-ui 加上 vinyl-mode：藏起 element-only，显示 vinyl-only -->
     <div id="placement-ui" hidden>
-        <div id="placement-hint" class="glass">
+        <div id="placement-hint" class="float">
             <b id="placement-title">摆放元素</b>
             <span id="placement-tips">拖动移动，角点缩放，边点拉伸，圆点旋转（<kbd>Shift</kbd> 每次 15°）</span>
             <span><kbd>Enter</kbd> 确认 <kbd>Esc</kbd> 取消</span>
@@ -98,7 +98,7 @@
             <span class="handle warp" data-warp="2"></span>
             <span class="handle warp" data-warp="3"></span>
         </div>
-        <div id="placement-toolbar" class="glass">
+        <div id="placement-toolbar" class="float">
             <div class="placement-group element-only">
                 <label for="placement-depth">深度</label>
                 <input type="range" class="depth" id="placement-depth" min="0" max="100" value="50" step="1">
@@ -114,7 +114,7 @@
             <button id="placement-reset" class="placement-btn" title="清除旋转、拉伸、翻转和变形"><svg class="i"><use href="#i-rotate-ccw"/></svg>复原</button>
             <span class="placement-sep"></span>
             <button id="placement-cancel" class="placement-btn">取消</button>
-            <button id="placement-confirm" class="placement-btn primary"><svg class="i"><use href="#i-check"/></svg>确认</button>
+            <button id="placement-confirm" class="placement-btn contrast"><svg class="i"><use href="#i-check"/></svg>确认</button>
         </div>
     </div>
 

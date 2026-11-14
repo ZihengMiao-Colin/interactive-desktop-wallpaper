@@ -36,7 +36,7 @@ const UI = (() => {
         const errorEl = document.createElement('div');
         errorEl.className = 'init-error';
         const title = document.createElement('strong');
-        title.textContent = '⚠️ 初始化失败';
+        title.textContent = '初始化失败';
         const body = document.createElement('div');
         body.textContent = message;
         const hint = document.createElement('small');

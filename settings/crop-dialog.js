@@ -109,8 +109,10 @@ function initCropDialog({ api }) {
         if (!session) return;
         const { media } = session;
         const aspect = media.width / media.height;
-        const style = getComputedStyle(dialog);
-        const maxW = dialog.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        // 舞台放在弹窗正文里，能用的宽度是正文去掉左右内边距
+        const host = stage.parentElement;
+        const style = getComputedStyle(host);
+        const maxW = host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
         const reserved = media.duration ? CROP_RESERVED_HEIGHT_VIDEO : CROP_RESERVED_HEIGHT;
         const maxH = Math.max(120, window.innerHeight - 40 - reserved);
         const width = Math.min(maxW, maxH * aspect);
