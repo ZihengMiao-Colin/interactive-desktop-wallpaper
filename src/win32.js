@@ -1,5 +1,6 @@
 /**
- * win32.js — 在本进程里直接调用 user32.dll（koffi），壁纸注入、全屏检测、桌面点击检测共用
+ * win32.js — 在本进程里直接调用 user32.dll（koffi），壁纸注入、全屏检测、桌面点击检测共用；
+ * 诊断报告列进程用 kernel32.dll
  *
  * 为什么不用 PowerShell 子进程（以前的做法）：
  *   有的电脑上安全软件不让程序启动隐藏的 PowerShell，spawn 直接报 EPERM / UNKNOWN，
@@ -29,6 +30,9 @@ const SMTO_NORMAL = 0;
 /** 发给 Progman 的消息最多等这么久（毫秒） */
 const SEND_MESSAGE_TIMEOUT_MS = 2000;
 
+const TH32CS_SNAPPROCESS = 0x00000002;
+const INVALID_HANDLE_VALUE = -1;
+
 const HWND_BOTTOM = 1;
 const SW_SHOW = 5;
 const SWP_NOSIZE = 0x0001;
@@ -57,6 +61,25 @@ function load() {
 
     koffi.struct('RECT', { left: 'int32_t', top: 'int32_t', right: 'int32_t', bottom: 'int32_t' });
     koffi.struct('POINT', { x: 'int32_t', y: 'int32_t' });
+
+    // 列进程（诊断报告用）：句柄用 intptr_t，失败返回的 INVALID_HANDLE_VALUE 到 JS 里就是 -1
+    const kernel32 = koffi.load('kernel32.dll');
+    const PROCESSENTRY32W = koffi.struct('PROCESSENTRY32W', {
+        dwSize: 'uint32_t',
+        cntUsage: 'uint32_t',
+        th32ProcessID: 'uint32_t',
+        th32DefaultHeapID: 'uintptr_t',
+        th32ModuleID: 'uint32_t',
+        cntThreads: 'uint32_t',
+        th32ParentProcessID: 'uint32_t',
+        pcPriClassBase: 'int32_t',
+        dwFlags: 'uint32_t',
+        szExeFile: koffi.array('char16_t', 260, 'String'),
+    });
+    const CreateToolhelp32Snapshot = kernel32.func('intptr_t __stdcall CreateToolhelp32Snapshot(uint32_t flags, uint32_t pid)');
+    const Process32FirstW = kernel32.func('int __stdcall Process32FirstW(intptr_t snapshot, _Inout_ PROCESSENTRY32W *entry)');
+    const Process32NextW = kernel32.func('int __stdcall Process32NextW(intptr_t snapshot, _Inout_ PROCESSENTRY32W *entry)');
+    const CloseHandle = kernel32.func('int __stdcall CloseHandle(intptr_t handle)');
 
     const FindWindowExW = user32.func('uintptr_t __stdcall FindWindowExW(uintptr_t parent, uintptr_t after, const char16_t *cls, const char16_t *title)');
     const GetClassNameW = user32.func('int __stdcall GetClassNameW(uintptr_t hwnd, _Out_ void *name, int size)');
@@ -135,6 +158,22 @@ function load() {
         },
 
         windowFromPoint: (point) => WindowFromPoint(point),
+
+        /** 正在运行的所有进程的 exe 文件名（诊断报告里认安全软件、别的壁纸软件） */
+        listProcessNames() {
+            const snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if (!snapshot || snapshot === INVALID_HANDLE_VALUE) throw new Error('CreateToolhelp32Snapshot failed');
+            try {
+                const entry = { dwSize: koffi.sizeof(PROCESSENTRY32W) };
+                const names = [];
+                for (let ok = Process32FirstW(snapshot, entry); ok; ok = Process32NextW(snapshot, entry)) {
+                    names.push(entry.szExeFile);
+                }
+                return names;
+            } finally {
+                CloseHandle(snapshot);
+            }
+        },
 
         // ---- 会发消息，工作线程 ----
 

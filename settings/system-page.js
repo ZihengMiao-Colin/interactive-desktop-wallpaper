@@ -1,5 +1,5 @@
 /**
- * system-page.js — 设置窗口"设置"页：界面主题、开机自启、深度图缓存位置和清除、卸载软件
+ * system-page.js — 设置窗口"设置"页：界面主题、开机自启、深度图缓存位置和清除、问题反馈、卸载软件
  */
 
 'use strict';
@@ -64,6 +64,40 @@ function initSystemPage({ api, saver, setStatus, onCacheCleared }) {
         await api.clearAllCache();
         onCacheCleared();
         setStatus('深度图缓存已清除');
+    });
+
+    // ---- 问题反馈：生成诊断报告（桌面上的 txt）、到 GitHub 反馈、打开日志文件夹 ----
+    const reportBtn = document.getElementById('btn-diag-report');
+    const githubBtn = document.getElementById('btn-diag-github');
+    const NO_REPORT_HINT = '。可以点"打开文件夹"，把里面的 main.log 发给开发者';
+
+    /** 收集显卡信息要几秒，生成中两个按钮都不能点 */
+    async function runDiagnostics(action, { done, failed }) {
+        reportBtn.disabled = true;
+        githubBtn.disabled = true;
+        setStatus('正在生成诊断报告…');
+        try {
+            const res = await action();
+            if (res && res.success) setStatus(done(res), 'success');
+            else setStatus(failed + ((res && res.error) || '未知错误') + NO_REPORT_HINT, 'error');
+        } catch (err) {
+            setStatus(failed + err.message + NO_REPORT_HINT, 'error');
+        } finally {
+            reportBtn.disabled = false;
+            githubBtn.disabled = false;
+        }
+    }
+
+    reportBtn.addEventListener('click', () => runDiagnostics(api.diagnostics.generateReport, {
+        done: (res) => `已生成 ${res.fileName}，已在文件夹里选中，发给开发者就行`,
+        failed: '诊断报告没有生成：',
+    }));
+    githubBtn.addEventListener('click', () => runDiagnostics(api.diagnostics.openGitHubFeedback, {
+        done: (res) => `已打开反馈页，把 ${res.fileName} 拖到输入框里上传`,
+        failed: '已打开反馈页，但诊断报告没有生成：',
+    }));
+    document.getElementById('btn-diag-logs').addEventListener('click', async () => {
+        if (!(await api.diagnostics.openLogDir())) setStatus('打不开日志文件夹', 'error');
     });
 
     // ---- 卸载：确认框里选要不要删数据，然后打开卸载程序（软件随即退出） ----

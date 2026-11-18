@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-14（界面按更新后的 `ark-style-ui` 重做：直角面板、中性灰配青色、色条加细框，去掉切角和磨砂，见阶段 19）；2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
+> 最近更新：2026-11-18（诊断报告和问题反馈：设置页 / 托盘一键生成 txt 报告、到 GitHub 反馈、主进程出错时弹中文提示框、补记窗口和 GPU 进程崩溃，见阶段 20）；2026-11-14（界面按更新后的 `ark-style-ui` 重做：直角面板、中性灰配青色、色条加细框，去掉切角和磨砂，见阶段 19）；2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -45,7 +45,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 平台 | 仅 Windows，仅主显示器 |
 
 - 启动：`npm start`；`npm run dev` 会打开 DevTools。
-- 打包：`npm run build`。日志在数据目录的 `logs/main.log`（主进程和各窗口的控制台输出都在里面，打包后排查问题看这个）。
+- 打包：`npm run build`。日志在数据目录的 `logs/main.log`（主进程和各窗口的控制台输出都在里面，页面的错误带文件名和行号，打包后排查问题看这个）。别人电脑上出问题时让对方点设置页"设置"→"问题反馈"→"生成报告"，把桌面上的 txt 发过来（见阶段 20）。
 - 测试：`npm test`；Python 用 `venv/Scripts/python.exe -m unittest tools/test_<名字>.py`（`test_generate_depth_map`、`test_prepare_wallpapers`、`test_prepare_builtin_element`）。
 - 浏览器预览（不用启动 Electron 就能看渲染效果）：`venv/Scripts/python.exe -m http.server 8765`，打开 `http://localhost:8765/index.html`；摆放模式加 `?mode=edit`。数据来自 `dev/dev-config.json`。
 
@@ -134,15 +134,25 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   │   ├── inference-process.js 推理子进程（utilityProcess）：缩放 → ONNX → 后处理 → PNG
 │   │   ├── processing.js    数值处理（Pillow 兼容的 bicubic、外扩、三次均值模糊、量化）
 │   │   └── png.js           8 位灰度 PNG 编码
+│   ├── diagnostics/         诊断报告和问题反馈（阶段 20）
+│   │   ├── index.js         生成报告（收集 → 拼 txt → 去掉用户名 → 存桌面 → 选中）、到 GitHub 反馈
+│   │   ├── collect.js       收集各部分信息，每部分单独 try
+│   │   ├── report.js        拼报告、GitHub 用的摘要、文件名、存文件（BOM + CRLF，桌面写不进去就换地方）
+│   │   ├── redact.js        去掉路径里的 Windows 用户名
+│   │   ├── logs.js          读日志末尾、挑最近的 error / warn
+│   │   ├── software.js      从进程名认出安全软件、别的壁纸软件
+│   │   ├── github.js        新建 issue 的地址（控制长度）
+│   │   ├── error-prompt.js  主进程出错时的中文提示框（限频）
+│   │   └── crash-log.js     窗口 / 子进程崩溃、窗口没响应、页面控制台输出（带行号）写进日志
 │   ├── store.js             config.json / 深度缓存 / custom_elements 目录 / 我的壁纸缩略图（wallpaper_thumbs）/ 卸载清单
 │   ├── uninstaller.js       设置页卸载：找安装目录里的卸载程序，带上删不删数据的参数打开它
 │   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移（含删掉的默认壁纸）
 │   ├── removed-assets.js    删掉的自带视频特效和爆炸元素：启动时清理旧配置里的引用
-│   └── tray-manager.js      托盘菜单
+│   └── tray-manager.js      托盘菜单（含"问题反馈"子菜单）
 ├── elements/                默认元素：只有 manifest.json，列表是空的（爆炸视频 2026-11-13 删掉了）
 ├── wallpapers/              默认壁纸图库：manifest.json + 图片 + depth/ + thumbs/
 ├── tools/prepare_builtin_element.py  默认绿幕元素预处理（裁剪 / 缩放 / 缩略图）
-├── tools/desktop-diagnose.bat       壁纸挂不上桌面层时收集排查信息（系统、窗口层级、日志），结果放在桌面的 txt 里
+├── tools/desktop-diagnose.bat       壁纸挂不上桌面层时收集排查信息（系统、窗口层级、"显示桌面"前后的变化、日志），结果放在桌面的 txt 里。没打进安装包，一般情况用软件里的诊断报告就够了（阶段 20）
 ├── tools/prepare_wallpapers.py       默认壁纸图库素材生成（缩图 / 缩略图 / 深度图；`--depth-only` 只重算深度图）
 ├── dev/                     浏览器预览用的假配置和示例 GIF
 ├── build/installer.nsh      NSIS 自定义脚本：卸载向导的"同时删除我的数据"勾选框、删数据、删开机自启
@@ -240,6 +250,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | `app:getUninstallInfo` / `app:uninstall` | R→M | 能不能卸载（开发版、找不到卸载程序时不能）/ 打开卸载程序（带 `{ deleteData }`）并退出 |
 | `app:getScreenInfo` | R→M | 主显示器的宽高和缩放比例（裁剪框的比例和"可能会模糊"的提示用） |
 | `app:isOnDesktopLayer` | R→M | 壁纸有没有挂到桌面层，注入结束才返回（没挂上时设置窗口显示提示） |
+| `diagnostics:generateReport` / `openGitHubFeedback` / `openLogDir` | R→M | 问题反馈：生成诊断报告（`{ success, path, fileName }` 或 `{ success: false, error }`）/ 先生成报告再打开 GitHub 反馈页（报告失败也打开）/ 打开日志文件夹 |
 | `renderer:ready`、`app:*` | R→M | 就绪通知、应用控制 |
 
 ---
@@ -303,6 +314,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 设置窗口 / 壁纸页界面 | ✅ 2026-10-26 改版，10-31 换成战术终端风格，11-14 按更新后的 skill 重做 | 左侧导航分六页、统一控件和 Lucide 图标、实时视差预览；摆放模式、Toast 同一套样式。现在的样子（11-14）：直角面板、中性灰配青色、色条加细框、宋体页面标题配英文小字，见 §9 阶段 19；夜间 / 日间 / 跟随系统主题见阶段 10 |
 | 打包后独立运行 | ✅ v1 | NSIS 安装包，见 §9 阶段 6 |
 | 卸载 | ✅ 2026-10-31 | 设置页"卸载软件…"或 Windows 设置 → 应用，两边都能选要不要删数据，见 §9 阶段 9 |
+| 诊断报告 / 问题反馈 | ✅ 2026-11-18 | 设置页和托盘一键生成 txt 报告（去掉用户名）、到 GitHub 反馈；主进程出错弹中文提示框；补记窗口和 GPU 进程崩溃，见 §9 阶段 20 |
 | 多显示器 | ❌ 不支持 | |
 
 ---
@@ -364,6 +376,12 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
     - 别的窗口最小化后、壁纸被压回去之前（最多 1 秒）如果窗口又恢复，会短暂被盖住。实测"显示桌面"开关隔 2.5 秒时没出现。
     - 只在这台电脑的桌面结构上实测过（Windows 11，图标层在 Progman 里）。Windows 10 和更早的 Windows 11 上图标层在单独的 WorkerW 里，`HWND_BOTTOM` 可能落到 WorkerW 下面，那样壁纸看不见（不挡程序），日志 `[WorkerW] Fallback:` 这一行写着壁纸下面紧挨着谁。
     - 没测重启资源管理器、换分辨率、多显示器。
+35. 诊断报告（阶段 20）的限制：
+    - 壁纸、音乐的文件名没去掉（报告开头提醒了用户）。
+    - "到 GitHub 反馈"要 GitHub 账号，国内网络可能打不开，所以还留着直接发 txt 的办法。
+    - 每次运行第一次生成要等 5 秒左右（收集完整显卡信息），慢的电脑最多 15 秒。
+    - 页面里的错误只有文件名和行号，没有堆栈（`console-message` 事件不带）。
+    - 程序完全打不开（还没跑到 JS）时用不了，只能让用户手动发 `%APPDATA%\interactive-desktop-wallpaper\logs\main.log`。
 
 ---
 
@@ -724,6 +742,19 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 验证：`npm test` 377 个全过。Electron 实测（复制真实配置到单独的数据目录，开调试端口截图）：夜间看了六个页面、选中壁纸后的预览、问号说明、卸载确认框、裁剪框（文件对话框在主进程里换成返回指定文件）、导入示例 GIF 后走了一遍"摆放 → 确认"、元素页的调整面板；日间看了壁纸、特效、唱片机页和卸载确认框；壁纸窗口里的 Toast 和加载提示；820×560 没有横向滚动；默认窗口下第一排默认壁纸连名字都在一屏内；模拟"减少动画"时换页动画和按钮过渡都没了；思源宋体和 Saira 确实加载了。浏览器预览看了摆放模式，控制台没有报错。
 - 没测：系统按钮那一条的新颜色（调试截图截不到窗口外框）；选中视频时的操作栏（测试配置里没有视频壁纸）；视频特效的预设缩略图（现在没有自带预设）；没装思源字体的电脑；打包后的安装版。
 - 顺带发现、没改的：问号说明在默认窗口里往下弹，底下几行超出窗口，要滚动才看得全（按尺寸算，改之前也是往下弹；没有回到旧版本实测）。
+
+### ✅ 阶段 20 — 诊断报告和问题反馈（2026-11-18）
+用户的问题：软件在别人电脑上出问题时拿不到报错信息。设计见 `docs/superpowers/specs/2026-11-18-diagnostics-design.md`（用户说"按你的判断来干"，里面的决定都是助手定的）。
+- 入口：设置页"设置"→"问题反馈"（生成报告 / 打开反馈页… / 打开日志文件夹）；托盘"问题反馈"子菜单（设置窗口打不开时用）；主进程出错时的中文提示框。
+- 报告（`src/diagnostics/`）：一个 txt（UTF-8 带 BOM、CRLF，老记事本也能看），放桌面，写不进去时退到"下载"、数据目录，生成后在资源管理器里选中。内容：版本、系统（Windows 11 的注册表里还写着 Windows 10，按版本号改）、处理器和内存、安装和数据目录；显示器的物理分辨率、缩放、刷新率（主显示器问系统，Electron 的换算会把 2560 算成 2561）；显卡（`getGPUInfo('complete')`，每次运行第一次要 5 秒左右，之后有缓存，超过 15 秒退回 basic）；桌面层状态和壁纸窗口的父窗口链（`describeWallpaperWindow`）、暂停原因、当前壁纸文件在不在；命中名单的安全软件和壁纸 / 桌面美化软件（koffi 调 `CreateToolhelp32Snapshot` 列进程，不启动外部程序）；最近 30 条 error / warn（去掉开 DevTools 时的安全警告）；`config.json`；日志最后 1500 行。每部分单独 try，失败只写一行原因。
+- 去掉用户名：只换 `Users\<用户名>` 这种路径里的（反斜杠、正斜杠、JSON 转义、URL 编码、8.3 短名都换），不全文替换：用户名是 24418 这种数字时会误伤时间戳。壁纸、音乐的文件名不去，报告开头写了。
+- GitHub 反馈：先生成报告，再打开 `issues/new?title=…&body=…`。正文有问题描述的位置、"把 xxx.txt 拖进来"、自动填的基本信息和最近 5 条错误；整个地址控制在 6000 字符内（中文编码后一个字占 9 个字符）。报告存不下来也打开，只是不提拖文件。
+- 报错提示框（`error-prompt.js`）：替换 electron-log 默认的英文框（`showDialog: false`）。只对未捕获异常弹；同一时间一个，关掉后 10 分钟内不再弹，可以勾"本次运行不再提示"。`startApp` 出错是 rejection，原来连框都没有，现在单独 `.catch`，按钮只有生成报告 / 退出。
+- 补记日志（`crash-log.js`）：窗口进程退出（`render-process-gone`）、GPU 等子进程退出（`child-process-gone`）、窗口没响应。正常退出、退出程序过程中、深度图子进程用完被 kill 的只记 info。页面的控制台输出改成自己记（`watchRendererConsole`，替代 electron-log 的 `spyRendererConsole`），错误和警告后面带"（文件名:行号）"。启动日志第一行带上版本、系统和 Electron 版本。
+- 顺手修的：托盘"打开深度图文件夹..."点了没反应（`createTray` 只把一部分回调转给菜单，漏了它）；托盘"关于"写死的 v1.0.0 改成真实版本号。
+- 试过没用的：在 preload 里监听 `window` 的 `error` 拿行号。开着 contextIsolation 时，页面脚本的异常只派发给页面自己的 world，preload 收不到。
+- 验证：`npm test` 457 个全过（新增 80 个）。Electron 实测（单独的数据目录 + 调试端口；桌面路径指到临时目录，"在文件夹里选中"、打开浏览器、系统提示框都换成只记录）：设置页三个按钮、生成中按钮不能点、提示文字；报告内容（真实显卡、2560×1600 240Hz、挂上桌面层后的 WorkerW → Progman、认出 360 的 `ZhuDongFangYu.exe`、整份报告搜不到用户名）；GitHub 地址（1597 字符，标题、正文对）；主进程故意抛异常：中文框、选"生成诊断报告"真的生成了，3 秒后的第二个异常只记日志；壁纸窗口 `forcefullyCrashRenderer`、`chrome://gpucrash` 都记成 error；设置页加载一个会抛异常的脚本，日志带"（boom.js:3）"；820 宽没有横向滚动。
+- 没测：托盘菜单的真实点击；真的弹出系统提示框、真的打开资源管理器和浏览器（都换成了记录）；GitHub 页面能不能正确填上（地址格式是 GitHub 文档里的）；启动失败的提示框（只有单元测试）；日间主题；打包后的安装版。
 
 ### ✅ 阶段 5 — 收尾（2026-11-10）
 - [x] 删掉 `生成深度图.bat`：应用自己能生成深度图，它还在选早就没有的 base / large 模型。

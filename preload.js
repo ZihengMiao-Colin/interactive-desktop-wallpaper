@@ -226,6 +226,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** 打开卸载程序并退出软件：{ success, error? } */
     uninstall: (deleteData) => ipcRenderer.invoke('app:uninstall', { deleteData }),
 
+    // ==================== 问题反馈 ====================
+
+    diagnostics: {
+        /** 生成诊断报告，存到桌面并在资源管理器里选中：{ success, path?, fileName?, error? } */
+        generateReport: () => ipcRenderer.invoke('diagnostics:generateReport'),
+        /** 先生成报告，再用浏览器打开 GitHub 的反馈页（基本信息已填好）：结果同上，报告失败也会打开 */
+        openGitHubFeedback: () => ipcRenderer.invoke('diagnostics:openGitHubFeedback'),
+        /** 打开日志文件夹 → 是否打开了 */
+        openLogDir: () => ipcRenderer.invoke('diagnostics:openLogDir'),
+    },
+
     // ==================== 渲染控制事件（主进程 → 渲染进程） ====================
 
     /**

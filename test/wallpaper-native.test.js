@@ -9,7 +9,7 @@ childProcess.spawn = () => {
     throw Object.assign(new Error('spawn EPERM'), { code: 'EPERM' });
 };
 
-const { injectToWallpaperLayer, findWallpaperWorker, toHwndNumber, showBehindOtherWindows } = require('../src/wallpaper-native');
+const { injectToWallpaperLayer, findWallpaperWorker, toHwndNumber, showBehindOtherWindows, describeWallpaperWindow } = require('../src/wallpaper-native');
 
 const DESKTOP_ROOT = 0x1000C;
 const SHELL_PID = 100;
@@ -42,6 +42,12 @@ function fakeDesktop(windows, { refuseSetParent = 0 } = {}) {
         },
         getParentWindow(hwnd) {
             return hwnd === DESKTOP_ROOT ? 0 : find(hwnd).parent;
+        },
+        /** 最外层的祖先窗口（顶层窗口就是它自己） */
+        getRootWindow(hwnd) {
+            let h = hwnd;
+            while (find(h).parent !== DESKTOP_ROOT) h = find(h).parent;
+            return h;
         },
         async sendMessage(hwnd, msg, wParam, lParam) {
             this.spawnMessages.push({ hwnd, msg, wParam, lParam });
@@ -369,4 +375,29 @@ test('窗口关掉后停止检查', async (t) => {
     api.getWindowBelow = () => { reads += 1; return 0; };
     t.mock.timers.tick(5000);
     assert.equal(reads, 0);
+});
+
+// ==================== 诊断报告用的窗口描述 ====================
+
+test('诊断：挂上桌面层后，写出壁纸窗口和它上面的 WorkerW、Progman', async () => {
+    const api = fakeDesktop([...modernDesktop(), self]);
+    await inject(api);
+    const lines = describeWallpaperWindow(self.hwnd, { api });
+    assert.match(lines[0], /^self Chrome_WidgetWin_1 hwnd=0x99 .*style=0x/);
+    assert.match(lines[1], /^parent WorkerW hwnd=0x13/);
+    assert.match(lines[2], /^parent Progman hwnd=0x10/);
+    assert.equal(lines.length, 3);
+});
+
+test('诊断：兜底模式下是顶层窗口，写出下面紧挨着谁', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const api = fallbackDesktop();
+    await startFallback(fakeWindow(), api);
+    const lines = describeWallpaperWindow(self.hwnd, { api });
+    assert.equal(lines.length, 2);
+    assert.match(lines[1], /^top-level, next below: Progman hwnd=0x10/);
+});
+
+test('诊断：窗口句柄无效时写一行说明', () => {
+    assert.deepEqual(describeWallpaperWindow(null, { api: fakeDesktop([]) }), ['invalid window handle']);
 });

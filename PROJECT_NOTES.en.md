@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-14 (UI redone with the updated `ark-style-ui`: square panels, neutral grays with a cyan accent, a color bar plus a thin frame, no more cut corners or frosted glass, see Phase 19); 2026-11-13 (deleted built-in assets with unclear licensing: only the 2 CC0 default wallpapers remain, and all built-in video effects and explosion elements are gone, see Phase 18; the license check is under "Public distribution notes" in §9); 2026-11-10 (wrap-up: added `LICENSE` and cleaned up the Python dependencies, see §9 Phase 5; before that, v1.3.1: the wallpaper no longer covers other programs when it can't attach to the desktop layer, see Phase 17; cropping on import, see Phase 16)
+> Last updated: 2026-11-18 (diagnostic report and feedback: one-click txt report from the settings page or tray, feedback on GitHub, a Chinese prompt when the main process throws, window and GPU process crashes now logged, see Phase 20); 2026-11-14 (UI redone with the updated `ark-style-ui`: square panels, neutral grays with a cyan accent, a color bar plus a thin frame, no more cut corners or frosted glass, see Phase 19); 2026-11-13 (deleted built-in assets with unclear licensing: only the 2 CC0 default wallpapers remain, and all built-in video effects and explosion elements are gone, see Phase 18; the license check is under "Public distribution notes" in §9); 2026-11-10 (wrap-up: added `LICENSE` and cleaned up the Python dependencies, see §9 Phase 5; before that, v1.3.1: the wallpaper no longer covers other programs when it can't attach to the desktop layer, see Phase 17; cropping on import, see Phase 16)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -44,7 +44,7 @@ On top of that you can layer:
 | Platform | Windows only, primary monitor only |
 
 - Start: `npm start`; `npm run dev` opens DevTools.
-- Package: `npm run build`. Logs are in `logs/main.log` in the data folder (output from the main process and every window's console; check this when debugging the packaged build).
+- Package: `npm run build`. Logs are in `logs/main.log` in the data folder (output from the main process and every window's console, with file and line for page errors; check this when debugging the packaged build). When the app fails on someone else's computer, ask them to click settings page "设置" → "问题反馈" → "生成报告" and send the txt from their Desktop (see Phase 20).
 - Tests: `npm test`; Python: `venv/Scripts/python.exe -m unittest tools/test_<name>.py` (`test_generate_depth_map`, `test_prepare_wallpapers`, `test_prepare_builtin_element`).
 - Browser preview (see the rendering without starting Electron): `venv/Scripts/python.exe -m http.server 8765`, open `http://localhost:8765/index.html`; add `?mode=edit` for placement mode. Data comes from `dev/dev-config.json`.
 
@@ -133,15 +133,25 @@ On top of that you can layer:
 │   │   ├── inference-process.js Inference child process (utilityProcess): resize → ONNX → post-process → PNG
 │   │   ├── processing.js    Numeric processing (Pillow-compatible bicubic, dilation, triple box blur, quantization)
 │   │   └── png.js           8-bit grayscale PNG encoder
+│   ├── diagnostics/         Diagnostic report and feedback (Phase 20)
+│   │   ├── index.js         Generate a report (collect → build txt → remove user name → save to Desktop → select it), GitHub feedback
+│   │   ├── collect.js       Collects each part, each in its own try
+│   │   ├── report.js        Builds the report, the GitHub summary, the file name; saves it (BOM + CRLF, another folder if the Desktop is not writable)
+│   │   ├── redact.js        Removes the Windows user name from paths
+│   │   ├── logs.js          Reads the end of the log, picks recent errors / warnings
+│   │   ├── software.js      Recognizes security software and other wallpaper tools by process name
+│   │   ├── github.js        The new-issue URL (length kept in check)
+│   │   ├── error-prompt.js  The Chinese prompt when the main process throws (rate-limited)
+│   │   └── crash-log.js     Logs window / child process crashes, unresponsive windows, page console output (with line numbers)
 │   ├── store.js             config.json / depth cache / custom_elements folder / My wallpapers thumbnails (wallpaper_thumbs) / uninstall list
 │   ├── uninstaller.js       Uninstall from the settings page: find the uninstaller in the install folder and launch it with the delete-data choice
 │   ├── gallery.js           Default wallpaper gallery: read manifest, look up by path, migrate old paths (including deleted default wallpapers)
 │   ├── removed-assets.js    Deleted built-in video effects and explosion elements: clean up references in old configs at startup
-│   └── tray-manager.js      Tray menu
+│   └── tray-manager.js      Tray menu (including the "问题反馈" feedback submenu)
 ├── elements/                Default elements: only manifest.json, with an empty list (the explosion videos were deleted on 2026-11-13)
 ├── wallpapers/              Default wallpaper gallery: manifest.json + images + depth/ + thumbs/
 ├── tools/prepare_builtin_element.py  Default green-screen element preprocessing (crop / scale / thumbnail)
-├── tools/desktop-diagnose.bat       Collects troubleshooting info (system, window hierarchy, log) into a txt on the Desktop when the wallpaper will not attach to the desktop layer
+├── tools/desktop-diagnose.bat       Collects troubleshooting info (system, window hierarchy, before/after "Show desktop", log) into a txt on the Desktop when the wallpaper will not attach to the desktop layer. Not in the installer; the in-app diagnostic report is usually enough (Phase 20)
 ├── tools/prepare_wallpapers.py       Default wallpaper gallery asset generation (downscale / thumbnail / depth map; `--depth-only` recomputes depth maps only)
 ├── dev/                     Fake config and sample GIF for browser preview
 ├── build/installer.nsh      NSIS custom script: "Also delete my data" checkbox in the uninstall wizard, deleting data, removing the startup entry
@@ -241,6 +251,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | `app:getUninstallInfo` / `app:uninstall` | R→M | Whether uninstalling is possible (not in the dev build or without an uninstaller) / launch the uninstaller (with `{ deleteData }`) and quit |
 | `app:getScreenInfo` | R→M | Primary display size and scale factor (for the crop box ratio and the "may look blurry" hint) |
 | `app:isOnDesktopLayer` | R→M | Whether the wallpaper is attached to the desktop layer; returns once injection has finished (the settings window shows a notice if not) |
+| `diagnostics:generateReport` / `openGitHubFeedback` / `openLogDir` | R→M | Feedback: generate a diagnostic report (`{ success, path, fileName }` or `{ success: false, error }`) / generate a report, then open the GitHub feedback page (opens even if the report failed) / open the log folder |
 | `renderer:ready`, `app:*` | R→M | Ready notification, app control |
 
 ---
@@ -306,6 +317,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | Settings window / wallpaper page UI | ✅ redesigned 2026-10-26, restyled as a tactical terminal 10-31, redone with the updated skill 11-14 | Six pages in a left nav, unified controls and Lucide icons, live parallax preview; placement mode and Toast share the same style. Current look (11-14): square panels, neutral grays with a cyan accent, a color bar plus a thin frame, serif Chinese page titles with a small English label, see §9 Phase 19; for the dark / light / follow-system theme see Phase 10 |
 | Standalone packaged build | ✅ v1 | NSIS installer, see §9 Phase 6 |
 | Uninstall | ✅ 2026-10-31 | Settings page "卸载软件…" or Windows Settings → Apps; both let you choose whether to delete data, see §9 Phase 9 |
+| Diagnostic report / feedback | ✅ 2026-11-18 | One-click txt report (user name removed) from the settings page and tray, feedback on GitHub; a Chinese prompt when the main process throws; window and GPU process crashes logged, see §9 Phase 20 |
 | Multiple monitors | ❌ Not supported | |
 
 ---
@@ -367,6 +379,12 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
     - If a window is restored after being minimized but before the wallpaper is pushed back (1 second at most), it can be covered briefly. This did not happen when "Show desktop" was toggled 2.5 seconds apart.
     - Only measured on this computer's desktop structure (Windows 11, icon layer inside Progman). On Windows 10 and older Windows 11 the icon layer is in a separate WorkerW, so `HWND_BOTTOM` may land below that WorkerW; the wallpaper would then be invisible (without blocking programs). The `[WorkerW] Fallback:` log line says what is directly below the wallpaper.
     - Not tested: restarting Explorer, changing the resolution, multiple monitors.
+35. Limits of the diagnostic report (Phase 20):
+    - Wallpaper and music file names are not removed (the report reminds the user at the top).
+    - "到 GitHub 反馈" (feedback on GitHub) needs a GitHub account and may not load on networks in mainland China, which is why sending the txt directly is still offered.
+    - The first report in each run takes about 5 s (collecting full GPU info), up to 15 s on slow computers.
+    - Page errors only have the file name and line, no stack (the `console-message` event does not carry one).
+    - Useless when the app cannot start at all (before any JS runs); the user then has to send `%APPDATA%\interactive-desktop-wallpaper\logs\main.log` by hand.
 
 ---
 
@@ -727,6 +745,19 @@ The user updated their own skill `ark-style-ui` (it now follows the in-game and 
 - Verification: all 377 `npm test` tests pass. Real Electron run (real config copied into a separate data directory, screenshots through the debugging port): in dark, the six pages, the preview with a wallpaper selected, the help popover, the uninstall dialog, the crop dialog (file dialog replaced in the main process to return a given file), a full "place → confirm" run after importing the sample GIF, and the adjust panel on the elements page; in light, the wallpaper, effects and vinyl pages and the uninstall dialog; the Toast and loading hint in the wallpaper window; no horizontal scrolling at 820×560; at the default size the first row of default wallpapers fits on one screen including the names; with "reduce motion" emulated the page-switch animation and button transitions are gone; Noto Serif SC and Saira really loaded. The browser preview was checked for placement mode with no console errors.
 - Not tested: the new colors of the system-button strip (debug screenshots do not capture the window frame); the action bar with a video selected (no video wallpaper in the test config); preset thumbnails for video effects (there are no built-in presets now); a machine without Noto Sans installed; the packaged installer.
 - Noticed and left alone: the help popover opens downward at the default window size and its last few lines fall outside the window, so you have to scroll to read them (going by the sizes it opened downward before this change too; not checked against the old version).
+
+### ✅ Phase 20 — Diagnostic report and feedback (2026-11-18)
+The user's problem: when the app fails on someone else's computer, there is no way to get the error. Design: `docs/superpowers/specs/2026-11-18-diagnostics-design.md` (the user said "go with your judgment", so the decisions there are the assistant's).
+- Entry points: settings page "设置" (Settings) → "问题反馈" (Feedback) (generate report / open feedback page… / open log folder); a "问题反馈" submenu in the tray (for when the settings window will not open); a Chinese prompt when the main process throws.
+- The report (`src/diagnostics/`): one txt (UTF-8 with BOM, CRLF, so old Notepad shows it too), saved on the Desktop, falling back to Downloads and then the data folder if the Desktop is not writable, then selected in Explorer. Contents: version, OS (the Windows 11 registry still says Windows 10, so it is corrected by build number), CPU and memory, install and data folders; each display's physical resolution, scaling and refresh rate (the primary display asks the system, because Electron's conversion turns 2560 into 2561); GPU (`getGPUInfo('complete')`, about 5 s the first time in each run and cached after that, falling back to basic after 15 s); desktop layer state and the wallpaper window's parent chain (`describeWallpaperWindow`), pause reasons, whether the current wallpaper file exists; security software and wallpaper / desktop tools that match a known list (processes listed with koffi through `CreateToolhelp32Snapshot`, no external program started); the last 30 error / warn entries (minus the security warnings DevTools prints); `config.json`; the last 1500 log lines. Each part has its own try; a failure only adds one line with the reason.
+- Removing the user name: only inside paths like `Users\<name>` (backslashes, forward slashes, JSON escapes, URL encoding and 8.3 short names are all handled), never a global replace: a numeric user name like 24418 would also hit timestamps. Wallpaper and music file names are kept, and the report says so at the top.
+- GitHub feedback: generate the report first, then open `issues/new?title=…&body=…`. The body has a place to describe the problem, "drag xxx.txt in here", the basic info filled in automatically, and the last 5 errors; the whole URL stays under 6000 characters (one Chinese character is 9 characters once encoded). If the report cannot be saved the page still opens, just without the drag hint.
+- Error prompt (`error-prompt.js`): replaces electron-log's default English box (`showDialog: false`). Only uncaught exceptions show it; one at a time, not again within 10 minutes of closing, and "本次运行不再提示" (don't show again this run) can be ticked. A failure in `startApp` is a rejection and used to show nothing at all; it now has its own `.catch`, with only "generate report" / "quit".
+- New log entries (`crash-log.js`): window process exits (`render-process-gone`), GPU and other child process exits (`child-process-gone`), unresponsive windows. Clean exits, exits while quitting, and the depth-map process being killed after use are info only. Page console output is now logged by our own `watchRendererConsole` (instead of electron-log's `spyRendererConsole`), and errors and warnings end with "(file:line)". The first startup log line now includes the version, OS and Electron version.
+- Fixed along the way: the tray's "打开深度图文件夹..." (open depth map folder) did nothing (`createTray` passed only some callbacks to the menu and missed this one); the tray's "关于" (About) showed a hard-coded v1.0.0 instead of the real version.
+- Tried and dropped: listening to `window` `error` events in the preload to get line numbers. With contextIsolation on, exceptions from page scripts are only dispatched to the page's own world, so the preload never sees them.
+- Verification: `npm test` all 457 pass (80 new). Real Electron run (separate data folder + debugging port; the Desktop path pointed at a temp folder, and "select in folder", opening the browser and system message boxes replaced with recorders): the three buttons on the settings page, buttons disabled while generating, the toast text; the report contents (real GPU, 2560×1600 240Hz, WorkerW → Progman once attached, 360's `ZhuDongFangYu.exe` recognized, the user name nowhere in the report); the GitHub URL (1597 characters, title and body correct); an exception thrown on purpose in the main process: the Chinese box appeared, choosing "生成诊断报告" really generated a report, and a second exception 3 s later was only logged; `forcefullyCrashRenderer` on the wallpaper window and `chrome://gpucrash` were both logged as errors; a script that throws, loaded into the settings page, was logged with "(boom.js:3)"; no horizontal scrolling at 820 wide.
+- Not tested: real clicks on the tray menu; real system message boxes, Explorer and browser (all replaced with recorders); whether GitHub fills in the page correctly (the URL format is from GitHub's docs); the startup-failure prompt (unit tests only); the light theme; the installed packaged build.
 
 ### ✅ Phase 5 — Wrap-up (2026-11-10)
 - [x] Deleted `生成深度图.bat` (the "generate depth map" batch file): the app generates depth maps itself, and the bat still offered base / large models that have long been gone.
