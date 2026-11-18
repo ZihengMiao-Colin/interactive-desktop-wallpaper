@@ -204,6 +204,29 @@ function dumpDesktop(api, target, progman, phase) {
         + ` style=0x${(api.getStyle(target) >>> 0).toString(16)} parent=${hex(api.getParentWindow(target))}`);
 }
 
+/**
+ * 诊断报告用：壁纸窗口现在挂在哪。挂在桌面层时列出一层层父窗口，顶层窗口（兜底模式）列出下面紧挨着谁。
+ * @param {Buffer|number} handle - getNativeWindowHandle() 的结果
+ * @returns {string[]}
+ */
+function describeWallpaperWindow(handle, { api } = {}) {
+    const win32 = api || getWin32();
+    const target = toHwndNumber(handle);
+    if (!target) return ['invalid window handle'];
+
+    const lines = [`self ${describeWindow(win32, target)} style=0x${(win32.getStyle(target) >>> 0).toString(16)}`];
+    const root = win32.getRootWindow(target);
+    if (root === target) {
+        const below = win32.getWindowBelow(target);
+        lines.push(`top-level, next below: ${below ? describeWindow(win32, below) : 'none'}`);
+        return lines;
+    }
+    for (let hwnd = win32.getParentWindow(target); hwnd; hwnd = hwnd === root ? 0 : win32.getParentWindow(hwnd)) {
+        lines.push(`parent ${describeWindow(win32, hwnd)}`);
+    }
+    return lines;
+}
+
 // ==================== 注入 ====================
 
 async function findProgman(api, delay) {
@@ -391,4 +414,5 @@ module.exports = {
     showBehindOtherWindows,
     findWallpaperWorker,
     toHwndNumber,
+    describeWallpaperWindow,
 };

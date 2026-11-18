@@ -35,7 +35,7 @@ npm start
 - `npm run dev`: also opens DevTools.
 - The settings window opens on launch: choose a wallpaper, generate depth maps, tweak parameters, manage custom elements. After you close it the app stays in the tray; launch the app again or click the tray icon (right-click → "打开设置", Open settings) to bring it back. When started at login it only shows the wallpaper, without the settings window.
 - The "设置" (settings) page of the settings window lets you switch the interface theme: dark (default), light, or follow system.
-- Logs are in `%APPDATA%/interactive-desktop-wallpaper/logs/main.log`.
+- If something goes wrong: "设置" (Settings) page in the settings window → "问题反馈" (Feedback) → "生成报告" (Generate report) creates a txt on your Desktop (system and GPU info plus the recent log, with your Windows user name removed from paths) that you can send to the developer; with a GitHub account, "打开反馈页…" (Open feedback page) files an issue directly. If the settings window will not open, the tray menu has "问题反馈" too. If the app does not start at all, send the log file `%APPDATA%/interactive-desktop-wallpaper/logs/main.log` directly.
 - Uninstalling: "设置" (Settings) page in the settings window → "卸载软件…" (Uninstall), or Windows Settings → Apps. Either way you can choose whether to also delete your data (settings, imported elements, generated depth maps); your own original images and music are never deleted.
 
 ## Packaging

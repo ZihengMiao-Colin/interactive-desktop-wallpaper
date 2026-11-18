@@ -38,15 +38,39 @@ const {
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 // ---- 日志：主进程和各窗口的控制台输出都写进 userData/logs/main.log（打包后没有控制台可看） ----
+// 窗口的控制台输出用自己的 watchRendererConsole 记（错误带文件名和行号），不用 electron-log 的 spyRendererConsole
 const log = require('electron-log/main');
-log.initialize({ preload: false, spyRendererConsole: true });
-log.errorHandler.startCatching();
+const { watchProcessCrashes, watchWindowHealth, watchRendererConsole } = require('./src/diagnostics/crash-log');
+log.initialize({ preload: false });
 Object.assign(console, log.functions);
+watchRendererConsole({ app, logger: log });
+
+// ---- 主进程出错时弹中文提示框（替换 electron-log 默认的英文框），可以直接生成诊断报告 ----
+// 尽早接上，启动早期的异常也能接住。生成报告、退出用到的函数在后面定义，弹框要等 app ready，那时都已经有了。
+// Promise 没处理的 rejection 只记日志不弹框（和 electron-log 原来的规则一样）
+const { createErrorPrompt } = require('./src/diagnostics/error-prompt');
+const errorPrompt = createErrorPrompt({
+    showDialog: async (options) => {
+        await app.whenReady();
+        return dialog.showMessageBox(options);
+    },
+    onReport: () => generateReportWithNotice(),
+    onQuit: () => cleanupAndQuit(),
+});
+log.errorHandler.startCatching({
+    showDialog: false,
+    onError: ({ error, errorName }) => {
+        if (errorName !== 'Unhandled rejection') errorPrompt.notify(error);
+    },
+});
 
 // ---- 自定义模块 ----
-const { injectToWallpaperLayer, showBehindOtherWindows } = require('./src/wallpaper-native');
+const { injectToWallpaperLayer, showBehindOtherWindows, describeWallpaperWindow } = require('./src/wallpaper-native');
+const { createDiagnostics } = require('./src/diagnostics');
+const { collectDiagnostics, windowsName } = require('./src/diagnostics/collect');
 const { createTray, updateTrayMenu } = require('./src/tray-manager');
 const { FullscreenDetector } = require('./src/fullscreen-detector');
 const { DesktopClickWatcher } = require('./src/desktop-click-watcher');
@@ -92,6 +116,9 @@ let settingsWindow = null;
 
 /** 壁纸窗口挂到桌面层了没有。没挂上（兜底模式）时它是普通顶层窗口 */
 let onDesktopLayer = false;
+
+/** 注入有结果了没有（诊断报告里区分"没挂上"和"还在挂"） */
+let injectionDone = false;
 
 /** 同一个结果，注入结束才完成：设置窗口打开时注入可能还没结束 */
 let reportDesktopLayer;
@@ -223,6 +250,7 @@ function createWallpaperWindow() {
             if (!wallpaperWindow || wallpaperWindow.isDestroyed()) return;
 
             onDesktopLayer = injected;
+            injectionDone = true;
             reportDesktopLayer(injected);
 
             if (injected) {
@@ -253,6 +281,7 @@ function createWallpaperWindow() {
         stopMousePolling();
         wallpaperWindow = null;
     });
+    watchWindowHealth(wallpaperWindow, '壁纸窗口', log);
 
     return wallpaperWindow;
 }
@@ -388,6 +417,7 @@ function createSettingsWindow() {
     settingsWindow.on('closed', () => {
         settingsWindow = null;
     });
+    watchWindowHealth(settingsWindow, '设置窗口', log);
 
     return settingsWindow;
 }
@@ -867,6 +897,11 @@ function registerIpcHandlers() {
         return true;
     });
 
+    // ---- 问题反馈（设置页）：生成诊断报告、到 GitHub 反馈、打开日志文件夹 ----
+    ipcMain.handle('diagnostics:generateReport', () => diagnostics.generateReport());
+    ipcMain.handle('diagnostics:openGitHubFeedback', () => diagnostics.openGitHubFeedback());
+    ipcMain.handle('diagnostics:openLogDir', async () => (await openLogDir()) === '');
+
     // ---- 退出应用 ----
     ipcMain.on('app:quit', () => {
         cleanupAndQuit();
@@ -1085,13 +1120,117 @@ function cleanupAndQuit() {
     app.quit();
 }
 
+// ==================== 诊断报告 ====================
+// 设置页"问题反馈"、托盘"问题反馈"、报错提示框共用。设计见 docs/superpowers/specs/2026-11-18-diagnostics-design.md
+
+/** 日志文件：[main.old.log, main.log]（main.log 超过大小时 electron-log 把它改名成 .old） */
+function logFiles() {
+    const current = log.transports.file.getFile().path;
+    const { dir, name, ext } = path.parse(current);
+    return [path.join(dir, `${name}.old${ext}`), current];
+}
+
+/** @returns {Promise<string>} 打开成功是空字符串，否则是错误信息（shell.openPath 的约定） */
+function openLogDir() {
+    return shell.openPath(path.dirname(logFiles()[1]));
+}
+
+/** 报告里要去掉的 Windows 用户名 */
+function currentUserName() {
+    try {
+        return os.userInfo().username;
+    } catch (_) {
+        return path.basename(os.homedir());
+    }
+}
+
+const diagnostics = createDiagnostics({
+    collect: () => collectDiagnostics({
+        app,
+        screen,
+        primaryScreenSize: () => getWin32().getScreenSize(),
+        store,
+        logFiles: logFiles(),
+        getAutoLaunch,
+        launchedAtLogin,
+        getState: () => ({
+            desktopLayer: injectionDone ? onDesktopLayer : null,
+            renderingActive: isRenderingActive,
+            screenLocked: isScreenLocked,
+            suspended: isSuspended,
+            placing: isPlacing,
+            unlockHolding: !!(unlockAnimation && unlockAnimation.holdsWallpaper),
+        }),
+        getWallpaperHandle: () => (wallpaperWindow && !wallpaperWindow.isDestroyed() ? wallpaperWindow.getNativeWindowHandle() : null),
+        describeWindow: (handle) => describeWallpaperWindow(handle),
+        listProcessNames: () => getWin32().listProcessNames(),
+        resolveCurrent: (config) => myWallpapers.resolveCurrent(config),
+    }),
+    username: currentUserName(),
+    // 桌面写不进去（被安全软件拦、OneDrive 同步出问题）时依次退到"下载"、数据目录
+    getSaveDirs: () => ['desktop', 'downloads', 'userData'].map((name) => {
+        try {
+            return app.getPath(name);
+        } catch (_) {
+            return null;
+        }
+    }),
+    shell,
+    logger: log,
+});
+
+/** 报告没生成：告诉用户日志在哪，可以直接发日志 */
+async function showReportFailure(error) {
+    const { response } = await dialog.showMessageBox({
+        type: 'error',
+        title: '互动3D壁纸',
+        message: '诊断报告没有生成',
+        detail: `${error}\n\n也可以直接把日志文件发给开发者：\n${logFiles()[1]}`,
+        buttons: ['打开日志文件夹', '关闭'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+    });
+    if (response === 0) await openLogDir();
+}
+
+/** 托盘、报错提示框用：生成报告，失败时弹框说明（设置页自己在状态栏显示结果） */
+async function generateReportWithNotice() {
+    const result = await diagnostics.generateReport();
+    if (!result.success) await showReportFailure(result.error);
+    return result;
+}
+
+async function openGitHubFeedbackWithNotice() {
+    const result = await diagnostics.openGitHubFeedback();
+    if (!result.success) await showReportFailure(result.error);
+    return result;
+}
+
+/** 日志里写的窗口名字 */
+function windowName(webContents) {
+    if (wallpaperWindow && !wallpaperWindow.isDestroyed() && wallpaperWindow.webContents === webContents) return '壁纸窗口';
+    if (settingsWindow && !settingsWindow.isDestroyed() && settingsWindow.webContents === webContents) return '设置窗口';
+    try {
+        const url = new URL(webContents.getURL());
+        return `窗口（${path.basename(url.pathname)}${url.search}）`;
+    } catch (_) {
+        return '窗口';
+    }
+}
+
+// 窗口进程、GPU 进程等崩溃写进日志（以前没记，别人电脑上显卡驱动出问题时日志里什么都看不到）
+watchProcessCrashes({ app, logger: log, nameOf: windowName });
+
 // ==================== 应用生命周期 ====================
 
 // 允许壁纸后台播放音频，免除手势交互限制
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 function startApp() {
-    console.log('[Main] App starting...');
+    // 版本和系统写在最前面：用户只发来日志时也知道是什么环境
+    console.log(`[Main] App starting... v${app.getVersion()}${app.isPackaged ? '' : ' (dev)'}`
+        + `, ${windowsName(os.version(), os.release())} ${os.release()} ${os.arch()}, Electron ${process.versions.electron}`);
 
     // 1. 初始化数据存储
     store = new AppStore();
@@ -1180,6 +1319,9 @@ function startApp() {
             }
             await shell.openPath(dir);
         },
+        onReport: () => generateReportWithNotice(),
+        onGitHubFeedback: () => openGitHubFeedbackWithNotice(),
+        onOpenLogDir: () => openLogDir(),
         onQuit: () => cleanupAndQuit(),
         getAutoLaunch,
         setAutoLaunch,
@@ -1211,7 +1353,12 @@ if (app.requestSingleInstanceLock()) {
         // 第二个实例启动时，打开设置窗口
         createSettingsWindow();
     });
-    app.whenReady().then(startApp);
+    // 启动流程出错是 Promise 的 rejection，不会走到 errorPrompt 的未捕获异常，单独接住：
+    // 这时托盘可能还没建好，提示框只给"生成诊断报告" / "退出程序"
+    app.whenReady().then(startApp).catch((err) => {
+        console.error('[Main] 启动失败:', err);
+        errorPrompt.notify(err, { fatal: true });
+    });
 } else {
     app.quit();
 }

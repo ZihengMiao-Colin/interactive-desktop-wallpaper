@@ -5,7 +5,7 @@
  *
  * 功能：
  *   - 在任务栏右下角创建托盘图标
- *   - 提供右键菜单：更换壁纸、调整参数、开机自启、退出
+ *   - 提供右键菜单：更换壁纸、调整参数、开机自启、问题反馈、退出
  *   - 左键单击打开设置窗口
  * ============================================================================
  */
@@ -20,19 +20,17 @@ const fs = require('fs');
  * @param {Object} callbacks - 菜单回调函数
  * @param {Function} callbacks.onOpenSettings - 打开设置窗口
  * @param {Function} callbacks.onSelectImage - 选择新图片
+ * @param {Function} callbacks.onOpenDepthDir - 打开深度图文件夹
+ * @param {Function} callbacks.onReport - 生成诊断报告
+ * @param {Function} callbacks.onGitHubFeedback - 到 GitHub 反馈
+ * @param {Function} callbacks.onOpenLogDir - 打开日志文件夹
  * @param {Function} callbacks.onQuit - 退出应用
  * @param {Function} callbacks.getAutoLaunch - 获取开机自启状态
  * @param {Function} callbacks.setAutoLaunch - 设置开机自启状态
  * @returns {Tray}
  */
 function createTray(callbacks) {
-    const {
-        onOpenSettings,
-        onSelectImage,
-        onQuit,
-        getAutoLaunch,
-        setAutoLaunch,
-    } = callbacks;
+    const { onOpenSettings } = callbacks;
 
     // 创建托盘图标（使用内置简单图标或自定义图标）
     let trayIcon;
@@ -53,14 +51,8 @@ function createTray(callbacks) {
         onOpenSettings();
     });
 
-    // 构建托盘菜单
-    updateTrayMenu(tray, {
-        onOpenSettings,
-        onSelectImage,
-        onQuit,
-        getAutoLaunch,
-        setAutoLaunch,
-    });
+    // 构建托盘菜单（回调整个传过去：以前只挑了几个，"打开深度图文件夹"的回调被漏掉，点了没反应）
+    updateTrayMenu(tray, callbacks);
 
     return tray;
 }
@@ -73,6 +65,9 @@ function updateTrayMenu(tray, callbacks) {
         onOpenSettings,
         onSelectImage,
         onOpenDepthDir,
+        onReport,
+        onGitHubFeedback,
+        onOpenLogDir,
         onQuit,
         getAutoLaunch,
         setAutoLaunch,
@@ -104,13 +99,23 @@ function updateTrayMenu(tray, callbacks) {
         },
         { type: 'separator' },
         {
+            // 设置窗口打不开时也能从这里生成报告
+            label: '问题反馈',
+            submenu: [
+                { label: '生成诊断报告（发给开发者）', click: () => onReport() },
+                { label: '到 GitHub 反馈...', click: () => onGitHubFeedback() },
+                { type: 'separator' },
+                { label: '打开日志文件夹', click: () => onOpenLogDir() },
+            ],
+        },
+        {
             label: '关于',
             click: () => {
                 const { dialog } = require('electron');
                 dialog.showMessageBox({
                     type: 'info',
                     title: '关于 互动3D壁纸',
-                    message: '互动3D壁纸 v1.0.0',
+                    message: `互动3D壁纸 v${app.getVersion()}`,
                     detail: '基于 Pixi.js + Electron 的伪3D深度视差桌面壁纸。\n使用 Depth Anything V2 生成深度图。',
                 });
             },
