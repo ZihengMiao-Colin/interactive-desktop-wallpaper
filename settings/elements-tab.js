@@ -2,8 +2,8 @@
  * elements-tab.js — 设置窗口"元素"页
  *
  * 上面是素材库（默认元素 + 自己添加的 + "添加素材"格），点素材进入摆放模式；
- * 下面左右两栏：左边是壁纸上的元素列表（可直接显示 / 隐藏），右边是选中元素的调整面板：
- * 深度、不透明度、颜色、播放方式、抠像，以及重新摆放和删除。
+ * 下面左右两栏：左边是壁纸上的元素列表（可直接显示 / 隐藏），右边是选中元素的调整面板，
+ * 分成"位置 / 颜色 / 播放 / 抠像"几个标签，一次只显示一组；标题栏里是重新摆放、显示 / 隐藏和删除。
  * 位置、大小、旋转、翻转、变形都在摆放模式里直接在壁纸上调。
  */
 
@@ -21,6 +21,10 @@ const CLICK_HINT = {
     follow: '平时隐藏，点击桌面空白处就在那里播放一次',
     element: '平时停在第一帧，点中它时播放一次',
 };
+/** 调整面板的标签 */
+const TAB_LABEL = { position: '位置', color: '颜色', playback: '播放', chroma: '抠像' };
+/** 标签带小点时的提示 */
+const TAB_MARK_TITLE = { color: '颜色调过', chroma: '绿幕抠像已打开' };
 
 /**
  * @param {{ api: object, setStatus: (msg: string, cls?: string) => void, setBadge: (page: string, text: string) => void }} deps
@@ -39,6 +43,8 @@ function initElementsTab({ api, setStatus, setBadge }) {
     let elements = { library: [], instances: [] };
     /** 右栏正在显示的元素 */
     let selectedId = null;
+    /** 右栏当前标签：切换元素、重绘时沿用 */
+    let activeTab = 'position';
     let holdUntil = 0;
     let pendingRender = null;
     const saveTimers = new Map();
@@ -187,7 +193,7 @@ function initElementsTab({ api, setStatus, setBadge }) {
         return item;
     }
 
-    // ---------- 壁纸上的元素：右栏调整面板 ----------
+    // ---------- 壁纸上的元素：右栏调整面板（分页：一次只显示一组） ----------
 
     /** 一行：标签 + 控件 + 数值 */
     function drow(label, control, valueEl) {
@@ -216,47 +222,30 @@ function initElementsTab({ api, setStatus, setBadge }) {
         return drow(label, control, valueEl);
     }
 
-    function section(title, endNode) {
-        const box = el('div', 'dsec');
-        const h3 = el('h3', '', title);
-        if (endNode) {
-            const end = el('span', 'end');
-            end.appendChild(endNode);
-            h3.appendChild(end);
-        }
-        box.appendChild(h3);
-        return box;
-    }
-
-    function renderPositionSection(instance) {
+    /** 位置：深度、不透明度 */
+    function renderPositionPane(instance) {
         const id = instance.id;
-        const box = section('位置');
-        box.appendChild(rangeRow('深度', 0, 100, Math.round(instance.depth * 100),
-            (v) => (v / 100).toFixed(2), (v) => saveInstance(id, { depth: v / 100 }), 'depth'));
-        box.appendChild(rangeRow('不透明度', 10, 100, Math.round(instance.opacity * 100),
-            (v) => v + '%', (v) => saveInstance(id, { opacity: v / 100 })));
-        box.appendChild(el('div', 'note', '大小、旋转、翻转和变形在摆放模式里直接拖。'));
-        return box;
+        return [
+            rangeRow('深度', 0, 100, Math.round(instance.depth * 100),
+                (v) => (v / 100).toFixed(2), (v) => saveInstance(id, { depth: v / 100 }), 'depth'),
+            rangeRow('不透明度', 10, 100, Math.round(instance.opacity * 100),
+                (v) => v + '%', (v) => saveInstance(id, { opacity: v / 100 })),
+            el('div', 'note', '大小、旋转、翻转和变形在摆放模式里直接拖。'),
+        ];
     }
 
-    /** 颜色：色相、饱和度、亮度、染色 */
-    function renderColorSection(instance) {
+    /** 颜色：色相、饱和度、亮度、染色（"恢复原色"在标签栏右端） */
+    function renderColorPane(instance) {
         const id = instance.id;
         const fx = Shared.elements.effectsOf(instance);
-        const reset = button('btn sm ghost', null, '恢复原色');
-        reset.addEventListener('click', () => {
-            // 不走 hold：希望收到新配置后立刻重绘，滑块回到默认位置
-            clearTimeout(saveTimers.get(id));
-            holdUntil = 0;
-            api.elements.updateInstance(id, { effects: { ...Shared.elements.DEFAULT_EFFECTS } });
-        });
-        const box = section('颜色', reset);
-        box.appendChild(rangeRow('色相', -180, 180, Math.round(fx.hue),
-            (v) => (v > 0 ? '+' : '') + v + '°', (v) => saveInstance(id, { effects: { hue: v } }), 'hue'));
-        box.appendChild(rangeRow('饱和度', 0, 200, Math.round(fx.saturation * 100),
-            (v) => v + '%', (v) => saveInstance(id, { effects: { saturation: v / 100 } })));
-        box.appendChild(rangeRow('亮度', 20, 200, Math.round(fx.brightness * 100),
-            (v) => v + '%', (v) => saveInstance(id, { effects: { brightness: v / 100 } })));
+        const rows = [
+            rangeRow('色相', -180, 180, Math.round(fx.hue),
+                (v) => (v > 0 ? '+' : '') + v + '°', (v) => saveInstance(id, { effects: { hue: v } }), 'hue'),
+            rangeRow('饱和度', 0, 200, Math.round(fx.saturation * 100),
+                (v) => v + '%', (v) => saveInstance(id, { effects: { saturation: v / 100 } })),
+            rangeRow('亮度', 20, 200, Math.round(fx.brightness * 100),
+                (v) => v + '%', (v) => saveInstance(id, { effects: { brightness: v / 100 } })),
+        ];
 
         // 染色：色块（点开选颜色）+ 强度滑块
         const swatch = el('label', 'swatch');
@@ -282,13 +271,13 @@ function initElementsTab({ api, setStatus, setBadge }) {
         });
         const tint = el('div', 'tint');
         tint.append(swatch, amount);
-        box.appendChild(drow('染色', tint, amountVal));
-        return box;
+        rows.push(drow('染色', tint, amountVal));
+        return rows;
     }
 
-    function renderPlaybackSection(instance) {
+    /** 播放：方式（循环 / 间隔播放 / 点击播放）和对应的选项 */
+    function renderPlaybackPane(instance) {
         const id = instance.id;
-        const box = section('播放');
 
         const seg = el('div', 'seg');
         for (const mode of ['loop', 'interval', 'click']) {
@@ -299,11 +288,10 @@ function initElementsTab({ api, setStatus, setBadge }) {
         }
         const segWrap = el('div');
         segWrap.appendChild(seg);
-        box.appendChild(drow('方式', segWrap));
+        const modeRow = drow('方式', segWrap);
 
         const intervalRow = rangeRow('播完等待', 1, 120, instance.playback.intervalSec,
             (v) => v + ' 秒', (v) => saveInstance(id, { playback: { intervalSec: v } }));
-        box.appendChild(intervalRow);
 
         // 点击播放：在点击位置出现，或者点中元素时播放
         const clickHint = el('div', 'note');
@@ -315,7 +303,6 @@ function initElementsTab({ api, setStatus, setBadge }) {
         const followWrap = el('div');
         followWrap.appendChild(follow.root);
         const followRow = drow('点击处出现', followWrap);
-        box.append(followRow, clickHint);
 
         let mode = ['interval', 'click'].includes(instance.playback.mode) ? instance.playback.mode : 'loop';
         const showModeRows = () => {
@@ -330,23 +317,109 @@ function initElementsTab({ api, setStatus, setBadge }) {
         });
         control.set(mode);
         showModeRows();
-        return box;
+        return [modeRow, intervalRow, followRow, clickHint];
     }
 
-    /** 绿幕抠像 */
-    function renderChromaSection(instance) {
+    /** 抠像：绿幕抠像开关，打开后才显示强度 */
+    function renderChromaPane(instance, setMark) {
         const id = instance.id;
-        let strengthRow = null;
-        const toggle = switchEl(instance.chroma.enabled, (on) => {
-            strengthRow.hidden = !on;
-            saveInstance(id, { chroma: { enabled: on } }, true);
-        }, '绿幕抠像');
-        const box = section('绿幕抠像', toggle.root);
-        strengthRow = rangeRow('抠像强度', 0, 100, Math.round(instance.chroma.strength * 100),
+        const strengthRow = rangeRow('抠像强度', 0, 100, Math.round(instance.chroma.strength * 100),
             (v) => v + '%', (v) => saveInstance(id, { chroma: { strength: v / 100 } }));
         strengthRow.hidden = !instance.chroma.enabled;
-        box.appendChild(strengthRow);
-        return box;
+        const toggle = switchEl(instance.chroma.enabled, (on) => {
+            strengthRow.hidden = !on;
+            setMark('chroma', on);
+            saveInstance(id, { chroma: { enabled: on } }, true);
+        }, '绿幕抠像');
+        const toggleWrap = el('div');
+        toggleWrap.appendChild(toggle.root);
+        return [drow('绿幕抠像', toggleWrap), strengthRow];
+    }
+
+    const PANES = {
+        position: renderPositionPane,
+        color: renderColorPane,
+        playback: renderPlaybackPane,
+        chroma: renderChromaPane,
+    };
+
+    /** 标签栏 + 一个标签内容区。切标签只换内容区；当前标签记在 activeTab，重绘时沿用 */
+    function renderTabs(instance, asset) {
+        // 图片没有播放和抠像（和以前一致）
+        const tabs = asset.type === 'image' ? ['position', 'color'] : ['position', 'color', 'playback', 'chroma'];
+        if (!tabs.includes(activeTab)) activeTab = 'position';
+
+        const bar = el('div', 'dtabs');
+        const list = el('div', 'dtab-list');
+        list.setAttribute('role', 'tablist');
+        list.setAttribute('aria-label', '调整项');
+        const pane = el('div', 'dpane');
+        pane.id = 'elements-pane';
+        pane.setAttribute('role', 'tabpanel');
+
+        const tabButtons = tabs.map((tab) => {
+            const b = el('button', 'dtab');
+            b.type = 'button';
+            b.id = 'elements-tab-' + tab;
+            b.dataset.tab = tab;
+            b.setAttribute('role', 'tab');
+            b.setAttribute('aria-controls', pane.id);
+            b.append(el('span', '', TAB_LABEL[tab]), el('i', 'dot'));
+            b.addEventListener('click', () => show(tab));
+            return b;
+        });
+        list.append(...tabButtons);
+
+        // 藏在别的标签里、和默认不一样的设置：标签上带一个小点
+        function setMark(tab, on) {
+            const b = tabButtons.find((x) => x.dataset.tab === tab);
+            if (!b) return;
+            b.classList.toggle('marked', on);
+            b.title = on ? TAB_MARK_TITLE[tab] : '';
+        }
+        setMark('color', Shared.elements.effectsAdjusted(instance));
+        setMark('chroma', !!(instance.chroma && instance.chroma.enabled));
+
+        const reset = button('btn sm ghost', null, '恢复原色');
+        reset.addEventListener('click', () => {
+            // 不走 hold：希望收到新配置后立刻重绘，滑块回到默认位置
+            clearTimeout(saveTimers.get(instance.id));
+            holdUntil = 0;
+            api.elements.updateInstance(instance.id, { effects: { ...Shared.elements.DEFAULT_EFFECTS } });
+        });
+        const end = el('span', 'end');
+        end.appendChild(reset);
+        bar.append(list, end);
+
+        function show(tab, focus) {
+            activeTab = tab;
+            for (const b of tabButtons) {
+                const on = b.dataset.tab === tab;
+                b.classList.toggle('on', on);
+                b.setAttribute('aria-selected', String(on));
+                b.tabIndex = on ? 0 : -1;
+                if (on && focus) b.focus();
+            }
+            pane.setAttribute('aria-labelledby', 'elements-tab-' + tab);
+            pane.replaceChildren(...PANES[tab](instance, setMark));
+            reset.hidden = tab !== 'color';
+        }
+
+        // 左右方向键、Home / End 在标签间切换
+        list.addEventListener('keydown', (e) => {
+            const i = tabs.indexOf(activeTab);
+            let next = null;
+            if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+            else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+            else if (e.key === 'Home') next = tabs[0];
+            else if (e.key === 'End') next = tabs[tabs.length - 1];
+            if (!next) return;
+            e.preventDefault();
+            show(next, true);
+        });
+
+        show(activeTab);
+        return [bar, pane];
     }
 
     function renderDetail(instance) {
@@ -378,10 +451,7 @@ function initElementsTab({ api, setStatus, setBadge }) {
             detail.replaceChildren(head, el('div', 'empty', '素材文件找不到了，只能删除。'));
             return;
         }
-        const parts = [head, renderPositionSection(instance), renderColorSection(instance)];
-        // 图片没有播放和抠像（和以前一致）
-        if (asset.type !== 'image') parts.push(renderPlaybackSection(instance), renderChromaSection(instance));
-        detail.replaceChildren(...parts);
+        detail.replaceChildren(head, ...renderTabs(instance, asset));
     }
 
     function renderInstances() {

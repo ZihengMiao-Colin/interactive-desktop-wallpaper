@@ -53,6 +53,17 @@ test('transformOf / effectsOf 给旧实例补齐新字段', () => {
     assert.equal(M.effectsOf({ effects: { hue: 40 } }).hue, 40);
 });
 
+test('effectsAdjusted：只有看得出变化才算调过', () => {
+    assert.equal(M.effectsAdjusted({}), false);
+    assert.equal(M.effectsAdjusted(M.createInstance(gifAsset, 'i1')), false);
+    assert.equal(M.effectsAdjusted({ effects: { hue: 30 } }), true);
+    assert.equal(M.effectsAdjusted({ effects: { saturation: 0.5 } }), true);
+    assert.equal(M.effectsAdjusted({ effects: { brightness: 1.2 } }), true);
+    assert.equal(M.effectsAdjusted({ effects: { tintAmount: 0.2 } }), true);
+    // 只换了染色颜色、强度还是 0：画面没变化
+    assert.equal(M.effectsAdjusted({ effects: { tint: '#00ff00', tintAmount: 0 } }), false);
+});
+
 test('normalizeRotation 落在 (-180, 180]', () => {
     assert.equal(M.normalizeRotation(45), 45);
     assert.equal(M.normalizeRotation(190), -170);

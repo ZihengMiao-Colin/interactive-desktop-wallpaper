@@ -87,6 +87,15 @@
         return { ...DEFAULT_EFFECTS, ...(instance.effects || {}) };
     }
 
+    /** 颜色是否调过（画面看得出变化）：只换染色颜色、强度为 0 不算 */
+    function effectsAdjusted(instance) {
+        const e = effectsOf(instance);
+        return e.hue !== DEFAULT_EFFECTS.hue
+            || e.saturation !== DEFAULT_EFFECTS.saturation
+            || e.brightness !== DEFAULT_EFFECTS.brightness
+            || e.tintAmount > 0;
+    }
+
     /** #rrggbb → [r, g, b]（0~1），写错时按白色处理 */
     function parseHexColor(hex) {
         const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
@@ -269,6 +278,7 @@
         normalizeRotation,
         transformOf,
         effectsOf,
+        effectsAdjusted,
         colorUniforms,
         defaultPlayback,
         createInstance,
