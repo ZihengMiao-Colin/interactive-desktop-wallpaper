@@ -32,6 +32,13 @@ if (isElectron && !isEditMode) {
     vinylManager.onRequestChange = (partial) => window.electronAPI.saveConfig({ vinyl: partial });
 }
 const videoOverlayManager = new VideoOverlayManager();
+// 导入的文件被挪走后主进程换了路径：正在放的歌、视频特效只换掉记着的路径，不从头重放
+if (!isEditMode) {
+    Host.onFilesRelocated((moves) => {
+        vinylManager.applyRelocations(moves);
+        videoOverlayManager.applyRelocations(moves);
+    });
+}
 
 /** 用户自定义元素（图片 / 动图 / 视频），在 Pixi 场景内渲染 */
 const elementsLayer = new ElementsLayer(Scene);

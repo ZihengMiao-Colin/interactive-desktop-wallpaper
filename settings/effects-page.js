@@ -85,6 +85,9 @@ function initEffectsPage({ api, saver, setStatus }) {
         }));
     }
 
+    /** 上次显示的时候自己的视频在不在（主进程检查完文件后和它比） */
+    const shownVideo = new Map();
+
     /** 预设卡片和"自己的视频"那一行的选中状态 */
     function renderSelection() {
         const cards = presetsGrid.querySelectorAll('.preset');
@@ -93,8 +96,29 @@ function initEffectsPage({ api, saver, setStatus }) {
         btnUseCustom.hidden = !customVideoPath;
         btnUseCustom.disabled = usingCustom;
         btnUseCustom.textContent = usingCustom ? '使用中' : '使用这个视频';
-        customName.textContent = customVideoPath ? customVideoName : '还没有导入，支持 MP4 / WebM';
+        const missing = !!customVideoPath && !api.fileExists(customVideoPath);
+        shownVideo.clear();
+        if (customVideoPath) shownVideo.set(Controls.fileKey(customVideoPath), !missing);
+        customName.textContent = customVideoPath
+            ? customVideoName + (missing ? '（找不到文件，点"导入视频…"重新选）' : '')
+            : '还没有导入，支持 MP4 / WebM';
+        customName.classList.toggle('missing', missing);
     }
+
+    // 主进程检查完文件：自己的视频找不到了（或者又找到了）时更新提示
+    api.files.onChecked((status) => {
+        if (Controls.fileStatusChanged(shownVideo, status)) renderSelection();
+    });
+
+    // 自己的视频被挪走、改名后主进程换了路径（在新配置之前到）：记着的路径和名字跟着换
+    api.files.onRelocated((moves) => {
+        const move = customVideoPath && moves.find((m) => Shared.myWallpapers.samePath(m.from, customVideoPath));
+        if (!move) return;
+        const baseName = (p) => p.split(/[\\/]/).pop();
+        if (customVideoName === baseName(move.from)) customVideoName = baseName(move.to);
+        customVideoPath = move.to;
+        renderSelection();
+    });
 
     enabled.addEventListener('change', () => {
         showEnabled(enabled.checked);

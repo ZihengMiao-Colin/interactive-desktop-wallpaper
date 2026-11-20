@@ -346,6 +346,38 @@ class AppStore {
     }
 
     /**
+     * 原图被挪走或改名后，把它的深度图缓存挪到新路径下（不用重新生成）。
+     * 深度图文件改名成新路径对应的文件名，索引换成新 key；大小和修改时间照旧，之后照常检查原图有没有被改过。
+     * @param {string} oldPath
+     * @param {string} newPath
+     * @returns {boolean} 旧路径有缓存并且挪好了
+     */
+    moveDepthCache(oldPath, newPath) {
+        const oldKey = this._hashPath(oldPath);
+        const entry = this._cacheIndex[oldKey];
+        if (!entry || !entry.depthFile) return false;
+        const newKey = this._hashPath(newPath);
+        const newFile = path.join(path.dirname(entry.depthFile), `${newKey}.png`);
+        try {
+            if (newKey !== oldKey) {
+                // 新路径原来也有一份缓存（旧的，文件已经换了）：被覆盖掉
+                const existing = this._cacheIndex[newKey];
+                if (existing && existing.depthFile && existing.depthFile !== newFile && fs.existsSync(existing.depthFile)) {
+                    fs.unlinkSync(existing.depthFile);
+                }
+                fs.renameSync(entry.depthFile, newFile);
+                delete this._cacheIndex[oldKey];
+            }
+            this._cacheIndex[newKey] = { ...entry, imagePath: newPath, depthFile: newFile };
+            this._saveCacheIndex();
+            return true;
+        } catch (err) {
+            console.error('[Store] Move depth cache failed:', err.message);
+            return false;
+        }
+    }
+
+    /**
      * 检查是否有某个图片的有效深度图缓存（规则与 getDepthCache 相同）。
      * @param {string} imagePath
      * @returns {boolean}

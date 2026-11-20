@@ -340,3 +340,40 @@ test('saveWallpaperThumb：带后缀时存成另一个文件（重新裁剪后�
     assert.match(path.basename(versioned), /^thumb_[^.]+_abc\.jpg$/);
     assert.ok(fs.existsSync(versioned));
 });
+
+// ==================== 文件挪走后深度图缓存跟着走 ====================
+
+test('moveDepthCache 把缓存挪到新路径：旧路径查不到，新路径查得到且不用重新生成', () => {
+    const { store, image, dir } = storeWithImage();
+    store.saveDepthCache(image, DEPTH_URL);
+    const moved = path.join(dir, 'sub', '改了名字.png');
+    fs.mkdirSync(path.dirname(moved));
+    fs.renameSync(image, moved);
+
+    assert.equal(store.moveDepthCache(image, moved), true);
+    assert.equal(store.hasDepthCache(moved), true);
+    assert.equal(store.getDepthCache(moved), DEPTH_URL);
+    assert.equal(store.hasDepthCache(image), false);
+    const pngs = fs.readdirSync(store.getDepthCacheDir()).filter((f) => f.endsWith('.png'));
+    assert.deepEqual(pngs, [store._hashPath(moved) + '.png']);
+    const index = JSON.parse(fs.readFileSync(path.join(dir, 'cache_index.json'), 'utf8'));
+    assert.deepEqual(Object.keys(index), [store._hashPath(moved)]);
+    assert.equal(index[store._hashPath(moved)].imagePath, moved);
+});
+
+test('moveDepthCache 旧路径没有缓存时返回 false，不改索引', () => {
+    const { store, image, dir } = storeWithImage();
+    store.saveDepthCache(image, DEPTH_URL);
+    const before = fs.readFileSync(path.join(dir, 'cache_index.json'), 'utf8');
+    assert.equal(store.moveDepthCache(path.join(dir, 'other.png'), path.join(dir, 'x.png')), false);
+    assert.equal(fs.readFileSync(path.join(dir, 'cache_index.json'), 'utf8'), before);
+});
+
+test('moveDepthCache 深度图在别的文件夹时，卸载清单换成新文件名', () => {
+    const { store, image, dir, externalDir } = storeWithExternalDepthDir();
+    store.saveDepthCache(image, DEPTH_URL);
+    const moved = path.join(dir, 'b.png');
+    fs.renameSync(image, moved);
+    store.moveDepthCache(image, moved);
+    assert.deepEqual(readUninstallList(dir), [path.join(externalDir, store._hashPath(moved) + '.png')]);
+});

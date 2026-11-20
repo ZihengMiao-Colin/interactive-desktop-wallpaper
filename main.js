@@ -94,6 +94,9 @@ const { nextWallpaperSignal } = require('./shared/frame-pacing');
 const { findDepthModel, generateDepthPng } = require('./src/depth/generator');
 const { DEFAULT_BLUR } = require('./src/depth/processing');
 const { findUninstaller, launchUninstaller } = require('./src/uninstaller');
+const { createFileTracking } = require('./src/file-tracking');
+const { isLocalDrivePath } = require('./src/file-tracking/file-id');
+const { IMAGE_EXTENSIONS: TRACKED_IMAGE_EXTENSIONS, VIDEO_EXTENSIONS: TRACKED_VIDEO_EXTENSIONS, AUDIO_EXTENSIONS } = require('./src/file-tracking/paths');
 
 // ==================== 资源位置 ====================
 
@@ -144,6 +147,9 @@ let placement = null;
 
 /** 默认壁纸图库（项目 wallpapers/ 目录），启动时读取 */
 let gallery = [];
+
+/** 导入的文件被挪走、改名后自动接上（src/file-tracking），启动时创建 */
+let fileTracking = null;
 
 /**
  * 主动要求壁纸窗口重绘一次。
@@ -414,6 +420,11 @@ function createSettingsWindow() {
 
     settingsWindow.loadFile('settings.html');
 
+    // 用户可能在软件开着的时候整理了文件夹：切回设置窗口时检查一遍导入的文件
+    settingsWindow.on('focus', () => {
+        if (fileTracking) fileTracking.scan();
+    });
+
     settingsWindow.on('closed', () => {
         settingsWindow = null;
     });
@@ -431,6 +442,8 @@ function broadcastConfig() {
         if (win && !win.isDestroyed()) win.webContents.send('config:load', config);
     }
     syncDesktopClickWatcher(config);
+    // 新导入的文件过一会儿记下编号，之后被挪走也能找回
+    if (fileTracking) fileTracking.noteConfigChanged();
 }
 
 // ==================== 桌面点击 ====================
@@ -563,6 +576,40 @@ async function showWallpaperDialog() {
 }
 
 /**
+ * 手动接上一个找不到的文件：选它现在的位置。只能选同一类（图片 / 视频 / 音频）；
+ * 列表外的扩展名（歌单、视频特效能导入任何文件，kind 为 null）只能选同样扩展名的。
+ * @param {{fromPath: string, kind: 'image'|'video'|'audio'|null, extension: string}} args
+ * @returns {Promise<string|null>}
+ */
+async function showRelinkDialog({ fromPath, kind, extension }) {
+    const isWallpaper = !!myWallpapers.wallpaperType(fromPath);
+    const filters = {
+        // 「我的壁纸」不支持 gif，唱片封面支持
+        image: { name: '图片', extensions: isWallpaper ? myWallpapers.IMAGE_EXTENSIONS : TRACKED_IMAGE_EXTENSIONS },
+        video: { name: '视频', extensions: TRACKED_VIDEO_EXTENSIONS },
+        audio: { name: '音频文件', extensions: AUDIO_EXTENSIONS },
+    };
+    const result = await dialog.showOpenDialog(dialogParent(), {
+        title: `找到「${path.basename(fromPath)}」现在的位置`,
+        defaultPath: path.dirname(fromPath),
+        filters: [filters[kind] || { name: `${extension.toUpperCase()} 文件`, extensions: [extension] }],
+        properties: ['openFile'],
+    });
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
+}
+
+/**
+ * 要不要给这个文件记编号、检查它在不在：只管用户自己电脑上的文件。
+ * 网络路径（检查可能要等很久）、默认壁纸、软件自己的文件不管。
+ */
+function isTrackedUserFile(filePath) {
+    if (!isLocalDrivePath(filePath) || findGalleryEntry(gallery, filePath)) return false;
+    const target = path.resolve(filePath).toLowerCase();
+    const inside = (dir) => !!dir && target.startsWith(path.resolve(dir).toLowerCase() + path.sep);
+    return ![app.getAppPath(), process.resourcesPath, ASSET_DIR, app.getPath('userData')].some(inside);
+}
+
+/**
  * 应用壁纸：记住它（重启后还是这个），并通知壁纸窗口加载。
  * 图片调用前应确保已有深度图缓存；视频的 3D 视差同样要先有深度图。
  * 裁剪从「我的壁纸」里取，调用的地方不用管，托盘换壁纸也用得上之前裁好的范围。
@@ -631,6 +678,9 @@ function registerIpcHandlers() {
     // ---- 选择壁纸图片或视频（只返回路径和类型） ----
     ipcMain.handle('dialog:selectWallpaper', () => showWallpaperDialog());
 
+    // ---- 导入的文件挪走后：files:locate 按编号找回一个文件，files:relink 让用户手动选它现在的位置 ----
+    fileTracking.registerIpc(ipcMain);
+
     // ---- 我的壁纸：加入 / 移除 / 改视频设置 / 补缩略图，改完广播配置 ----
     /** 存裁好的缩略图：文件名要变（重新裁剪后地址不变的话，设置窗口会一直显示缓存里的旧图），旧文件删掉 */
     const replaceThumb = (filePath, thumbDataUrl, oldThumb) => {
@@ -664,8 +714,11 @@ function registerIpcHandlers() {
         return myWallpapers.findEntry(list, filePath);
     });
     ipcMain.handle('myWallpapers:setThumb', (_event, filePath, thumbDataUrl) => {
-        if (!myWallpapers.findEntry(store.getConfig().myWallpapers, filePath) || !thumbDataUrl) return null;
+        const entry = myWallpapers.findEntry(store.getConfig().myWallpapers, filePath);
+        if (!entry || !thumbDataUrl) return null;
         const thumb = store.saveWallpaperThumb(filePath, thumbDataUrl);
+        // 手动接上文件后重新生成缩略图：旧的那张不再用了
+        if (entry.thumb && entry.thumb !== thumb) store.deleteWallpaperThumb(entry.thumb);
         const list = myWallpapers.updateEntry(store.getConfig().myWallpapers, filePath, { thumb });
         store.saveConfig({ myWallpapers: list });
         broadcastConfig();
@@ -1102,6 +1155,7 @@ function cleanupAndQuit() {
     }
 
     if (unlockAnimation) unlockAnimation.dispose();
+    if (fileTracking) fileTracking.stop();
 
     if (wallpaperWindow && !wallpaperWindow.isDestroyed()) {
         wallpaperWindow.close();
@@ -1227,7 +1281,7 @@ watchProcessCrashes({ app, logger: log, nameOf: windowName });
 // 允许壁纸后台播放音频，免除手势交互限制
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
-function startApp() {
+async function startApp() {
     // 版本和系统写在最前面：用户只发来日志时也知道是什么环境
     console.log(`[Main] App starting... v${app.getVersion()}${app.isPackaged ? '' : ' (dev)'}`
         + `, ${windowsName(os.version(), os.release())} ${os.release()} ${os.arch()}, Electron ${process.versions.electron}`);
@@ -1290,6 +1344,23 @@ function startApp() {
         }, Date.now());
         store.saveConfig({ myWallpapers: list, myWallpapersVersion: 1 });
     }
+
+    // 导入的文件被挪走、改名了：建窗口之前先找回来，壁纸窗口一打开拿到的就是新路径
+    fileTracking = createFileTracking({
+        store,
+        dataFile: path.join(app.getPath('userData'), 'file_ids.json'),
+        shouldTrack: isTrackedUserFile,
+        sendToWindows: (channel, payload) => {
+            for (const win of [wallpaperWindow, settingsWindow]) {
+                if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+            }
+        },
+        broadcastConfig,
+        applyWallpaper,
+        showRelinkDialog: showRelinkDialog,
+    });
+    await fileTracking.scan();
+    fileTracking.start();
 
     // 清理上次没删掉的素材副本（移除素材时视频可能正被占用）
     const orphans = cleanupOrphanFiles(store.getElementsDir(), store.getConfig().customElements.library);

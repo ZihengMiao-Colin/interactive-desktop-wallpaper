@@ -99,5 +99,28 @@ const Controls = (() => {
         }
     }
 
-    return { el, setRange, bindRange, segmented, switchEl, button, initHelpTips };
+    /** 手动接上找不到的文件后的提示（api.files.relink 返回的 { to, count }） */
+    function relinkMessage({ to, count }) {
+        const name = String(to).split(/[\\/]/).pop();
+        return count > 1 ? `已找回「${name}」，另外还找回了 ${count - 1} 个` : `已找回「${name}」`;
+    }
+
+    /** 文件的 key：不分大小写和斜杠方向 */
+    const fileKey = (p) => String(p || '').toLowerCase().replace(/\//g, '\\');
+
+    /**
+     * 主进程检查完文件（files:checked）后要不要重画：只比主进程这次查过的路径。
+     * 没查过的（网络路径等）这里也不查：每分钟同步查一次，网络盘断了会卡住窗口。
+     * @param {Map<string, boolean>} shown - 上次画的时候每个文件在不在，key 用 fileKey
+     * @param {{checked?: string[], missing?: string[]}} status
+     */
+    function fileStatusChanged(shown, status) {
+        const missing = new Set(((status && status.missing) || []).map(fileKey));
+        return ((status && status.checked) || []).some((p) => {
+            const key = fileKey(p);
+            return shown.has(key) && shown.get(key) === missing.has(key);
+        });
+    }
+
+    return { el, setRange, bindRange, segmented, switchEl, button, initHelpTips, relinkMessage, fileKey, fileStatusChanged };
 })();

@@ -10,7 +10,7 @@ The Android version is at [interactive-phone-wallpaper](https://github.com/Zihen
 
 - **Depth parallax wallpaper**: Depth Anything V2 generates the depth map and a custom shader offsets the image by depth; parallax strength, smoothing and focus depth are adjustable.
 - **Video wallpapers**: set a local video (MP4 / WebM, etc.) as the wallpaper, looping; play it as is, with 3D parallax (one depth map for the whole video, best for fixed-camera footage) or panning as a whole with the mouse, with optional sound.
-- **My wallpapers**: images and videos you picked yourself stay on the Wallpaper page, one click to switch back.
+- **My wallpapers**: images and videos you picked yourself stay on the Wallpaper page, one click to switch back. If you move or rename the original file on the same drive, the app finds it again automatically; if you move it to another drive, click the "file not found" tile and pick where it is now, and other missing files from the same folder are relinked too. The playlist works the same way; the video effect's own video is also found automatically, but after a move to another drive it has to be imported again.
 - **Unlock animation**: import a video and it plays full screen (over the taskbar) each time you unlock the computer, with adjustable fade in and fade out. Press Esc or click to skip; when it ends you are back on the desktop. The app has to be running.
 - **Cropping on import**: a crop box opens when you import an image wallpaper, video wallpaper or unlock video. Drag it to choose what stays (for example to cut off a watermark); the ratio is locked to your screen, and anything already imported can be cropped again.
 - **Custom elements**: import images / GIF / animated WebP / APNG / MP4 / WebM.
@@ -94,7 +94,7 @@ For architecture details, known issues and the development plan, see [PROJECT_NO
 - **Depth occlusion**: each element pixel is compared against the depth of the background content actually shown at that pixel, so occlusion edges follow foreground objects as the mouse moves.
 - **Animated images**: decoded with Chromium's built-in WebCodecs `ImageDecoder`, no third-party library.
 - **UI**: terminal style in black, white and gray with a cyan accent (square panels, a color bar plus a thin frame, serif Chinese page titles with a few small English labels); all styling lives in CSS variables in `ui/tokens.css`. Fonts are bundled, both under the SIL OFL: Noto Serif SC and Saira, from [Fontsource](https://fontsource.org/).
-- **Data**: config lives in `%APPDATA%/interactive-desktop-wallpaper/config.json`; imported assets are copied into `custom_elements/` in the same folder, so moving the original files does not break anything.
+- **Data**: config lives in `%APPDATA%/interactive-desktop-wallpaper/config.json`; imported assets are copied into `custom_elements/` in the same folder, so moving the original files does not break anything. My wallpapers, the playlist and the video effect only store paths, plus each file's NTFS file ID (`file_ids.json`) so a moved file can be found again.
 
 ## License
 

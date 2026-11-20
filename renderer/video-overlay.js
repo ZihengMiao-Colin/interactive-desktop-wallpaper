@@ -210,6 +210,21 @@ class VideoOverlayManager {
         }
     }
 
+    /**
+     * 文件被挪走、改名后主进程换掉了配置里的路径（在新配置之前到）。
+     * 视频还在正常播放就只换掉记着的路径，不重新加载；已经因为文件不见了出错的，按新路径重新加载。
+     * @param {Array<{from: string, to: string}>} moves
+     */
+    applyRelocations(moves) {
+        for (const { from, to } of moves || []) {
+            if (this.config.customPath !== from) continue;
+            this.config.customPath = to;
+            if (!this.video || this.video.dataset.currentPath !== from) continue;
+            if (this.video.error && this.config.enabled) this._applySource();
+            else this.video.dataset.currentPath = to;
+        }
+    }
+
     _resolveCurrentVideo() {
         if (this.config.presetId === 'custom' && this.config.customPath) {
             let mode = this.config.blendMode;

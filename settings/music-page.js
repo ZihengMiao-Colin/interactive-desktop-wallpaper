@@ -82,10 +82,13 @@ function initMusicPage({ api, saver, setStatus }) {
 
     /** 拖动排序：正在拖的是第几首（-1 表示没在拖） */
     let dragFrom = -1;
+    /** 上次画歌单的时候每首歌的文件在不在（主进程检查完文件后和它比） */
+    const shownTracks = new Map();
 
     function renderTrack(track, i) {
         const isCurrent = track.path === vinyl.current;
         const missing = !api.fileExists(track.path);
+        shownTracks.set(Controls.fileKey(track.path), !missing);
         const row = el('div', 'track' + (isCurrent ? ' on' : '') + (isCurrent && vinyl.playing ? ' playing' : '') + (missing ? ' missing' : ''));
         row.draggable = true;
         row.title = track.path;
@@ -100,7 +103,7 @@ function initMusicPage({ api, saver, setStatus }) {
         }
         const tx = el('span', 'tx');
         tx.appendChild(el('b', '', track.name));
-        if (missing) tx.appendChild(el('small', '', '文件找不到了'));
+        if (missing) tx.appendChild(el('small', '', '文件找不到了，点一下重新找'));
         const del = button('btn sm icon ghost del', 'x', '', `从歌单移除「${track.name}」`);
         del.draggable = false;
         del.addEventListener('click', (e) => {
@@ -109,8 +112,12 @@ function initMusicPage({ api, saver, setStatus }) {
         });
         row.append(grip, no, tx, del);
 
-        // 点一首直接放（已经在放的就不打断）
+        // 点一首直接放（已经在放的就不打断）；文件找不到的先让用户选它现在的位置
         row.addEventListener('click', () => {
+            if (!api.fileExists(track.path)) {
+                relinkTrack(track);
+                return;
+            }
             if (isCurrent && vinyl.playing) return;
             update({ current: track.path, playing: true });
         });
@@ -126,6 +133,18 @@ function initMusicPage({ api, saver, setStatus }) {
             markDrop(-1);
         });
         return row;
+    }
+
+    /** 找不到的歌：选它现在的位置，同一个旧文件夹里别的歌顺带接上（主进程换好配置后广播回来重画歌单） */
+    async function relinkTrack(track) {
+        try {
+            const result = await api.files.relink(track.path);
+            if (!result || result.canceled) return;
+            if (result.error) setStatus(result.error, 'error');
+            else setStatus(Controls.relinkMessage(result), 'success');
+        } catch (err) {
+            setStatus('重新找文件失败：' + err.message, 'error');
+        }
     }
 
     /** 鼠标在第几首的上半截之前：拖放后插到那一首前面（在最后一首下半截时是歌单长度） */
@@ -163,7 +182,13 @@ function initMusicPage({ api, saver, setStatus }) {
         if (slot !== from && slot !== from + 1) update({ playlist: PL.moveTrack(vinyl.playlist, from, slot) });
     });
 
+    // 主进程检查完文件：有歌找不到了（或者又找到了）才重画歌单
+    api.files.onChecked((status) => {
+        if (dragFrom < 0 && Controls.fileStatusChanged(shownTracks, status)) renderPlaylist();
+    });
+
     function renderPlaylist() {
+        shownTracks.clear();
         const n = vinyl.playlist.length;
         countEl.textContent = n ? `${n} 首` : '';
         if (!n) {

@@ -179,6 +179,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ==================== 我的壁纸 ====================
 
+    /** 导入的文件被挪走、改名后（src/file-tracking） */
+    files: {
+        /** 按编号找这个文件现在在哪：还在原处返回原路径，找回了返回新路径（主进程顺带换掉配置），找不到返回 null */
+        locate: (filePath) => ipcRenderer.invoke('files:locate', filePath),
+        /** 弹对话框让用户选它现在的位置 → { to, count } | { canceled: true } | { error } */
+        relink: (fromPath) => ipcRenderer.invoke('files:relink', fromPath),
+        /** 有文件换了路径：[{ from, to }]，在新配置之前到 */
+        onRelocated: (callback) => {
+            ipcRenderer.on('files:relocated', (_event, moves) => callback(moves));
+        },
+        /** 主进程检查完一遍文件（启动、切回设置窗口、每分钟）：{ checked, missing }，设置页据此更新"找不到文件" */
+        onChecked: (callback) => {
+            ipcRenderer.on('files:checked', (_event, status) => callback(status));
+        },
+    },
+
     myWallpapers: {
         /** 加入（已有的提到最前）：{ path, type, thumbDataUrl?, duration?, crop? } → 条目 */
         add: (item) => ipcRenderer.invoke('myWallpapers:add', item),
