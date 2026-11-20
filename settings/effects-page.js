@@ -93,8 +93,22 @@ function initEffectsPage({ api, saver, setStatus }) {
         btnUseCustom.hidden = !customVideoPath;
         btnUseCustom.disabled = usingCustom;
         btnUseCustom.textContent = usingCustom ? '使用中' : '使用这个视频';
-        customName.textContent = customVideoPath ? customVideoName : '还没有导入，支持 MP4 / WebM';
+        const missing = !!customVideoPath && !api.fileExists(customVideoPath);
+        customName.textContent = customVideoPath
+            ? customVideoName + (missing ? '（找不到文件，点"导入视频…"重新选）' : '')
+            : '还没有导入，支持 MP4 / WebM';
+        customName.classList.toggle('missing', missing);
     }
+
+    // 自己的视频被挪走、改名后主进程换了路径（在新配置之前到）：记着的路径和名字跟着换
+    api.files.onRelocated((moves) => {
+        const move = customVideoPath && moves.find((m) => Shared.myWallpapers.samePath(m.from, customVideoPath));
+        if (!move) return;
+        const baseName = (p) => p.split(/[\\/]/).pop();
+        if (customVideoName === baseName(move.from)) customVideoName = baseName(move.to);
+        customVideoPath = move.to;
+        renderSelection();
+    });
 
     enabled.addEventListener('change', () => {
         showEnabled(enabled.checked);

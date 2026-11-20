@@ -2,8 +2,10 @@
  * my-wallpapers-panel.js — 壁纸页的「我的壁纸」：用户自己选过的图片和视频
  *
  * 一直显示，第一格永远是"从电脑选择…"（图片或视频），后面按最近用过的排。
- * 视频左下角标 ▶ 和时长；原文件找不到的格子显示"找不到文件"；悬停右上角有裁剪按钮和 ×（从列表移除，不删原文件）。
- * 只记路径，不复制文件。没有缩略图的条目（升级迁移、托盘加的图片）在这里补生成。
+ * 视频左下角标 ▶ 和时长；原文件找不到的格子显示"找不到文件"，点它选文件现在的位置（同一个旧文件夹里别的顺带接上）；
+ * 悬停右上角有裁剪按钮和 ×（从列表移除，不删原文件）。
+ * 只记路径，不复制文件；同一个盘里挪动、改名由主进程自动找回（src/file-tracking）。
+ * 没有缩略图的条目（升级迁移、托盘加的图片）在这里补生成。
  */
 
 'use strict';
@@ -62,7 +64,7 @@ function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
         const card = el('button', 'wp' + (MW.samePath(entry.path, selectedPath) ? ' sel' : '') + (exists ? '' : ' missing'));
         card.type = 'button';
         card.disabled = busy;
-        card.title = entry.path;
+        card.title = exists ? entry.path : `找不到文件，点一下选它现在的位置\n原来在：${entry.path}`;
 
         const thumbOk = entry.thumb && api.fileExists(entry.thumb);
         if (thumbOk) {
@@ -120,7 +122,7 @@ function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
         card.appendChild(el('span', 'name', fileName(entry.path)));
         card.addEventListener('click', () => {
             if (!api.fileExists(entry.path)) {
-                setStatus('找不到这个文件，可能被移动或删除了', 'error');
+                relink(entry);
                 return;
             }
             onSelect(entry);
@@ -128,10 +130,29 @@ function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
         return card;
     }
 
+    /** 找不到的格子：让用户选它现在的位置，接上后按新文件重新生成缩略图（选的可能不是原来那个文件） */
+    async function relink(entry) {
+        try {
+            const result = await api.files.relink(entry.path);
+            if (!result || result.canceled) return;
+            if (result.error) {
+                setStatus(result.error, 'error');
+                return;
+            }
+            setStatus(Controls.relinkMessage(result), 'success');
+            thumbTried.add(result.to);
+            makeThumbnailInfo(api.toFileUrl(result.to), entry.type, entry.crop)
+                .then((info) => api.myWallpapers.setThumb(result.to, info.dataUrl))
+                .catch((err) => console.warn('重新生成缩略图失败:', result.to, err.message));
+        } catch (err) {
+            setStatus('重新找文件失败：' + err.message, 'error');
+        }
+    }
+
     function render() {
         grid.replaceChildren(renderAddCard(), ...list.map(renderCard));
         countEl.textContent = list.length || '';
-        hintEl.textContent = list.length ? '只记住位置，原文件挪走后会失效' : '你自己的图片和视频';
+        hintEl.textContent = list.length ? '同一个盘里挪动、改名会自动找回' : '你自己的图片和视频';
     }
 
     /** 上一次画的时候的列表和当前壁纸（拖滑块时每秒广播好几次配置，没变就不重画，免得反复查文件在不在） */

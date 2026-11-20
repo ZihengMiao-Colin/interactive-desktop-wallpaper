@@ -328,6 +328,15 @@ function initWallpaperPage({ api, saver, setStatus, setNowUsing, preview, cropDi
         mine.setSelected(filePath);
     }
 
+    // 选中的文件被挪走、改名后主进程换了路径（在新配置之前到）：选中的那一格跟着换
+    api.files.onRelocated((moves) => {
+        const move = selectedPath && moves.find((m) => MW.samePath(m.from, selectedPath));
+        if (!move) return;
+        selectedPath = move.to;
+        if (selectedVideo) selectedVideo.path = move.to;
+        markSelected(selectedPath);
+    });
+
     /** 生成深度图期间两边的格子都不能点（换了图，结果会记到别的图上） */
     function setPanelsBusy(value) {
         gallery.setBusy(value);

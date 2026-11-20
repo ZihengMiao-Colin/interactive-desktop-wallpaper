@@ -99,5 +99,11 @@ const Controls = (() => {
         }
     }
 
-    return { el, setRange, bindRange, segmented, switchEl, button, initHelpTips };
+    /** 手动接上找不到的文件后的提示（api.files.relink 返回的 { to, count }） */
+    function relinkMessage({ to, count }) {
+        const name = String(to).split(/[\\/]/).pop();
+        return count > 1 ? `已找回「${name}」，另外还找回了 ${count - 1} 个` : `已找回「${name}」`;
+    }
+
+    return { el, setRange, bindRange, segmented, switchEl, button, initHelpTips, relinkMessage };
 })();
