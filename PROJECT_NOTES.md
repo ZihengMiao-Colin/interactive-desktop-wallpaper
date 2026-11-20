@@ -766,6 +766,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
   - 模拟 v1.3.1 老用户（配置里写上已删的 `lake-forest.jpg`、开着 `snow2` 视频特效、壁纸上摆着 `builtin:bomb1`）：启动后壁纸换成雪山镜湖，视频特效变成 `custom` 并关掉，爆炸元素去掉，日志里两条迁移记录，0 个错误。
   - 这次 360 开着（`360tray.exe`、`ZhuDongFangYu.exe` 都在），打包版两次都挂上了 WorkerW（`app:isOnDesktopLayer` 为 `true`，提示不显示）。和 11-05 的结果不一样，原因没查；兜底模式的代码没变。
 - 没测：真的安装和覆盖安装（没动本机的安装）；托盘菜单的真实点击；日间主题。
+- 已发布（2026-11-19，用户确认公开）：https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.4.0 ，tag `v1.4.0` 指向 `0d3bac5`，是 Latest。附件的大小和 SHA-256 和上面一致；没登录也能打开页面和下载附件。发布说明沿用 v1.3.1 的结构，加了"v1.4.0 更新内容"、老用户升级后被删素材怎么处理，以及一小节"许可"。
 
 ### ✅ 阶段 5 — 收尾（2026-11-10）
 - [x] 删掉 `生成深度图.bat`：应用自己能生成深度图，它还在选早就没有的 base / large 模型。

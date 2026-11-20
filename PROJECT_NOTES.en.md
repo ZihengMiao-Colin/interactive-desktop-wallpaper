@@ -769,6 +769,7 @@ Phases 18–20 packaged as **v1.4.0** (2026-11-19). Since v1.3.1 there is a new 
   - Simulated v1.3.1 user (config pointing at the deleted `lake-forest.jpg`, the `snow2` video effect on, a `builtin:bomb1` element placed): after startup the wallpaper is the snowy peaks lake, the video effect is `custom` and off, the explosion element is gone, the log has two migration lines and 0 errors.
   - 360 was running this time (`360tray.exe` and `ZhuDongFangYu.exe` both present), yet the packaged build attached to WorkerW both times (`app:isOnDesktopLayer` was `true`, no notice). This differs from 11-05; the cause was not investigated. The fallback-mode code is unchanged.
 - Not tested: a real install or install-over-upgrade (the copy installed on this machine was left alone); real clicks on the tray menu; the light theme.
+- Published (2026-11-19, the user confirmed going public): https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.4.0 , tag `v1.4.0` points to `0d3bac5` and is Latest. The asset's size and SHA-256 match the above; the page and the download open without signing in. The release notes keep v1.3.1's structure and add "v1.4.0 更新内容", what happens to removed assets when upgrading, and a short "License" section.
 
 ### ✅ Phase 5 — Wrap-up (2026-11-10)
 - [x] Deleted `生成深度图.bat` (the "generate depth map" batch file): the app generates depth maps itself, and the bat still offered base / large models that have long been gone.
