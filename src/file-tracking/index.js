@@ -15,14 +15,13 @@
 const fs = require('fs');
 const path = require('path').win32;
 const { FileTracker } = require('./tracker');
-const { fileKind, sameKind, collectPaths, replacePaths, relinkMoves } = require('./paths');
+const { fileKind, sameKind, inFolder, collectPaths, replacePaths, relinkMoves } = require('./paths');
 const { findEntry, resolveCurrent, samePath } = require('../../shared/my-wallpapers');
 
 const SCAN_INTERVAL_MS = 60 * 1000;
 /** 配置改动后隔多久给新加的文件记编号（拖滑块时配置一秒存好几次，不用每次都查） */
 const RECORD_DELAY_MS = 2000;
 
-const keyOf = (p) => String(p || '').toLowerCase().replace(/\//g, '\\');
 
 async function exists(p) {
     try {
@@ -79,9 +78,10 @@ function createFileTracking({
             try {
                 const moves = await tracker.findMoves(collectPaths(store.getConfig()));
                 if (moves.length) applyMoves(moves);
-                await tracker.record(collectPaths(store.getConfig()));
-                // 设置页开着时文件被挪走、又没找回来：配置没变，设置页收到这个才会重新看哪些文件找不到
-                sendToWindows('files:checked');
+                const status = await tracker.record(collectPaths(store.getConfig()));
+                // 设置页开着时文件被挪走、又没找回来：配置没变，设置页收到这个才会重新标"找不到文件"。
+                // 带上这里查过的结果，设置页不用自己再查（网络路径同步查可能卡住窗口）
+                sendToWindows('files:checked', status);
             } catch (err) {
                 console.error('[FileTracking] 检查文件失败:', err);
             } finally {
@@ -113,9 +113,10 @@ function createFileTracking({
      * @returns {Promise<{to: string, count: number} | {canceled: true} | {error: string}>}
      */
     async function relink(fromPath) {
-        const kind = fileKind(fromPath);
-        if (!kind) return { error: '不支持的文件类型' };
-        const picked = await showRelinkDialog({ fromPath, kind });
+        // 歌单、视频特效的对话框能选任何文件：列表外的扩展名（kind 为 null）按扩展名选
+        const extension = path.extname(String(fromPath || '')).slice(1).toLowerCase();
+        if (!extension) return { error: '不支持的文件类型' };
+        const picked = await showRelinkDialog({ fromPath, kind: fileKind(fromPath), extension });
         if (!picked) return { canceled: true };
         if (!sameKind(fromPath, picked)) return { error: '要选同一种文件' };
 
@@ -125,10 +126,10 @@ function createFileTracking({
         }
 
         // 只看原来同一个文件夹下面的：别处的路径可能在网络盘上，没必要去碰
-        const oldDir = keyOf(path.dirname(fromPath)) + '\\';
+        const oldDir = path.dirname(fromPath);
         const missing = [];
         for (const p of collectPaths(config)) {
-            if (!keyOf(p).startsWith(oldDir)) continue;
+            if (!inFolder(p, oldDir)) continue;
             if (samePath(p, fromPath) || !(await exists(p))) missing.push(p);
         }
         const moves = relinkMoves({ from: fromPath, to: picked, missing, exists: (p) => fs.existsSync(p) });

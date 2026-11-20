@@ -576,11 +576,12 @@ async function showWallpaperDialog() {
 }
 
 /**
- * 手动接上一个找不到的文件：选它现在的位置。只能选同一类（图片 / 视频 / 音频）。
- * @param {{fromPath: string, kind: 'image'|'video'|'audio'}} args
+ * 手动接上一个找不到的文件：选它现在的位置。只能选同一类（图片 / 视频 / 音频）；
+ * 列表外的扩展名（歌单、视频特效能导入任何文件，kind 为 null）只能选同样扩展名的。
+ * @param {{fromPath: string, kind: 'image'|'video'|'audio'|null, extension: string}} args
  * @returns {Promise<string|null>}
  */
-async function showRelinkDialog({ fromPath, kind }) {
+async function showRelinkDialog({ fromPath, kind, extension }) {
     const isWallpaper = !!myWallpapers.wallpaperType(fromPath);
     const filters = {
         // 「我的壁纸」不支持 gif，唱片封面支持
@@ -591,7 +592,7 @@ async function showRelinkDialog({ fromPath, kind }) {
     const result = await dialog.showOpenDialog(dialogParent(), {
         title: `找到「${path.basename(fromPath)}」现在的位置`,
         defaultPath: path.dirname(fromPath),
-        filters: [filters[kind]],
+        filters: [filters[kind] || { name: `${extension.toUpperCase()} 文件`, extensions: [extension] }],
         properties: ['openFile'],
     });
     return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];

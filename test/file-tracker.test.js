@@ -126,3 +126,40 @@ test('壁纸图片挪走后被改成 gif 时找不回（「我的壁纸」不支
     fs.renameSync(a, path.join(dir, 'a.gif'));
     assert.deepEqual(await tracker.findMoves([a]), []);
 });
+
+test('外接硬盘暂时拔掉（这会儿不能检查）时不删它的记录，插回来后改了名的照样找回', async () => {
+    let driveUp = true;
+    const { dir, dataFile, make, tracker } = setup({ shouldTrack: () => driveUp });
+    const a = make('a.mp3');
+    await tracker.record([a]);
+    driveUp = false;
+    await tracker.record([a]);
+    assert.equal(Object.values(saved(dataFile)).length, 1);
+
+    driveUp = true;
+    const b = path.join(dir, 'b.mp3');
+    fs.renameSync(a, b);
+    const moves = await tracker.findMoves([a]);
+    assert.equal(moves.length, 1);
+    assert.ok(samePath(moves[0].to, b));
+});
+
+test('record 返回检查过的路径和其中找不到的（不该管的不算）', async () => {
+    const { dir, make, tracker } = setup({ shouldTrack: (p) => !p.startsWith('\\\\') });
+    const a = make('a.jpg');
+    const gone = path.join(dir, 'gone.jpg');
+    const unc = '\\\\nas\\share\\x.mp3';
+    const result = await tracker.record([a, gone, unc]);
+    assert.deepEqual(result, { checked: [a, gone], missing: [gone] });
+});
+
+test('列表外扩展名的歌（.opus）改名后也能找回', async () => {
+    const { dir, make, tracker } = setup();
+    const a = make('a.opus');
+    await tracker.record([a]);
+    const b = path.join(dir, '新名字.opus');
+    fs.renameSync(a, b);
+    const moves = await tracker.findMoves([a]);
+    assert.equal(moves.length, 1);
+    assert.ok(samePath(moves[0].to, b));
+});

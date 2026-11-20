@@ -82,10 +82,13 @@ function initMusicPage({ api, saver, setStatus }) {
 
     /** 拖动排序：正在拖的是第几首（-1 表示没在拖） */
     let dragFrom = -1;
+    /** 上次画歌单的时候每首歌的文件在不在（主进程检查完文件后和它比） */
+    const shownTracks = new Map();
 
     function renderTrack(track, i) {
         const isCurrent = track.path === vinyl.current;
         const missing = !api.fileExists(track.path);
+        shownTracks.set(Controls.fileKey(track.path), !missing);
         const row = el('div', 'track' + (isCurrent ? ' on' : '') + (isCurrent && vinyl.playing ? ' playing' : '') + (missing ? ' missing' : ''));
         row.draggable = true;
         row.title = track.path;
@@ -179,15 +182,13 @@ function initMusicPage({ api, saver, setStatus }) {
         if (slot !== from && slot !== from + 1) update({ playlist: PL.moveTrack(vinyl.playlist, from, slot) });
     });
 
-    /** 哪些歌的文件找不到（主进程检查完文件后和上次画的比，变了才重画） */
-    const missingKey = () => vinyl.playlist.map((t) => (api.fileExists(t.path) ? '1' : '0')).join('');
-    let renderedMissing = '';
-    api.files.onChecked(() => {
-        if (dragFrom < 0 && missingKey() !== renderedMissing) renderPlaylist();
+    // 主进程检查完文件：有歌找不到了（或者又找到了）才重画歌单
+    api.files.onChecked((status) => {
+        if (dragFrom < 0 && Controls.fileStatusChanged(shownTracks, status)) renderPlaylist();
     });
 
     function renderPlaylist() {
-        renderedMissing = missingKey();
+        shownTracks.clear();
         const n = vinyl.playlist.length;
         countEl.textContent = n ? `${n} 首` : '';
         if (!n) {

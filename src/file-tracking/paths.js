@@ -29,13 +29,28 @@ function fileKind(filePath) {
     return null;
 }
 
+const extOf = (p) => path.extname(String(p || '')).slice(1).toLowerCase();
+
 /**
  * 两个文件是不是同一类，找回 / 接上时用：类型要一样，壁纸能不能用也要一样
  * （「我的壁纸」不支持 gif，壁纸被接到 gif 上的话那一格会被当成坏数据去掉）。
+ * 列表外的扩展名（歌单、视频特效的对话框能选任何文件，比如 .opus）扩展名一样就算同一类；没有扩展名的不算。
  */
 function sameKind(a, b) {
-    const kind = fileKind(a);
-    return !!kind && kind === fileKind(b) && wallpaperType(a) === wallpaperType(b);
+    const kindOf = (p) => fileKind(p) || (extOf(p) ? 'ext:' + extOf(p) : null);
+    const kind = kindOf(a);
+    return !!kind && kind === kindOf(b) && wallpaperType(a) === wallpaperType(b);
+}
+
+/** 文件夹的 key：小写、斜杠统一，结尾正好一个 \（盘符根目录 F:\ 本来就带） */
+function folderKey(dir) {
+    const key = String(dir || '').toLowerCase().replace(/\//g, '\\');
+    return key.endsWith('\\') ? key : key + '\\';
+}
+
+/** 路径在不在这个文件夹（含子文件夹）下面，不分大小写和斜杠方向 */
+function inFolder(filePath, dir) {
+    return String(filePath || '').toLowerCase().replace(/\//g, '\\').startsWith(folderKey(dir));
 }
 
 const isPath = (p) => typeof p === 'string' && p !== '';
@@ -125,13 +140,13 @@ function replacePaths(config, moves) {
  */
 function relinkMoves({ from, to, missing, exists }) {
     const moves = [{ from, to }];
-    const oldDir = path.dirname(from).toLowerCase().replace(/\//g, '\\');
+    const oldDir = path.dirname(from);
+    const prefixLength = folderKey(oldDir).length;
     const newDir = path.dirname(to);
     for (const p of list(missing)) {
         if (samePath(p, from) || moves.some((m) => samePath(m.from, p))) continue;
-        const normalized = String(p).replace(/\//g, '\\');
-        if (!normalized.toLowerCase().startsWith(oldDir + '\\')) continue;
-        const candidate = path.join(newDir, normalized.slice(oldDir.length + 1));
+        if (!inFolder(p, oldDir)) continue;
+        const candidate = path.join(newDir, String(p).replace(/\//g, '\\').slice(prefixLength));
         if (sameKind(p, candidate) && exists(candidate)) moves.push({ from: p, to: candidate });
     }
     return moves;
@@ -143,6 +158,7 @@ module.exports = {
     AUDIO_EXTENSIONS,
     fileKind,
     sameKind,
+    inFolder,
     collectPaths,
     replacePaths,
     relinkMoves,

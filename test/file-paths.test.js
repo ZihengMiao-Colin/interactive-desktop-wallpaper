@@ -126,11 +126,40 @@ test('relinkMoves 不认识类型的文件不顺带接上，别的类型（音�
 
 test('sameKind：同一类才算；壁纸图片换成 gif 不算（「我的壁纸」不支持 gif，接上后那一格会消失）', () => {
     const { sameKind } = require('../src/file-tracking/paths');
-    assert.equal(sameKind('C:\a.jpg', 'D:\b.PNG'), true);
-    assert.equal(sameKind('C:\a.mp3', 'D:\b.flac'), true);
-    assert.equal(sameKind('C:\a.mp4', 'D:\b.mkv'), true);
-    assert.equal(sameKind('C:\a.jpg', 'D:\b.gif'), false);
-    assert.equal(sameKind('C:\a.gif', 'D:\b.gif'), true);
-    assert.equal(sameKind('C:\a.jpg', 'D:\b.mp4'), false);
-    assert.equal(sameKind('C:\a', 'D:\b'), false);
+    assert.equal(sameKind('C:\\a.jpg', 'D:\\b.PNG'), true);
+    assert.equal(sameKind('C:\\a.mp3', 'D:\\b.flac'), true);
+    assert.equal(sameKind('C:\\a.mp4', 'D:\\b.mkv'), true);
+    assert.equal(sameKind('C:\\a.jpg', 'D:\\b.gif'), false);
+    assert.equal(sameKind('C:\\a.gif', 'D:\\b.gif'), true);
+    assert.equal(sameKind('C:\\a.jpg', 'D:\\b.mp4'), false);
+    assert.equal(sameKind('C:\\a', 'D:\\b'), false);
+});
+
+test('sameKind：列表外的扩展名（歌单能导入任何文件）扩展名一样就算同一类', () => {
+    const { sameKind } = require('../src/file-tracking/paths');
+    assert.equal(sameKind('C:\\m\\a.opus', 'D:\\n\\b.OPUS'), true);
+    assert.equal(sameKind('C:\\m\\a.opus', 'D:\\n\\b.wma'), false);
+    assert.equal(sameKind('C:\\m\\a.opus', 'D:\\n\\b.mp3'), false);
+});
+
+test('relinkMoves 在盘符根目录（U 盘根目录放歌）也能顺带接上同一个文件夹里的', () => {
+    const moves = relinkMoves({
+        from: 'F:\\a.mp3', to: 'G:\\a.mp3',
+        missing: ['F:\\a.mp3', 'F:\\b.mp3', 'F:\\sub\\c.opus', 'E:\\d.mp3'],
+        exists: () => true,
+    });
+    assert.deepEqual(moves, [
+        { from: 'F:\\a.mp3', to: 'G:\\a.mp3' },
+        { from: 'F:\\b.mp3', to: 'G:\\b.mp3' },
+        { from: 'F:\\sub\\c.opus', to: 'G:\\sub\\c.opus' },
+    ]);
+});
+
+test('inFolder：路径在不在某个文件夹（含子文件夹）下面，盘符根目录也对', () => {
+    const { inFolder } = require('../src/file-tracking/paths');
+    assert.equal(inFolder('F:\\b.mp3', 'F:\\'), true);
+    assert.equal(inFolder('f:/sub/c.mp3', 'F:\\'), true);
+    assert.equal(inFolder('C:\\old\\a.jpg', 'C:\\OLD'), true);
+    assert.equal(inFolder('C:\\older\\a.jpg', 'C:\\old'), false);
+    assert.equal(inFolder('E:\\b.mp3', 'F:\\'), false);
 });

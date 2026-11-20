@@ -71,17 +71,26 @@ class FileTracker {
     }
 
     /**
-     * 给还在的文件记编号（没记过、或者原位置换成了别的文件时更新），删掉不再用的记录。
+     * 给还在的文件记编号（没记过、或者原位置换成了别的文件时更新），删掉配置里不再引用的记录。
+     * 配置里还在引用、只是这会儿不能检查的（外接硬盘拔掉了、开机时还没挂上）记录留着，插回来后还能找回。
      * @param {string[]} paths - 配置里现在引用的所有路径
+     * @returns {Promise<{checked: string[], missing: string[]}>} 这次检查过的路径、其中找不到的
      */
     async record(paths) {
         let changed = false;
         const wanted = new Set();
+        const checked = [];
+        const missing = [];
         for (const p of paths) {
-            if (!this._trackable(p)) continue;
+            if (typeof p !== 'string' || !p) continue;
             const key = keyOf(p);
             wanted.add(key);
-            if (!(await this._exists(p))) continue;
+            if (!this._trackable(p)) continue;
+            checked.push(p);
+            if (!(await this._exists(p))) {
+                missing.push(p);
+                continue;
+            }
             const id = this.fileIds.readFileId(p);
             if (!id) continue;
             const old = this.records[key];
@@ -97,6 +106,7 @@ class FileTracker {
             }
         }
         if (changed) this._save();
+        return { checked, missing };
     }
 
     /**

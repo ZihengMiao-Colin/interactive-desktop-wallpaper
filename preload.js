@@ -189,9 +189,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         onRelocated: (callback) => {
             ipcRenderer.on('files:relocated', (_event, moves) => callback(moves));
         },
-        /** 主进程检查完一遍文件（启动、切回设置窗口、每分钟）：设置页重新看哪些文件找不到 */
+        /** 主进程检查完一遍文件（启动、切回设置窗口、每分钟）：{ checked, missing }，设置页据此更新"找不到文件" */
         onChecked: (callback) => {
-            ipcRenderer.on('files:checked', () => callback());
+            ipcRenderer.on('files:checked', (_event, status) => callback(status));
         },
     },
 

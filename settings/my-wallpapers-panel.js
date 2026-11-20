@@ -61,6 +61,7 @@ function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
 
     function renderCard(entry) {
         const exists = api.fileExists(entry.path);
+        shown.set(Controls.fileKey(entry.path), exists);
         const card = el('button', 'wp' + (MW.samePath(entry.path, selectedPath) ? ' sel' : '') + (exists ? '' : ' missing'));
         card.type = 'button';
         card.disabled = busy;
@@ -149,12 +150,11 @@ function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
         }
     }
 
-    /** 哪些格子的文件找不到（主进程检查完文件后和上次画的比，变了才重画） */
-    const missingKey = () => list.map((e) => (api.fileExists(e.path) ? '1' : '0')).join('');
-    let renderedMissing = '';
+    /** 上次画的时候每个文件在不在（主进程检查完文件后和它比，变了才重画） */
+    const shown = new Map();
 
     function render() {
-        renderedMissing = missingKey();
+        shown.clear();
         grid.replaceChildren(renderAddCard(), ...list.map(renderCard));
         countEl.textContent = list.length || '';
         hintEl.textContent = list.length ? '同一个盘里挪动、改名会自动找回' : '你自己的图片和视频';
@@ -179,8 +179,8 @@ function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
     api.onLoadConfig(refresh);
     const ready = api.getConfig().then(refresh);
     // 设置页开着时文件被挪走、又没自动找回来：配置没变，靠这个把"找不到文件"显示出来
-    api.files.onChecked(() => {
-        if (missingKey() !== renderedMissing) render();
+    api.files.onChecked((status) => {
+        if (Controls.fileStatusChanged(shown, status)) render();
     });
 
     return {

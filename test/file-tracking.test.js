@@ -201,3 +201,51 @@ test('scan 结束后通知窗口 files:checked（设置页据此刷新"找不到
     await ctx.tracking.scan();
     assert.deepEqual(ctx.calls.filter((c) => c[0] === 'send').map((c) => c[1]), ['files:relocated', 'files:checked']);
 });
+
+test('files:checked 带上主进程查过的路径和找不到的，设置页不用自己去查（网络路径同步查会卡住窗口）', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-tracking-'));
+    const store = new AppStore({ userDataPath: dir });
+    const kept = path.join(dir, 'kept.jpg');
+    fs.writeFileSync(kept, 'x');
+    const gone = path.join(dir, 'gone.mp3');
+    const unc = '\\\\nas\\share\\song.mp3';
+    store.saveConfig({ currentImage: kept, vinyl: { playlist: [{ path: gone, name: 'gone' }, { path: unc, name: 'song' }], current: gone } });
+    const sent = [];
+    const tracking = createFileTracking({
+        store, dataFile: path.join(dir, 'ids.json'), shouldTrack: (p) => !p.startsWith('\\\\'),
+        sendToWindows: (channel, payload) => sent.push([channel, payload]), broadcastConfig: () => {},
+        applyWallpaper: () => {}, showRelinkDialog: async () => null, log: () => {},
+    });
+    await tracking.scan();
+    const checked = sent.find((s) => s[0] === 'files:checked')[1];
+    assert.deepEqual(checked.checked.sort(), [gone, kept].sort());
+    assert.deepEqual(checked.missing, [gone]);
+});
+
+test('relink：列表外扩展名的歌（.opus）能接上，对话框拿到扩展名；没有扩展名的不支持', async () => {
+    let picked = null;
+    const ctx = setup({ pick: () => picked });
+    const gone = path.join(ctx.files, 'old', 'a.opus');
+    picked = ctx.make('new\\a.opus');
+    ctx.store.saveConfig({ vinyl: { playlist: [{ path: gone, name: 'a' }], current: gone } });
+    assert.deepEqual(await ctx.tracking.relink(gone), { to: picked, count: 1 });
+    const dialog = ctx.calls.find((c) => c[0] === 'dialog')[1];
+    assert.deepEqual(dialog, { fromPath: gone, kind: null, extension: 'opus' });
+    assert.equal(ctx.store.getConfig().vinyl.current, picked);
+
+    assert.deepEqual(await ctx.tracking.relink(path.join(ctx.files, 'noext')), { error: '不支持的文件类型' });
+});
+
+test('relink：原来在盘符根目录（U 盘换了盘符），同一个根目录里其它找不到的顺带接上', async (t) => {
+    const letter = [...'QRSTUVWXYZ'].find((l) => !fs.existsSync(l + ':\\'));
+    if (!letter) return t.skip('没有空着的盘符');
+    let picked = null;
+    const ctx = setup({ pick: () => picked });
+    const a = letter + ':\\a.mp3';
+    const b = letter + ':\\b.mp3';
+    picked = ctx.make('usb\\a.mp3');
+    const bNew = ctx.make('usb\\b.mp3');
+    ctx.store.saveConfig({ vinyl: { playlist: [{ path: a, name: 'a' }, { path: b, name: 'b' }], current: a } });
+    assert.deepEqual(await ctx.tracking.relink(a), { to: picked, count: 2 });
+    assert.deepEqual(ctx.store.getConfig().vinyl.playlist.map((tr) => tr.path), [picked, bNew]);
+});
