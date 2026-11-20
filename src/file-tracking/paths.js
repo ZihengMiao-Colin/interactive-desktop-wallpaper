@@ -12,7 +12,7 @@
 'use strict';
 
 const path = require('path').win32;
-const { samePath } = require('../../shared/my-wallpapers');
+const { samePath, wallpaperType } = require('../../shared/my-wallpapers');
 const { trackName } = require('../../shared/playlist');
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'];
@@ -27,6 +27,15 @@ function fileKind(filePath) {
     if (VIDEO_EXTENSIONS.includes(ext)) return 'video';
     if (AUDIO_EXTENSIONS.includes(ext)) return 'audio';
     return null;
+}
+
+/**
+ * 两个文件是不是同一类，找回 / 接上时用：类型要一样，壁纸能不能用也要一样
+ * （「我的壁纸」不支持 gif，壁纸被接到 gif 上的话那一格会被当成坏数据去掉）。
+ */
+function sameKind(a, b) {
+    const kind = fileKind(a);
+    return !!kind && kind === fileKind(b) && wallpaperType(a) === wallpaperType(b);
 }
 
 const isPath = (p) => typeof p === 'string' && p !== '';
@@ -123,7 +132,7 @@ function relinkMoves({ from, to, missing, exists }) {
         const normalized = String(p).replace(/\//g, '\\');
         if (!normalized.toLowerCase().startsWith(oldDir + '\\')) continue;
         const candidate = path.join(newDir, normalized.slice(oldDir.length + 1));
-        if (fileKind(candidate) && fileKind(candidate) === fileKind(p) && exists(candidate)) moves.push({ from: p, to: candidate });
+        if (sameKind(p, candidate) && exists(candidate)) moves.push({ from: p, to: candidate });
     }
     return moves;
 }
@@ -133,6 +142,7 @@ module.exports = {
     VIDEO_EXTENSIONS,
     AUDIO_EXTENSIONS,
     fileKind,
+    sameKind,
     collectPaths,
     replacePaths,
     relinkMoves,

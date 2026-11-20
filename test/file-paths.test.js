@@ -123,3 +123,14 @@ test('relinkMoves 不认识类型的文件不顺带接上，别的类型（音�
         { from: 'C:\\old\\b.mp3', to: 'E:\\new\\b.mp3' },
     ]);
 });
+
+test('sameKind：同一类才算；壁纸图片换成 gif 不算（「我的壁纸」不支持 gif，接上后那一格会消失）', () => {
+    const { sameKind } = require('../src/file-tracking/paths');
+    assert.equal(sameKind('C:\a.jpg', 'D:\b.PNG'), true);
+    assert.equal(sameKind('C:\a.mp3', 'D:\b.flac'), true);
+    assert.equal(sameKind('C:\a.mp4', 'D:\b.mkv'), true);
+    assert.equal(sameKind('C:\a.jpg', 'D:\b.gif'), false);
+    assert.equal(sameKind('C:\a.gif', 'D:\b.gif'), true);
+    assert.equal(sameKind('C:\a.jpg', 'D:\b.mp4'), false);
+    assert.equal(sameKind('C:\a', 'D:\b'), false);
+});

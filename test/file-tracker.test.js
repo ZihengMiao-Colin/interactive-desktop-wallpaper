@@ -118,3 +118,11 @@ test('rename 把记录挪到新路径，之后 locate 用新路径的记录', as
     assert.equal(tracker.locate(a), null);
     assert.ok(samePath(tracker.locate(b), c));
 });
+
+test('壁纸图片挪走后被改成 gif 时找不回（「我的壁纸」不支持 gif）', async () => {
+    const { dir, make, tracker } = setup();
+    const a = make('a.jpg');
+    await tracker.record([a]);
+    fs.renameSync(a, path.join(dir, 'a.gif'));
+    assert.deepEqual(await tracker.findMoves([a]), []);
+});

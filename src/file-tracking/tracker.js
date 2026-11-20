@@ -11,7 +11,7 @@
 'use strict';
 
 const fs = require('fs');
-const { fileKind } = require('./paths');
+const { sameKind } = require('./paths');
 
 /** 记录的 key：不分大小写和斜杠方向（和 shared/my-wallpapers.js 的 samePath 一样） */
 const keyOf = (p) => String(p || '').toLowerCase().replace(/\//g, '\\');
@@ -125,7 +125,7 @@ class FileTracker {
             if (!record) return null;
             const found = this.fileIds.findPathById(record, fromPath);
             if (!found || inRecycleBin(found)) return null;
-            if (!fileKind(found) || fileKind(found) !== fileKind(fromPath)) return null;
+            if (!sameKind(fromPath, found)) return null;
             const now = this.fileIds.readFileId(found);
             if (!now || now.vol !== record.vol || now.id !== record.id || now.size !== record.size) return null;
             return found;
