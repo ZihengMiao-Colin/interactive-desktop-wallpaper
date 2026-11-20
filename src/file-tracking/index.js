@@ -80,6 +80,8 @@ function createFileTracking({
                 const moves = await tracker.findMoves(collectPaths(store.getConfig()));
                 if (moves.length) applyMoves(moves);
                 await tracker.record(collectPaths(store.getConfig()));
+                // 设置页开着时文件被挪走、又没找回来：配置没变，设置页收到这个才会重新看哪些文件找不到
+                sendToWindows('files:checked');
             } catch (err) {
                 console.error('[FileTracking] 检查文件失败:', err);
             } finally {

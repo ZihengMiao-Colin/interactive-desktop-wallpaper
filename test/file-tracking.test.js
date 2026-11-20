@@ -65,8 +65,8 @@ test('scan：当前图片壁纸改名后，配置里所有引用、深度图缓�
     assert.deepEqual(config.myWallpapers[0].crop, { x: 0.1, y: 0, w: 0.8, h: 1 });
     assert.equal(ctx.store.hasDepthCache(config.currentImage), true);
 
-    const sendIndex = ctx.calls.findIndex((c) => c[0] === 'send');
-    assert.equal(ctx.calls[sendIndex][1], 'files:relocated');
+    const sendIndex = ctx.calls.findIndex((c) => c[0] === 'send' && c[1] === 'files:relocated');
+    assert.ok(sendIndex >= 0);
     assert.equal(ctx.calls[sendIndex][2].length, 1);
     assert.equal(ctx.calls[sendIndex][2][0].from, a);
     assert.ok(samePath(ctx.calls[sendIndex][2][0].to, b));
@@ -187,4 +187,17 @@ test('relink：壁纸图片选了 gif 时不接（「我的壁纸」不支持 gi
     ctx.store.saveConfig({ myWallpapers: [{ path: gone, type: 'image', addedAt: 1, lastUsedAt: 1 }] });
     assert.deepEqual(await ctx.tracking.relink(gone), { error: '要选同一种文件' });
     assert.equal(ctx.store.getConfig().myWallpapers.length, 1);
+});
+
+test('scan 结束后通知窗口 files:checked（设置页据此刷新"找不到文件"），找回了文件时在 files:relocated 之后', async () => {
+    const ctx = setup();
+    const a = ctx.make('a.jpg');
+    ctx.store.saveConfig({ currentImage: a });
+    await ctx.tracking.scan();
+    assert.deepEqual(ctx.calls.filter((c) => c[0] === 'send').map((c) => c[1]), ['files:checked']);
+
+    ctx.calls.length = 0;
+    fs.renameSync(a, path.join(ctx.files, 'b.jpg'));
+    await ctx.tracking.scan();
+    assert.deepEqual(ctx.calls.filter((c) => c[0] === 'send').map((c) => c[1]), ['files:relocated', 'files:checked']);
 });

@@ -100,6 +100,9 @@ function initEffectsPage({ api, saver, setStatus }) {
         customName.classList.toggle('missing', missing);
     }
 
+    // 主进程检查完文件：自己的视频找不到了（或者又找到了）时更新提示
+    api.files.onChecked(() => renderSelection());
+
     // 自己的视频被挪走、改名后主进程换了路径（在新配置之前到）：记着的路径和名字跟着换
     api.files.onRelocated((moves) => {
         const move = customVideoPath && moves.find((m) => Shared.myWallpapers.samePath(m.from, customVideoPath));

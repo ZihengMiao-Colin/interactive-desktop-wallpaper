@@ -179,7 +179,15 @@ function initMusicPage({ api, saver, setStatus }) {
         if (slot !== from && slot !== from + 1) update({ playlist: PL.moveTrack(vinyl.playlist, from, slot) });
     });
 
+    /** 哪些歌的文件找不到（主进程检查完文件后和上次画的比，变了才重画） */
+    const missingKey = () => vinyl.playlist.map((t) => (api.fileExists(t.path) ? '1' : '0')).join('');
+    let renderedMissing = '';
+    api.files.onChecked(() => {
+        if (dragFrom < 0 && missingKey() !== renderedMissing) renderPlaylist();
+    });
+
     function renderPlaylist() {
+        renderedMissing = missingKey();
         const n = vinyl.playlist.length;
         countEl.textContent = n ? `${n} 首` : '';
         if (!n) {

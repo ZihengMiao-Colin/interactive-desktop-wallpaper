@@ -149,7 +149,12 @@ function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
         }
     }
 
+    /** 哪些格子的文件找不到（主进程检查完文件后和上次画的比，变了才重画） */
+    const missingKey = () => list.map((e) => (api.fileExists(e.path) ? '1' : '0')).join('');
+    let renderedMissing = '';
+
     function render() {
+        renderedMissing = missingKey();
         grid.replaceChildren(renderAddCard(), ...list.map(renderCard));
         countEl.textContent = list.length || '';
         hintEl.textContent = list.length ? '同一个盘里挪动、改名会自动找回' : '你自己的图片和视频';
@@ -173,6 +178,10 @@ function initMyWallpapersPanel({ api, onSelect, onPick, onCrop, setStatus }) {
 
     api.onLoadConfig(refresh);
     const ready = api.getConfig().then(refresh);
+    // 设置页开着时文件被挪走、又没自动找回来：配置没变，靠这个把"找不到文件"显示出来
+    api.files.onChecked(() => {
+        if (missingKey() !== renderedMissing) render();
+    });
 
     return {
         ready,
