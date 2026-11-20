@@ -20,6 +20,8 @@ const Host = (() => {
             mode,
             getConfig: () => api.getConfig(),
             onConfig: (callback) => api.onLoadConfig(callback),
+            /** 导入的文件被挪走、改名后换了路径：[{ from, to }]，在新配置之前到 */
+            onFilesRelocated: (callback) => api.files.onRelocated(callback),
             getBuiltinAssets: () => api.elements.getBuiltin(),
             /** 全屏视频特效预设（绝对路径：打包后素材在 resources/overlay，不在页面旁边） */
             getOverlayPresets: () => api.getOverlayPresets(),
@@ -52,6 +54,7 @@ const Host = (() => {
             return { customElements: Shared.elements.normalizeCustomElements(c.customElements) };
         },
         onConfig: () => {},
+        onFilesRelocated: () => {},
         getBuiltinAssets: async () => {
             try {
                 const manifest = await fetch('elements/manifest.json').then((r) => r.json());

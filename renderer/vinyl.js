@@ -171,6 +171,26 @@ class VinylPlayerManager {
         this.showStatus();
     }
 
+    /**
+     * 文件被挪走、改名后主进程换掉了配置里的路径（在新配置之前到）。
+     * 把记着的路径先换成新的，收到新配置时就不会当成换了一首歌、从头重放；
+     * 这首正因为文件不见了放不了的话，清掉记着的路径，让新配置按新路径重新加载。
+     * @param {Array<{from: string, to: string}>} moves
+     */
+    applyRelocations(moves) {
+        for (const { from, to } of moves || []) {
+            if (from === this.currentAudioPath) {
+                if (this.skippingPath === from) {
+                    this.currentAudioPath = '';
+                    this.skippingPath = '';
+                } else {
+                    this.currentAudioPath = to;
+                }
+            }
+            if (from === this.currentCoverPath) this.currentCoverPath = to;
+        }
+    }
+
     // ==================== 歌单 ====================
 
     /** 改配置里的唱片机字段（换歌、停下） */
@@ -195,10 +215,29 @@ class VinylPlayerManager {
         this.showStatus();
     }
 
-    /** 当前这首放不了：提示并跳到下一首；连着放不了的歌够整张歌单了就停下 */
+    /**
+     * 当前这首放不了。文件不在原来的位置时先让主进程按编号找一下：找到了主进程会换掉配置里的路径
+     * （先发 files:relocated，见 applyRelocations），这首照常放；找不到再跳到下一首。
+     */
     skipBroken() {
         if (this.previewOnly || !this.config || this.skippingPath === this.currentAudioPath) return;
-        this.skippingPath = this.currentAudioPath;
+        const brokenPath = this.currentAudioPath;
+        this.skippingPath = brokenPath;
+        const files = isElectron && window.electronAPI && window.electronAPI.files;
+        if (files && brokenPath && !window.electronAPI.fileExists(brokenPath)) {
+            const skipIfStillBroken = (found) => {
+                // 找回来的话 applyRelocations 已经清掉了 skippingPath，这里就不跳了
+                if ((!found || found === brokenPath) && this.skippingPath === brokenPath) this.skipToNext();
+            };
+            files.locate(brokenPath).then(skipIfStillBroken, () => skipIfStillBroken(null));
+            return;
+        }
+        this.skipToNext();
+    }
+
+    /** 提示并跳到下一首；连着放不了的歌够整张歌单了就停下 */
+    skipToNext() {
+        if (!this.config) return;
         const track = Shared.playlist.currentTrack(this.config);
         const name = track ? track.name : '这首歌';
         this.failures += 1;
