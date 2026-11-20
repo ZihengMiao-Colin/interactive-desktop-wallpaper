@@ -755,17 +755,18 @@ h1, h2, h3 { font-feature-settings: "palt"; }
 .asset.add svg.i { width: 20px; height: 20px; }
 .asset.add:hover { --p-line: var(--accent-text); color: var(--accent-text); }
 
-/* 壁纸上的元素：左边列表，右边调整面板 */
+/* 壁纸上的元素：左边列表，右边调整面板（最宽 520px，全屏时不再一路拉宽） */
 .md {
     display: grid;
-    grid-template-columns: minmax(200px, 250px) 1fr;
+    grid-template-columns: minmax(200px, 250px) minmax(0, 520px);
     gap: 16px;
     align-items: start;
 }
 /* 一个元素都没有时只留一句引导 */
 .md.none { grid-template-columns: 1fr; }
 .md.none .inst-list { display: none; }
-.inst-list { display: grid; }
+/* minmax(0, 1fr)：列宽不被最长的名字撑开，否则列表会伸到右边面板底下 */
+.inst-list { display: grid; grid-template-columns: minmax(0, 1fr); }
 /* 一行一个元素，行之间细线分隔；选中的左边一条主色、底色亮一档 */
 .inst {
     position: relative;
@@ -851,27 +852,58 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     text-overflow: ellipsis;
 }
 .detail-head .end { display: flex; gap: 4px; margin-left: auto; }
-.dsec { padding: 8px 20px 14px; }
-.dsec + .dsec { border-top: 1px solid var(--line); }
-.dsec h3 {
+/* 标签栏：一排文字标签，选中的底下一条主色；右端放当前标签的附加按钮（恢复原色） */
+.dtabs {
+    display: flex;
+    align-items: stretch;
+    padding: 0 10px 0 6px;
+    border-bottom: 1px solid var(--line);
+}
+.dtab-list { display: flex; }
+.dtab {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 28px;
-    margin: 6px 0 4px;
+    gap: 5px;
+    height: 34px;
+    padding: 0 12px;
+    border: 0;
+    background: none;
     color: var(--text-2);
-    font-size: 12px;
-    font-weight: 700;
+    font: inherit;
+    font-size: 12.5px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.15s, background-color 0.15s;
 }
-/* 小节标题前的小方块 */
-.dsec h3::before { content: ''; flex: none; width: 6px; height: 6px; background: var(--line-strong); }
-.dsec h3 .end { margin-left: auto; }
+.dtab:hover:not(.on) { background: var(--hover); color: var(--text); }
+.dtab.on { color: var(--text); font-weight: 700; }
+.dtab.on::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    background: var(--accent);
+}
+.dtab:focus-visible { outline-offset: -2px; }
+/* 这一组里有和默认不一样的设置 */
+.dtab .dot { display: none; width: 5px; height: 5px; background: var(--accent-text); }
+.dtab.marked .dot { display: block; }
+.dtabs .end { display: flex; align-items: center; margin-left: auto; }
+.dtabs .end .btn[hidden] { display: none; }
+/* 标签内容区：最小高度按最高的"颜色"一组（4 行），切标签时面板不忽高忽低 */
+.dpane {
+    min-height: calc(4 * 30px + 20px);
+    padding: 10px 16px;
+}
 .drow {
     display: grid;
     grid-template-columns: 72px 1fr 52px;
     align-items: center;
     gap: 10px;
-    min-height: 36px;
+    min-height: 30px;
 }
 .drow[hidden], .note[hidden] { display: none; }
 .drow > label { color: var(--text-2); }
