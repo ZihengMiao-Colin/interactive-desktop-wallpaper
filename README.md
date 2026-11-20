@@ -102,4 +102,4 @@ venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id x
 
 - 默认壁纸（`wallpapers/`）：2 张，都是 CC0（作者已放弃版权），分别来自 Pexels 和 Pixabay，作者写在 `wallpapers/manifest.json` 的 `credit` 里。
 - 字体（`ui/fonts/`）：SIL OFL 1.1，许可证文件在同一目录。
-- 深度模型 Depth Anything V2 Small（不在仓库里，安装包里带了）：Apache-2.0。
+- 深度模型 Depth Anything V2 Small（不在仓库里，安装包里带了）：Apache-2.0，许可证文本在 `licenses/`，安装后在 `resources/models/`。

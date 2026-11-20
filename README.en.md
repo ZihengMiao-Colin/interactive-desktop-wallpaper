@@ -102,4 +102,4 @@ The code is under the [MIT License](LICENSE). The following are not covered by i
 
 - Default wallpapers (`wallpapers/`): 2 images, both CC0 (the authors have waived their copyright), one from Pexels and one from Pixabay; the authors are in the `credit` field of `wallpapers/manifest.json`.
 - Fonts (`ui/fonts/`): SIL OFL 1.1, with the license files in the same folder.
-- The Depth Anything V2 Small depth model (not in the repo, bundled in the installer): Apache-2.0.
+- The Depth Anything V2 Small depth model (not in the repo, bundled in the installer): Apache-2.0; the license text is in `licenses/`, and in `resources/models/` once installed.

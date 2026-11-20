@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-18 (diagnostic report and feedback: one-click txt report from the settings page or tray, feedback on GitHub, a Chinese prompt when the main process throws, window and GPU process crashes now logged, see Phase 20); 2026-11-14 (UI redone with the updated `ark-style-ui`: square panels, neutral grays with a cyan accent, a color bar plus a thin frame, no more cut corners or frosted glass, see Phase 19); 2026-11-13 (deleted built-in assets with unclear licensing: only the 2 CC0 default wallpapers remain, and all built-in video effects and explosion elements are gone, see Phase 18; the license check is under "Public distribution notes" in §9); 2026-11-10 (wrap-up: added `LICENSE` and cleaned up the Python dependencies, see §9 Phase 5; before that, v1.3.1: the wallpaper no longer covers other programs when it can't attach to the desktop layer, see Phase 17; cropping on import, see Phase 16)
+> Last updated: 2026-11-19 (Phases 18–20 packaged as v1.4.0; the installer now carries the model's Apache-2.0 license, see the end of Phase 20); 2026-11-18 (diagnostic report and feedback: one-click txt report from the settings page or tray, feedback on GitHub, a Chinese prompt when the main process throws, window and GPU process crashes now logged, see Phase 20); 2026-11-14 (UI redone with the updated `ark-style-ui`: square panels, neutral grays with a cyan accent, a color bar plus a thin frame, no more cut corners or frosted glass, see Phase 19); 2026-11-13 (deleted built-in assets with unclear licensing: only the 2 CC0 default wallpapers remain, and all built-in video effects and explosion elements are gone, see Phase 18; the license check is under "Public distribution notes" in §9); 2026-11-10 (wrap-up: added `LICENSE` and cleaned up the Python dependencies, see §9 Phase 5; before that, v1.3.1: the wallpaper no longer covers other programs when it can't attach to the desktop layer, see Phase 17; cropping on import, see Phase 16)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -159,6 +159,7 @@ On top of that you can layer:
 ├── generate_depth_map.py / export_onnx.py   Python depth-map generation (used by tools/prepare_wallpapers.py; the app now uses src/depth/)
 ├── requirements.txt         Python dependencies of the venv (pinned; don't remove the encoding line at the top, see §9 Phase 5)
 ├── LICENSE                  MIT, code only; licenses for assets, fonts and the model are in the README "License" section
+├── licenses/                Third-party licenses shipped with the installer (the depth model's Apache-2.0, packaged into resources/models/)
 ├── background.png / background2.png / depth_map.png   Default assets
 └── default wallpaper/       (in .gitignore) Original images of the default wallpapers; the gallery assets are generated from it; can be deleted
 ```
@@ -759,6 +760,16 @@ The user's problem: when the app fails on someone else's computer, there is no w
 - Verification: `npm test` all 457 pass (80 new). Real Electron run (separate data folder + debugging port; the Desktop path pointed at a temp folder, and "select in folder", opening the browser and system message boxes replaced with recorders): the three buttons on the settings page, buttons disabled while generating, the toast text; the report contents (real GPU, 2560×1600 240Hz, WorkerW → Progman once attached, 360's `ZhuDongFangYu.exe` recognized, the user name nowhere in the report); the GitHub URL (1597 characters, title and body correct); an exception thrown on purpose in the main process: the Chinese box appeared, choosing "生成诊断报告" really generated a report, and a second exception 3 s later was only logged; `forcefullyCrashRenderer` on the wallpaper window and `chrome://gpucrash` were both logged as errors; a script that throws, loaded into the settings page, was logged with "(boom.js:3)"; no horizontal scrolling at 820 wide.
 - Not tested: real clicks on the tray menu; real system message boxes, Explorer and browser (all replaced with recorders); whether GitHub fills in the page correctly (the URL format is from GitHub's docs); the startup-failure prompt (unit tests only); the light theme; the installed packaged build.
 
+Phases 18–20 packaged as **v1.4.0** (2026-11-19). Since v1.3.1 there is a new feature (feedback) and a UI redo, so the minor version goes up.
+- `package.json` version set to 1.4.0. Added the model license still owed under "Public distribution notes" in §9: `licenses/depth-anything-v2-small.txt` (source, a note on the changes, and the full Apache-2.0 text, whose MD5 matches apache.org's), which `extraResources` puts at `resources/models/LICENSE-depth-anything-v2-small.txt`. `findDepthModel` only matches `depth_anything_v2_small*.onnx`, so it never picks this file. The IR 9, opset 18 and PyTorch export in the change note were checked against the model file's header.
+- Installer: 190,251,699 bytes (v1.3.1 was 357,361,544; the difference is the deleted videos and wallpapers), SHA-256 `fb690f2e430398689f3f32a38b4c394637bffef77fe89e550a49d6a045486bbc`.
+- `npm test`: all 457 pass. Extracted `app.asar` and compared it with the source: of 198 files only `package.json`, rewritten by electron-builder, differs.
+- Ran `dist/win-unpacked` (separate data folder + debugging ports; the desktop path, "show in folder" and opening the browser replaced with recorders):
+  - New user: version 1.4.0, packaged; gallery shows 2, default is the snowy peaks lake; generating a depth map for the bundled Milky Way image succeeded in 0.95 s; report generation works (UTF-8 with BOM, CRLF, no user name found), GitHub URL 1753 characters; no horizontal scrolling in the default window; 0 error / warn lines in the log.
+  - Simulated v1.3.1 user (config pointing at the deleted `lake-forest.jpg`, the `snow2` video effect on, a `builtin:bomb1` element placed): after startup the wallpaper is the snowy peaks lake, the video effect is `custom` and off, the explosion element is gone, the log has two migration lines and 0 errors.
+  - 360 was running this time (`360tray.exe` and `ZhuDongFangYu.exe` both present), yet the packaged build attached to WorkerW both times (`app:isOnDesktopLayer` was `true`, no notice). This differs from 11-05; the cause was not investigated. The fallback-mode code is unchanged.
+- Not tested: a real install or install-over-upgrade (the copy installed on this machine was left alone); real clicks on the tray menu; the light theme.
+
 ### ✅ Phase 5 — Wrap-up (2026-11-10)
 - [x] Deleted `生成深度图.bat` (the "generate depth map" batch file): the app generates depth maps itself, and the bat still offered base / large models that have long been gone.
 - [x] `requirements.txt` now lists what the venv actually has installed — onnxruntime / numpy / pillow — pinned to the venv's versions (checked with `pip install --dry-run --no-index -r requirements.txt`). Don't remove the `# -*- coding: utf-8 -*-` first line: on Chinese Windows pip reads the file as GBK by default and fails with `UnicodeDecodeError` on the Chinese comments (the old file had the same problem). ffmpeg and the torch needed by `export_onnx.py` are mentioned in comments.
@@ -821,7 +832,7 @@ Public distribution notes (v1.0.0 is public; these still hold):
 - No code signing, so others will see a SmartScreen prompt.
 - Electron 28 no longer receives security updates. It only loads local pages, so the risk is low and v1 can leave it.
 - ~~`package.json` says `"license": "MIT"`, but the repo has no `LICENSE` file~~ ✅ 2026-11-10 added; the README says what is not covered by MIT.
-- The Depth Anything V2 Small model bundled in the installer is Apache-2.0, which requires a copy of its license text when redistributing; the installer doesn't include one yet. Add the license text at the next build.
+- ~~The Depth Anything V2 Small model bundled in the installer is Apache-2.0, which requires a copy of its license text when redistributing; the installer doesn't include one yet~~ ✅ 2026-11-19 from v1.4.0 on it is at `resources/models/LICENSE-depth-anything-v2-small.txt` (source file `licenses/depth-anything-v2-small.txt`). v1.3.1 and older installers don't have it.
 - The record player cover `coverPath` points to an image in `default wallpaper/` (now in `.gitignore`); change the cover before deleting that folder.
 
 ---

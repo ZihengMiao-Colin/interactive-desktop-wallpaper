@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-18（诊断报告和问题反馈：设置页 / 托盘一键生成 txt 报告、到 GitHub 反馈、主进程出错时弹中文提示框、补记窗口和 GPU 进程崩溃，见阶段 20）；2026-11-14（界面按更新后的 `ark-style-ui` 重做：直角面板、中性灰配青色、色条加细框，去掉切角和磨砂，见阶段 19）；2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
+> 最近更新：2026-11-19（阶段 18–20 打包成 v1.4.0，安装包带上模型的 Apache-2.0 许可证，见阶段 20 末尾）；2026-11-18（诊断报告和问题反馈：设置页 / 托盘一键生成 txt 报告、到 GitHub 反馈、主进程出错时弹中文提示框、补记窗口和 GPU 进程崩溃，见阶段 20）；2026-11-14（界面按更新后的 `ark-style-ui` 重做：直角面板、中性灰配青色、色条加细框，去掉切角和磨砂，见阶段 19）；2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -160,6 +160,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ├── generate_depth_map.py / export_onnx.py   Python 版深度图（tools/prepare_wallpapers.py 在用；应用里已换成 src/depth/）
 ├── requirements.txt         venv 里的 Python 依赖（版本锁定；第一行的编码声明不能删，见 §9 阶段 5）
 ├── LICENSE                  MIT，只管代码；素材、字体、模型的许可见 README"许可"一节
+├── licenses/                随安装包分发的第三方许可证（深度模型的 Apache-2.0，打包时放进 resources/models/）
 ├── background.png / background2.png / depth_map.png   默认素材
 └── default wallpaper/       （在 .gitignore 里）默认壁纸的原图，图库素材由它生成，可以删除
 ```
@@ -756,6 +757,16 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 验证：`npm test` 457 个全过（新增 80 个）。Electron 实测（单独的数据目录 + 调试端口；桌面路径指到临时目录，"在文件夹里选中"、打开浏览器、系统提示框都换成只记录）：设置页三个按钮、生成中按钮不能点、提示文字；报告内容（真实显卡、2560×1600 240Hz、挂上桌面层后的 WorkerW → Progman、认出 360 的 `ZhuDongFangYu.exe`、整份报告搜不到用户名）；GitHub 地址（1597 字符，标题、正文对）；主进程故意抛异常：中文框、选"生成诊断报告"真的生成了，3 秒后的第二个异常只记日志；壁纸窗口 `forcefullyCrashRenderer`、`chrome://gpucrash` 都记成 error；设置页加载一个会抛异常的脚本，日志带"（boom.js:3）"；820 宽没有横向滚动。
 - 没测：托盘菜单的真实点击；真的弹出系统提示框、真的打开资源管理器和浏览器（都换成了记录）；GitHub 页面能不能正确填上（地址格式是 GitHub 文档里的）；启动失败的提示框（只有单元测试）；日间主题；打包后的安装版。
 
+阶段 18–20 打包成 **v1.4.0**（2026-11-19）。v1.3.1 之后有新功能（问题反馈）和界面重做，所以升次版本号。
+- `package.json` 版本号改为 1.4.0。补上 §9"公开分发相关"里欠着的模型许可证：`licenses/depth-anything-v2-small.txt`（来源、改动说明 + Apache-2.0 全文，全文和 apache.org 的 MD5 一致），`extraResources` 把它放到 `resources/models/LICENSE-depth-anything-v2-small.txt`。`findDepthModel` 只认 `depth_anything_v2_small*.onnx`，不会选到它。改动说明里的 IR 9、opset 18、PyTorch 导出是读模型文件头核对的。
+- 安装包 190,251,699 字节（v1.3.1 是 357,361,544，少的是删掉的视频和壁纸），SHA-256 `fb690f2e430398689f3f32a38b4c394637bffef77fe89e550a49d6a045486bbc`。
+- `npm test` 457 个全过；解出 `app.asar` 和源码比对，198 个文件只有 electron-builder 改写的 `package.json` 不同。
+- 跑 `dist/win-unpacked`（单独的数据目录 + 调试端口，桌面路径和"在文件夹里选中"、打开浏览器都换成记录）：
+  - 全新用户：版本 1.4.0、安装版；图库 2 张，默认雪山镜湖；用打包里的银河图生成深度图 0.95 秒成功；生成报告正常（UTF-8 带 BOM、CRLF、搜不到用户名），GitHub 地址 1753 字符；默认窗口没有横向滚动；日志 0 个 error / warn。
+  - 模拟 v1.3.1 老用户（配置里写上已删的 `lake-forest.jpg`、开着 `snow2` 视频特效、壁纸上摆着 `builtin:bomb1`）：启动后壁纸换成雪山镜湖，视频特效变成 `custom` 并关掉，爆炸元素去掉，日志里两条迁移记录，0 个错误。
+  - 这次 360 开着（`360tray.exe`、`ZhuDongFangYu.exe` 都在），打包版两次都挂上了 WorkerW（`app:isOnDesktopLayer` 为 `true`，提示不显示）。和 11-05 的结果不一样，原因没查；兜底模式的代码没变。
+- 没测：真的安装和覆盖安装（没动本机的安装）；托盘菜单的真实点击；日间主题。
+
 ### ✅ 阶段 5 — 收尾（2026-11-10）
 - [x] 删掉 `生成深度图.bat`：应用自己能生成深度图，它还在选早就没有的 base / large 模型。
 - [x] `requirements.txt` 改成 venv 实际装的 onnxruntime / numpy / pillow，版本锁定成和 venv 一样（`pip install --dry-run --no-index -r requirements.txt` 核对过）。第一行的 `# -*- coding: utf-8 -*-` 不能删：中文 Windows 上 pip 默认按 GBK 读这个文件，读到中文注释会报 `UnicodeDecodeError`（原来的文件也有这个问题）。ffmpeg 和 `export_onnx.py` 要的 torch 写在注释里。
@@ -818,7 +829,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 没有代码签名，别人运行会看到 SmartScreen 提示。
 - Electron 28 已停止安全更新。只加载本地页面，风险低，v1 可以不动。
 - ~~`package.json` 写了 `"license": "MIT"`，但仓库里没有 `LICENSE` 文件~~ ✅ 2026-11-10 补上了，README 写明了哪些不在 MIT 范围内。
-- 安装包带的 Depth Anything V2 Small 模型是 Apache-2.0，转发时要附上它的许可证文本，安装包里现在没有。下次打包时把许可证文本一起放进去。
+- ~~安装包带的 Depth Anything V2 Small 模型是 Apache-2.0，转发时要附上它的许可证文本，安装包里现在没有~~ ✅ 2026-11-19 从 v1.4.0 起放在 `resources/models/LICENSE-depth-anything-v2-small.txt`（源文件 `licenses/depth-anything-v2-small.txt`）。v1.3.1 及更早的安装包里没有。
 - 唱片机封面 `coverPath` 指向 `default wallpaper/`（已加进 `.gitignore`）里的一张图，删这个目录前先换封面。
 
 ---
