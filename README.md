@@ -1,8 +1,8 @@
-# 互动3D壁纸
+# Kirie 壁纸
 
 **简体中文** | [English](README.en.md)
 
-Windows 桌面上的伪 3D 视差动态壁纸：选一张图片，AI 自动生成深度图，移动鼠标时画面按远近产生视差，像透过窗户看一个立体场景。还可以往壁纸上放自己的图片、GIF、视频，它们会和场景一起移动，并被前景物体自然遮挡。
+Kirie（日语"切り絵"，剪纸画）是 Windows 桌面上的伪 3D 视差动态壁纸：选一张图片，AI 自动生成深度图，移动鼠标时画面按远近产生视差，像透过窗户看一个立体场景。还可以往壁纸上放自己的图片、GIF、视频，它们会和场景一起移动，并被前景物体自然遮挡。
 
 安卓手机版在 [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper)：同样的视差效果，倾斜手机驱动，深度图在手机本地生成。
 
@@ -44,7 +44,7 @@ npm start
 npm run build
 ```
 
-生成 `dist/Interactive3DWallpaper-Setup-<版本>.exe`（NSIS 安装包，文件名不带中文，方便传到 GitHub Releases）。打包要求项目根目录有 `depth_anything_v2_small_ir9.onnx`，它会被复制进安装包。第一次打包遇到 `winCodeSign` 解压报"Cannot create symbolic link"的处理办法见 [PROJECT_NOTES.md](PROJECT_NOTES.md) §9 阶段 6。
+生成 `dist/Kirie-Setup-<版本>.exe`（NSIS 安装包，文件名不带中文，方便传到 GitHub Releases）。打包要求项目根目录有 `depth_anything_v2_small_ir9.onnx`，它会被复制进安装包。第一次打包遇到 `winCodeSign` 解压报"Cannot create symbolic link"的处理办法见 [PROJECT_NOTES.md](PROJECT_NOTES.md) §9 阶段 6。
 
 ## 开发
 
