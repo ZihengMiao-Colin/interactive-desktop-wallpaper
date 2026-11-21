@@ -1,8 +1,8 @@
-# Interactive 3D Wallpaper
+# Kirie
 
 [简体中文](README.md) | **English**
 
-A pseudo-3D parallax live wallpaper for the Windows desktop: pick an image, an AI model generates its depth map, and as you move the mouse the scene shifts by distance, like looking at a 3D scene through a window. You can also place your own images, GIFs and videos on the wallpaper; they move with the scene and are naturally occluded by foreground objects.
+Kirie (Japanese 切り絵, paper-cut art) is a pseudo-3D parallax live wallpaper for the Windows desktop: pick an image, an AI model generates its depth map, and as you move the mouse the scene shifts by distance, like looking at a 3D scene through a window. You can also place your own images, GIFs and videos on the wallpaper; they move with the scene and are naturally occluded by foreground objects.
 
 The Android version is at [interactive-phone-wallpaper](https://github.com/ZihengMiao-Colin/interactive-phone-wallpaper): the same parallax effect, driven by tilting the phone, with depth maps generated on the phone.
 
@@ -44,7 +44,7 @@ npm start
 npm run build
 ```
 
-Produces `dist/Interactive3DWallpaper-Setup-<version>.exe` (an NSIS installer; the file name has no Chinese characters so it uploads cleanly to GitHub Releases). Packaging requires `depth_anything_v2_small_ir9.onnx` in the project root; it is copied into the installer. If the first build fails extracting `winCodeSign` with "Cannot create symbolic link", see [PROJECT_NOTES.en.md](PROJECT_NOTES.en.md) §9 Phase 6.
+Produces `dist/Kirie-Setup-<version>.exe` (an NSIS installer; the file name has no Chinese characters so it uploads cleanly to GitHub Releases). Packaging requires `depth_anything_v2_small_ir9.onnx` in the project root; it is copied into the installer. If the first build fails extracting `winCodeSign` with "Cannot create symbolic link", see [PROJECT_NOTES.en.md](PROJECT_NOTES.en.md) §9 Phase 6.
 
 ## Development
 

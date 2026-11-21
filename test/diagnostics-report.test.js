@@ -17,7 +17,7 @@ function sampleInfo(overrides = {}) {
             os: 'Windows 11 Pro', osRelease: '10.0.26200', arch: 'x64',
             cpu: 'Intel(R) Core(TM) i7-12700H', cpuCount: 20, memoryGB: 15.7,
             locale: 'zh-CN', uptimeSec: 4980,
-            exePath: 'C:\\Program Files\\互动3D壁纸\\互动3D壁纸.exe',
+            exePath: 'C:\\Program Files\\Kirie 壁纸\\Kirie.exe',
             dataDir: 'C:\\Users\\Alice\\AppData\\Roaming\\interactive-desktop-wallpaper',
             depthDir: 'C:\\Users\\Alice\\AppData\\Roaming\\interactive-desktop-wallpaper\\depth_cache',
             launchedAtLogin: false, autoLaunch: true,
@@ -47,7 +47,7 @@ function sampleInfo(overrides = {}) {
 
 test('报告开头有生成时间和隐私说明', () => {
     const text = formatReport(sampleInfo());
-    assert.match(text, /^互动3D壁纸 诊断报告\n/);
+    assert.match(text, /^Kirie 壁纸 诊断报告\n/);
     assert.match(text, /生成时间：2026-11-18 14:03:22/);
     assert.match(text, /用户名已换成/);
 });
@@ -138,7 +138,7 @@ test('GitHub 用的摘要：每行一项，读取失败的写失败', () => {
 });
 
 test('文件名带日期时间，不同秒生成的不会重名', () => {
-    assert.equal(reportFileName(new Date(2026, 10, 18, 14, 3, 22)), '互动3D壁纸-诊断报告-20261118-140322.txt');
+    assert.equal(reportFileName(new Date(2026, 10, 18, 14, 3, 22)), 'Kirie-诊断报告-20261118-140322.txt');
 });
 
 test('saveReport 存到第一个能写的文件夹，带 BOM 和 Windows 换行（老记事本也能正常显示中文）', () => {

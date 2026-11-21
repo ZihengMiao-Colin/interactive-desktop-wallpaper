@@ -23,7 +23,8 @@
   },
   "build": {
     "appId": "com.wallpaper.interactive-3d",
-    "productName": "互动3D壁纸",
+    "productName": "Kirie 壁纸",
+    "executableName": "Kirie",
     "directories": {
       "output": "dist"
     },
@@ -80,7 +81,7 @@
       "icon": "assets/icon.ico"
     },
     "nsis": {
-      "artifactName": "Interactive3DWallpaper-Setup-${version}.${ext}",
+      "artifactName": "Kirie-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true

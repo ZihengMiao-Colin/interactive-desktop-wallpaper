@@ -104,7 +104,7 @@ Function un.removeAutoLaunch
       Goto done
     ${EndIf}
     ReadRegStr $R2 HKCU "${RUN_KEY}" $R1
-    ; 命令一般是 "C:\...\互动3D壁纸.exe" --autostart，去掉开头的引号再比较
+    ; 命令一般是 "C:\...\Kirie.exe" --autostart，去掉开头的引号再比较
     StrCpy $R4 $R2 1
     ${If} $R4 == '"'
       StrCpy $R2 $R2 "" 1

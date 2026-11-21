@@ -1,8 +1,8 @@
-# 互动3D壁纸 — 项目现状 & 开发计划
+# Kirie 壁纸 — 项目现状 & 开发计划
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-20（软件定名 Kirie，图标换成 K 字图标：黑底三个往右下错开的 K，16 到 256 每个尺寸单独画，安装包、任务栏、托盘、设置窗口标题栏都换了；改名还没做，见阶段 24）；2026-11-20（唱片机每首歌一张封面：优先用歌曲文件自带的封面，也能自己选图，切歌时跟着换；唱片机页加了能拖的进度条，见阶段 23）；2026-11-20（导入的文件挪了、改了名也能接着用：记住 NTFS 文件编号，同一个盘里挪动、改名后自动找回，找不回的点一下手动接上，同一个文件夹里的顺带接上，见 4.9 和阶段 22）；2026-11-20（元素页右边的调整面板改成分页：位置 / 颜色 / 播放 / 抠像，一次只显示一组；修好左边列表压到面板底下，见阶段 21）；2026-11-19（阶段 18–20 打包成 v1.4.0，安装包带上模型的 Apache-2.0 许可证，见阶段 20 末尾）；2026-11-18（诊断报告和问题反馈：设置页 / 托盘一键生成 txt 报告、到 GitHub 反馈、主进程出错时弹中文提示框、补记窗口和 GPU 进程崩溃，见阶段 20）；2026-11-14（界面按更新后的 `ark-style-ui` 重做：直角面板、中性灰配青色、色条加细框，去掉切角和磨砂，见阶段 19）；2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
+> 最近更新：2026-11-20（改名：Windows 里显示"Kirie 壁纸"，exe 叫 `Kirie.exe`，安装包叫 `Kirie-Setup-<版本>.exe`，界面、提示、诊断报告里的名字都换了，见阶段 25）；2026-11-20（软件定名 Kirie，图标换成 K 字图标：黑底三个往右下错开的 K，16 到 256 每个尺寸单独画，安装包、任务栏、托盘、设置窗口标题栏都换了；改名还没做，见阶段 24）；2026-11-20（唱片机每首歌一张封面：优先用歌曲文件自带的封面，也能自己选图，切歌时跟着换；唱片机页加了能拖的进度条，见阶段 23）；2026-11-20（导入的文件挪了、改了名也能接着用：记住 NTFS 文件编号，同一个盘里挪动、改名后自动找回，找不回的点一下手动接上，同一个文件夹里的顺带接上，见 4.9 和阶段 22）；2026-11-20（元素页右边的调整面板改成分页：位置 / 颜色 / 播放 / 抠像，一次只显示一组；修好左边列表压到面板底下，见阶段 21）；2026-11-19（阶段 18–20 打包成 v1.4.0，安装包带上模型的 Apache-2.0 许可证，见阶段 20 末尾）；2026-11-18（诊断报告和问题反馈：设置页 / 托盘一键生成 txt 报告、到 GitHub 反馈、主进程出错时弹中文提示框、补记窗口和 GPU 进程崩溃，见阶段 20）；2026-11-14（界面按更新后的 `ark-style-ui` 重做：直角面板、中性灰配青色、色条加细框，去掉切角和磨砂，见阶段 19）；2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -39,7 +39,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | Win32 调用 | `koffi`（3.3.6，版本锁定）在主进程里直接调 user32.dll（`src/win32.js`）。程序运行时不启动 PowerShell，原因见 §9 阶段 12 |
 | Python | 项目内 `venv/`（3.11.9），只装了 onnxruntime / numpy / pillow。应用本身不再用 Python，只给 `tools/` 下的素材脚本和 Python 测试用 |
 | ONNX 模型 | 根目录（`.gitignore` 忽略）：`_ir9.onnx` 100MB（选最大的，实际用这个）、`_int8.onnx` 28MB、2MB 的空壳。打包时 `_ir9.onnx` 复制成 `resources/models/depth_anything_v2_small.onnx` |
-| 打包 | electron-builder，只出 NSIS 安装包（`npm run build` → `dist/Interactive3DWallpaper-Setup-<版本>.exe`，约 334MB；装好约 560MB）。素材和模型在 `resources/` 下（asar 外），onnxruntime 的 dll 解包到 `app.asar.unpacked` |
+| 打包 | electron-builder，只出 NSIS 安装包（`npm run build` → `dist/Kirie-Setup-<版本>.exe`，约 334MB；装好约 560MB）。素材和模型在 `resources/` 下（asar 外），onnxruntime 的 dll 解包到 `app.asar.unpacked` |
 | 界面字体 | 自带在 `ui/fonts/`（SIL OFL，约 6.3MB）：思源宋体（中文大标题，按字切成 101 片按需加载）、Saira（英文小字和数字）。正文用系统的思源黑体 / 微软雅黑 |
 | 测试 | Node 内置 `node --test`（`npm test`）；预处理脚本用 Python `unittest` |
 | 平台 | 仅 Windows，仅主显示器 |
@@ -838,9 +838,17 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 打包配置 `build.win.icon`、设置窗口的 `icon` 改用 `assets/icon.ico`。托盘也改用 `.ico`，去掉了强制缩成 16px（新函数 `loadTrayIcon`，文件不在或读出空图时用原来的兜底小圆点）。Electron 用 `.ico` 路径建的图，会按系统要的尺寸从文件里取对应那张。
 - 设置窗口标题栏左上角的 logo 换成 `assets/icon-20.svg`，日间、夜间都用图标本来的颜色，和任务栏上一样。
 - 宣传图：圆窗山景 1024 方图、1280×640 横幅（GitHub 仓库预览图的尺寸）和生成脚本放在没提交的 `promo/brand/`。横幅只有英文：界面自带的思源宋体拆成了很多按字符范围分的小文件，要先处理才能拿来画图。
-- 还没做：改名（窗口标题、安装包文件名、卸载界面、诊断报告、README、测试里写死的"互动3D壁纸"），下一次单独做。`package.json` 的 `name` 以后也不改，改了老用户的设置目录会变。
+- 改名见阶段 25。`package.json` 的 `name` 以后也不改，改了老用户的设置目录会变。
 - 验证：`npm test` 534 个全过（新增 `test/app-icon.test.js` 5 个），`tools/test_make_icon.py` 7 个全过。开发版实测（单独的数据目录，屏幕缩放 150%）：任务栏上设置窗口是新图标；托盘折叠区里的图标截下来和手画的 24px 那张逐像素相同，说明 Windows 确实从 `.ico` 里挑了对应尺寸；标题栏 logo 夜间、日间截图都正常。打包：`npx electron-builder --win nsis --config.directories.output=dist/test-build`（不覆盖 `dist/` 里已发布的 1.4.0 安装包）成功；从打出来的程序和安装包里取出 16、20、24、32、48、256 的图标，都和手画的逐像素相同。打包出来的程序（单独的数据目录）启动后，托盘图标截下来也和手画的 24px 那张逐像素相同，说明图标放在 `app.asar` 里也读得到。
 - 没测：100% / 125% / 200% 缩放（只靠单元测试保证每个尺寸都是手画的）；真的安装。
+
+### ✅ 阶段 25 — 改名 Kirie 壁纸（2026-11-20，在 `feat/rename-kirie` 分支上做）
+用户定的：Windows 里（开始菜单、桌面快捷方式、系统"应用"列表、安装向导）显示"Kirie 壁纸"，开始菜单搜"壁纸"也能搜到；exe 和安装包用英文名；不考虑旧版和老用户的任何相关事项。设计见 `docs/superpowers/specs/2026-11-20-rename-kirie-design.md`，计划见 `docs/superpowers/plans/2026-11-20-rename-kirie.md`。
+- 打包配置：`productName` 改成 `Kirie 壁纸`，加 `executableName: "Kirie"`（exe 叫 `Kirie.exe`），安装包 `Kirie-Setup-<版本>.exe`。`name`（`interactive-desktop-wallpaper`）和 `appId` 没改：数据目录 `%APPDATA%\interactive-desktop-wallpaper` 和安装目录 `%LOCALAPPDATA%\Programs\interactive-desktop-wallpaper` 都由 `name` 决定（打包后的 `package.json` 里没有 `productName`，已核实），改了没好处。
+- 界面和提示：设置窗口标题 `Kirie 壁纸 - 设置`，壁纸窗口标题 `Kirie 壁纸`；标题栏左上角 "Kirie"（Saira）加小字"互动 3D 壁纸"（新类名 `.sub`，不再用英文大写样式 `.en`）；托盘提示和"关于"、出错提示框、报告失败提示框、卸载说明和确认框都换成"Kirie 壁纸"。诊断报告文件名 `Kirie-诊断报告-<时间>.txt`，第一行 `Kirie 壁纸 诊断报告`。
+- 没改：GitHub 仓库名和问题反馈链接、安卓版。历史记录里的旧名字、旧文件名保留原样。
+- 验证：`npm test` 535 个全过（7 个测试文件里的名字跟着改，新增"打包配置"测试 1 个），`tools/test_make_icon.py` 7 个全过；代码里搜不到旧名字。开发版实测（单独的数据目录）：两个窗口的标题是 `Kirie 壁纸 - 设置` 和 `Kirie 壁纸`，标题栏夜间、日间截图正常。打包到 `dist/test-build`：生成 `Kirie-Setup-1.4.0.exe` 和 `win-unpacked/Kirie.exe`，exe 里记的产品名是"Kirie 壁纸"，程序和安装包的图标都和手画的逐像素相同。
+- 没测：真的安装（本机装着正式版，没动它），所以开始菜单、桌面快捷方式、系统"应用"列表里的名字没亲眼看到；托盘提示文字。
 
 ### ✅ 阶段 5 — 收尾（2026-11-10）
 - [x] 删掉 `生成深度图.bat`：应用自己能生成深度图，它还在选早就没有的 base / large 模型。
@@ -889,7 +897,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 1. 改 `package.json` 的 `version`，跑 `npm test`，然后 `npm run build`。
 2. 确认安装包是最新代码：`node node_modules/@electron/asar/bin/asar.js extract dist/win-unpacked/resources/app.asar <临时目录>`，解出来和源码逐个比对（`diff --strip-trailing-cr`）。打包后又改过代码就重新打。
 3. 提交并推送。
-4. 先建草稿：`gh release create v<版本> dist/Interactive3DWallpaper-Setup-<版本>.exe --draft --target <提交的完整 SHA> --title "互动3D壁纸 v<版本>" --notes-file <说明文件>`。草稿只有自己看得到。用 `gh release view v<版本> --json assets` 核对附件的大小和 SHA-256，发布说明（中英两份）给用户确认。
+4. 先建草稿：`gh release create v<版本> dist/Kirie-Setup-<版本>.exe --draft --target <提交的完整 SHA> --title "Kirie 壁纸 v<版本>" --notes-file <说明文件>`。草稿只有自己看得到。用 `gh release view v<版本> --json assets` 核对附件的大小和 SHA-256，发布说明（中英两份）给用户确认。
 5. 正式公开：`gh release edit v<版本> --draft=false --latest`。草稿阶段 tag 还不存在，公开时 GitHub 才创建；之后 `git fetch --tags` 同步到本地。
 
 公开分发相关（v1.0.0 已公开，下面几条仍然成立）：

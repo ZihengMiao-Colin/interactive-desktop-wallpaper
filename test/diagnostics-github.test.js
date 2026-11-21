@@ -14,9 +14,9 @@ test('打开本项目的新建 issue 页面，标题带版本号', () => {
 });
 
 test('正文有问题描述的位置、拖入报告的提示（带文件名）、自动填的基本信息', () => {
-    const body = params(buildIssueUrl({ version: '1.3.1', summary, problems: [], reportFile: '互动3D壁纸-诊断报告-1.txt' })).get('body');
+    const body = params(buildIssueUrl({ version: '1.3.1', summary, problems: [], reportFile: 'Kirie-诊断报告-1.txt' })).get('body');
     assert.match(body, /遇到了什么问题/);
-    assert.match(body, /互动3D壁纸-诊断报告-1\.txt/);
+    assert.match(body, /Kirie-诊断报告-1\.txt/);
     assert.match(body, /拖/);
     assert.doesNotMatch(body, /桌面/, '桌面写不进去时报告存在"下载"里，不能写死位置');
     assert.match(body, /- 软件版本：1\.3\.1（安装版）/);

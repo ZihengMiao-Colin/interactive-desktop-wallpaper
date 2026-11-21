@@ -45,8 +45,10 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     height: 20px;
 }
 .titlebar .logo img { display: block; width: 20px; height: 20px; }
-.titlebar b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; }
-.titlebar .en { padding-left: 10px; border-left: 1px solid var(--line-strong); font-size: 9.5px; }
+/* 软件名 Kirie：用 Saira，和宣传图上的字样一致 */
+.titlebar b { font-family: var(--f-display); font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
+/* 软件名旁边的中文小字 */
+.titlebar .sub { padding-left: 10px; border-left: 1px solid var(--line-strong); font-size: 11px; color: var(--text-2); }
 
 .shell {
     display: grid;
