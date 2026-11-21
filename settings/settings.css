@@ -39,14 +39,12 @@ h1, h2, h3 { font-feature-settings: "palt"; }
     border-bottom: 1px solid var(--line);
     -webkit-app-region: drag;
 }
+/* 软件图标（assets/icon-20.svg，20px 那套参数画的），日间、夜间都用图标本来的颜色，和任务栏上一致 */
 .titlebar .logo {
-    display: grid;
-    place-items: center;
     width: 20px;
     height: 20px;
-    background: var(--accent);
 }
-.titlebar .logo svg { width: 13px; height: 13px; fill: var(--accent-ink); }
+.titlebar .logo img { display: block; width: 20px; height: 20px; }
 .titlebar b { font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; }
 .titlebar .en { padding-left: 10px; border-left: 1px solid var(--line-strong); font-size: 9.5px; }
 

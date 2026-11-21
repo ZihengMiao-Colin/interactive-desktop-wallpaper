@@ -77,7 +77,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "artifactName": "Interactive3DWallpaper-Setup-${version}.${ext}",
