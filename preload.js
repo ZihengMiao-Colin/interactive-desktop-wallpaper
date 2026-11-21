@@ -96,11 +96,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** 打开系统文件对话框，选择要加进歌单的本地音乐（可多选）→ 路径数组，取消时为 [] */
     selectAudioFiles: () => ipcRenderer.invoke('dialog:selectAudioFiles'),
 
-    /** 打开系统文件对话框，选择唱片中心封面 */
+    /** 打开系统文件对话框，给一首歌选封面图片 → 路径，取消时为 null */
     selectCover: () => ipcRenderer.invoke('dialog:selectCover'),
 
     /** 打开摆放窗口拖动唱片机（位置和大小） */
     startVinylPlacement: () => ipcRenderer.invoke('vinyl:startPlacement'),
+
+    /** 唱片机：每首歌的封面、播放进度和跳转（音乐在壁纸窗口里放，主进程在两个窗口之间转发） */
+    vinyl: {
+        /** 一首歌该显示哪张封面：{ path, cover } → { file, source: 'manual'|'embedded'|'sidecar'|'none' } */
+        resolveCover: (track) => ipcRenderer.invoke('vinyl:resolveCover', track),
+        // ---- 设置页用 ----
+        /** 让壁纸跳到 { path, time }（path 不是壁纸正在放的那首时不跳） */
+        seek: (target) => ipcRenderer.send('vinyl:seek', target),
+        /** 要一次当前进度（切到唱片机页、窗口重新显示时） */
+        requestProgress: () => ipcRenderer.send('vinyl:requestProgress'),
+        /** 收到进度：{ path, currentTime, duration, playing } */
+        onProgress: (callback) => {
+            ipcRenderer.on('vinyl:progress', (_event, progress) => callback(progress));
+        },
+        // ---- 壁纸用 ----
+        sendProgress: (progress) => ipcRenderer.send('vinyl:progress', progress),
+        onSeek: (callback) => {
+            ipcRenderer.on('vinyl:seek', (_event, target) => callback(target));
+        },
+        onProgressRequest: (callback) => {
+            ipcRenderer.on('vinyl:requestProgress', () => callback());
+        },
+    },
 
     /** 打开系统文件对话框，选择本地视频特效 */
     selectOverlayVideo: () => ipcRenderer.invoke('dialog:selectOverlayVideo'),

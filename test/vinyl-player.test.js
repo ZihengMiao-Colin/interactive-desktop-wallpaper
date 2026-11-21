@@ -110,3 +110,30 @@ test('clampCenter：唱片机整个露在屏幕里，比屏幕还大时居中', 
     const huge = { left: 600, right: 600, top: 10, bottom: 10 };
     assert.equal(clampCenter(0.9, 0.5, huge, 1000, 1000).x, 0.5);
 });
+
+const { cleanProgress, cleanSeek } = require('../shared/vinyl-player');
+
+test('cleanSeek：要跳到的位置要有歌、秒数是有限的非负数', () => {
+    assert.deepEqual(cleanSeek({ path: 'C:/m/a.mp3', time: 3.5, extra: 1 }), { path: 'C:/m/a.mp3', time: 3.5 });
+    assert.deepEqual(cleanSeek({ path: 'C:/m/a.mp3', time: 0 }), { path: 'C:/m/a.mp3', time: 0 });
+    assert.equal(cleanSeek({ path: 'C:/m/a.mp3', time: NaN }), null);
+    assert.equal(cleanSeek({ path: 'C:/m/a.mp3', time: -1 }), null);
+    assert.equal(cleanSeek({ path: 'C:/m/a.mp3', time: Infinity }), null);
+    assert.equal(cleanSeek({ path: 'C:/m/a.mp3', time: '3' }), null);
+    assert.equal(cleanSeek({ path: '', time: 3 }), null);
+    assert.equal(cleanSeek(null), null);
+});
+
+test('cleanProgress：时长还不知道（NaN、Infinity）时记成 0，当前秒数不超过时长', () => {
+    assert.deepEqual(cleanProgress({ path: 'C:/m/a.mp3', currentTime: 12, duration: 200, playing: 1 }),
+        { path: 'C:/m/a.mp3', currentTime: 12, duration: 200, playing: true });
+    assert.deepEqual(cleanProgress({ path: 'C:/m/a.mp3', currentTime: 3, duration: NaN, playing: false }),
+        { path: 'C:/m/a.mp3', currentTime: 3, duration: 0, playing: false });
+    assert.equal(cleanProgress({ path: 'C:/m/a.mp3', currentTime: 5, duration: Infinity }).duration, 0);
+    assert.equal(cleanProgress({ path: 'C:/m/a.mp3', currentTime: 250, duration: 200 }).currentTime, 200);
+    assert.equal(cleanProgress({ path: 'C:/m/a.mp3', currentTime: NaN, duration: 200 }).currentTime, 0);
+    // 没有歌（歌单删光了）也要发，设置页据此显示 --:--
+    assert.deepEqual(cleanProgress({ path: '', currentTime: 0, duration: 0 }), { path: '', currentTime: 0, duration: 0, playing: false });
+    assert.equal(cleanProgress({ path: 5 }), null);
+    assert.equal(cleanProgress(null), null);
+});
