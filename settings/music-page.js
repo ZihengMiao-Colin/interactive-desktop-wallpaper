@@ -118,8 +118,10 @@ function initMusicPage({ api, saver, setStatus, onPageChange }) {
         coverOf(track).then((r) => {
             if (coverKey(PL.currentTrack(vinyl)) !== key) return;
             discCover.style.backgroundImage = coverThumb.style.backgroundImage = coverUrl(r.file);
-            const lost = track.cover && r.source !== 'manual' ? '你选的图找不到了，现在' : '';
-            coverDesc.textContent = `「${track.name}」${lost}${COVER_SOURCE_DESC[r.source] || ''}`;
+            const desc = COVER_SOURCE_DESC[r.source] || '';
+            coverDesc.textContent = track.cover && r.source !== 'manual'
+                ? `你给「${track.name}」选的图找不到了，现在${desc}`
+                : `「${track.name}」${desc}`;
         });
     }
 
