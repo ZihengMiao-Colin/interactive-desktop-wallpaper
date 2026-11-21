@@ -2,7 +2,8 @@
  * playlist.js — 唱片机歌单的纯逻辑（主进程、壁纸页、设置页共用）
  *
  * 配置里的 vinyl：
- *   playlist: [{ path, name }]   同一个文件只出现一次，path 兼作这首歌的 id
+ *   playlist: [{ path, name, cover? }]   同一个文件只出现一次，path 兼作这首歌的 id；
+ *             cover 是用户给这首选的封面图（没选时用文件自带的封面或同名图片，见 src/audio-cover.js）
  *   current:  当前这首歌的 path（歌单为空时是 ''）
  *   playMode: 'list' 列表循环 | 'one' 单曲循环 | 'shuffle' 随机播放 | 'once' 顺序播放（放完最后一首停下）
  * 旧版本只有一首歌（audioPath / audioName / loop），读配置时由 normalizeVinyl 换成一首歌的歌单。
@@ -24,10 +25,12 @@
         return dot > 0 ? base.slice(0, dot) : base;
     }
 
-    /** 整理成合法的歌：有 path，有名字（没有就用文件名） */
+    /** 整理成合法的歌：有 path，有名字（没有就用文件名）；用户给这首选过封面图的留着 cover */
     function toTrack(t) {
         if (!t || typeof t.path !== 'string' || !t.path) return null;
-        return { path: t.path, name: typeof t.name === 'string' && t.name ? t.name : trackName(t.path) };
+        const track = { path: t.path, name: typeof t.name === 'string' && t.name ? t.name : trackName(t.path) };
+        if (typeof t.cover === 'string' && t.cover) track.cover = t.cover;
+        return track;
     }
 
     /** 去掉坏数据和重复的歌（同一个 path 只留第一次出现的） */
@@ -45,10 +48,11 @@
 
     /**
      * 补齐 / 修正 vinyl 里的歌单字段；旧配置的 audioPath 变成一首歌的歌单，loop: false 变成顺序播放。
-     * 旧字段（audioPath、audioName、loop）去掉，免得有地方还在读它们。
+     * 旧字段（audioPath、audioName、loop，以及整台唱片机共用的封面 coverPath，现在每首歌各有各的）去掉，
+     * 免得有地方还在读它们。
      */
     function normalizeVinyl(vinyl) {
-        const { audioPath, audioName, loop, ...rest } = vinyl || {};
+        const { audioPath, audioName, loop, coverPath, ...rest } = vinyl || {};
         const hasList = Array.isArray(rest.playlist);
         const playlist = hasList
             ? cleanList(rest.playlist)
@@ -106,6 +110,15 @@
         return out;
     }
 
+    /** 给 trackPath 那首设上自选封面（cover 为 '' 时去掉，回到自带的封面或同名图片）；别的歌原样不动 */
+    function setTrackCover(list, trackPath, cover) {
+        return (list || []).map((t) => {
+            if (!t || t.path !== trackPath) return t;
+            const { cover: _old, ...rest } = t;
+            return cover ? { ...rest, cover } : rest;
+        });
+    }
+
     /** 随机挑一首不是第 i 首的（只有一首时就是它自己） */
     function randomOther(list, i, rand) {
         if (list.length < 2) return list[0].path;
@@ -150,6 +163,6 @@
 
     return {
         MODES, trackName, normalizeVinyl, currentIndex, currentTrack,
-        addTracks, removeTrack, moveTrack, step, afterEnded, loopsCurrent,
+        addTracks, removeTrack, moveTrack, setTrackCover, step, afterEnded, loopsCurrent,
     };
 });

@@ -71,9 +71,19 @@ test('旧配置的单首歌读成一首歌的歌单，保存后写回磁盘的�
     assert.equal(onDisk.playlist.length, 1);
 });
 
-test('新用户没有歌单：空歌单、列表循环', () => {
+test('新用户没有歌单：空歌单、列表循环，没有封面', () => {
     const { vinyl } = storeWithConfig().store.getConfig();
     assert.deepEqual([vinyl.playlist, vinyl.current, vinyl.playMode], [[], '', 'list']);
+    assert.equal('coverPath' in vinyl, false);
+});
+
+test('旧版整台唱片机共用的封面 coverPath：读出来就没有了，保存后磁盘上也去掉', () => {
+    const { store, dir } = storeWithConfig({ vinyl: { playlist: [{ path: 'C:/m/a.mp3' }], current: 'C:/m/a.mp3', coverPath: 'C:/c/old.png' } });
+    assert.equal('coverPath' in store.getConfig().vinyl, false);
+    store.saveConfig({ vinyl: { playing: true } });
+    const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')).vinyl;
+    assert.equal('coverPath' in onDisk, false);
+    assert.equal(onDisk.playing, true);
 });
 
 test('instances 不是数组时回退为空数组', () => {
