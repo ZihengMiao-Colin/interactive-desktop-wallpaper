@@ -72,6 +72,12 @@ venv/Scripts/python.exe -m http.server 8765
 venv/Scripts/python.exe tools/prepare_builtin_element.py elements/xxx.mp4 --id xxx --name "名称"
 ```
 
+**软件图标**：`assets/icon.ico`（16 到 256 九个尺寸，每个尺寸单独画）、`icon.png`、`icon.svg`、`icon-20.svg`（设置窗口标题栏用）都由脚本生成，颜色和形状写在脚本里。改完重新生成，`tools/test_make_icon.py` 会检查 `assets/` 里的是不是最新的。
+
+```bash
+venv/Scripts/python.exe tools/make_icon.py
+```
+
 ## 目录结构
 
 | 路径 | 内容 |
