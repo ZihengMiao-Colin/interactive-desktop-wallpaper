@@ -2,7 +2,7 @@
 
 **简体中文** | [English](PROJECT_NOTES.en.md)
 
-> 最近更新：2026-11-20（导入的文件挪了、改了名也能接着用：记住 NTFS 文件编号，同一个盘里挪动、改名后自动找回，找不回的点一下手动接上，同一个文件夹里的顺带接上，见 4.9 和阶段 22）；2026-11-20（元素页右边的调整面板改成分页：位置 / 颜色 / 播放 / 抠像，一次只显示一组；修好左边列表压到面板底下，见阶段 21）；2026-11-19（阶段 18–20 打包成 v1.4.0，安装包带上模型的 Apache-2.0 许可证，见阶段 20 末尾）；2026-11-18（诊断报告和问题反馈：设置页 / 托盘一键生成 txt 报告、到 GitHub 反馈、主进程出错时弹中文提示框、补记窗口和 GPU 进程崩溃，见阶段 20）；2026-11-14（界面按更新后的 `ark-style-ui` 重做：直角面板、中性灰配青色、色条加细框，去掉切角和磨砂，见阶段 19）；2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
+> 最近更新：2026-11-20（唱片机每首歌一张封面：优先用歌曲文件自带的封面，也能自己选图，切歌时跟着换；唱片机页加了能拖的进度条，见阶段 23）；2026-11-20（导入的文件挪了、改了名也能接着用：记住 NTFS 文件编号，同一个盘里挪动、改名后自动找回，找不回的点一下手动接上，同一个文件夹里的顺带接上，见 4.9 和阶段 22）；2026-11-20（元素页右边的调整面板改成分页：位置 / 颜色 / 播放 / 抠像，一次只显示一组；修好左边列表压到面板底下，见阶段 21）；2026-11-19（阶段 18–20 打包成 v1.4.0，安装包带上模型的 Apache-2.0 许可证，见阶段 20 末尾）；2026-11-18（诊断报告和问题反馈：设置页 / 托盘一键生成 txt 报告、到 GitHub 反馈、主进程出错时弹中文提示框、补记窗口和 GPU 进程崩溃，见阶段 20）；2026-11-14（界面按更新后的 `ark-style-ui` 重做：直角面板、中性灰配青色、色条加细框，去掉切角和磨砂，见阶段 19）；2026-11-13（删掉授权说不清的自带素材：默认壁纸只剩 2 张 CC0 的，自带视频特效和爆炸元素全删，见阶段 18；授权核对见 §9"公开分发相关"）；2026-11-10（收尾：补 `LICENSE`、整理 Python 依赖，见 §9 阶段 5；之前是 v1.3.1：挂不上桌面时不再挡住程序，见阶段 17；导入时裁剪，见阶段 16）
 > 用途：后续开发的"地图"。改动代码后请顺手更新本文件，并同步英文版 `PROJECT_NOTES.en.md`（以中文版为准）。
 
 **当前范围**
@@ -76,7 +76,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── parallax-page.js     "视差"页：强度、跟手程度、对焦深度、恢复推荐值；当前是视频时提示哪些设置不起作用
 │   ├── elements-tab.js      "元素"页：素材库 + 左右两栏（元素列表 / 分页的调整面板）
 │   ├── effects-page.js      "特效"页：天气 + 视频特效
-│   ├── music-page.js        "唱片机"页：播放控制、歌单（添加 / 删除 / 拖动排序 / 点一首播放）、播放顺序、外观
+│   ├── music-page.js        "唱片机"页：播放控制和进度条、歌单（添加 / 删除 / 拖动排序 / 点一首播放 / 每首的封面）、播放顺序、外观
 │   ├── unlock-page.js       "解锁动画"页：选视频、开关、淡入淡出时长、声音、预览
 │   ├── crop-dialog.js       裁剪框：导入壁纸、解锁视频时弹出，只负责让用户选出区域，存到哪里由调用的页面决定
 │   ├── system-page.js       "设置"页：开机自启、深度图缓存、卸载软件（确认框里选要不要删数据）
@@ -89,7 +89,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── video-wallpaper.js   视频壁纸：隐藏的 <video> 做纹理，每个新视频帧更新纹理并叫醒画面（requestVideoFrameCallback）
 │   ├── weather.js           天气管理器：画布、按配置切换特效、每帧算风和视差
 │   ├── weather/             五种天气：kit.js（离屏贴图、贴图矩阵、粒子基类）+ rain / snow / sakura / leaves / sunlight
-│   ├── vinyl.js             唱片机：唱臂抬起 / 摆入 / 放下、唱片加减速（Web Animations）、音乐淡入淡出、位置和大小
+│   ├── vinyl.js             唱片机：唱臂抬起 / 摆入 / 放下、唱片加减速（Web Animations）、音乐淡入淡出、每首歌的封面、进度和跳转、位置和大小
 │   ├── video-overlay.js     全屏视频特效
 │   ├── unlock-player.html / unlock-player.js 解锁动画的全屏播放页：放视频，把进度和操作报给主进程
 │   ├── elements/
@@ -106,8 +106,8 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   ├── playback.js          动图取帧、间隔播放调度、点击播放状态机
 │   ├── frame-pacing.js      空闲停帧判断；暂停时视频壁纸要不要接着放（keepVideoPlaying）
 │   ├── config-sync.js       配置节流保存、只应用变化的配置段、换壁纸用的只认最后一次的串行队列
-│   ├── vinyl-player.js      唱片机纯逻辑：唱片匀加减速、唱臂随进度的角度、桌面点击判断、位置和大小（normalizeLayout / clampCenter）
-│   ├── playlist.js          歌单纯逻辑：旧配置迁移、增删、排序、上一首 / 下一首、播完接哪首
+│   ├── vinyl-player.js      唱片机纯逻辑：唱片匀加减速、唱臂随进度的角度、桌面点击判断、位置和大小（normalizeLayout / clampCenter）、进度和跳转消息的检查（cleanProgress / cleanSeek）
+│   ├── playlist.js          歌单纯逻辑：旧配置迁移、增删、排序、每首的自选封面（setTrackCover）、上一首 / 下一首、播完接哪首
 │   ├── my-wallpapers.js     我的壁纸列表（加入、去重、排序、移除、迁移）、当前壁纸是图片还是视频（resolveCurrent）
 │   ├── crop.js              裁剪区域的纯逻辑：整理配置里的值、框的默认位置、移动、缩放、换比例、比例文字、模糊判断、CSS 和网址格式
 │   ├── unlock-animation.js  解锁动画纯逻辑：配置补全、时长换算、状态转换表（transition）
@@ -149,6 +149,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 │   │   ├── tracker.js       记编号（userData/file_ids.json）、按编号找回并确认是原来那个文件
 │   │   ├── file-id.js       读 NTFS 文件编号、用 kernel32 的 OpenFileById 按编号查现在的路径
 │   │   └── paths.js         纯逻辑：收集配置里的用户文件路径、批量换路径、顺带接上、是不是同一类文件
+│   ├── audio-cover.js       唱片机每首歌的封面：读 mp3 / flac / m4a 自带的封面、找同名图片、缓存到 userData/vinyl_covers（阶段 23）
 │   ├── store.js             config.json / 深度缓存（文件挪走后跟着改 key）/ custom_elements 目录 / 我的壁纸缩略图（wallpaper_thumbs）/ 卸载清单
 │   ├── uninstaller.js       设置页卸载：找安装目录里的卸载程序，带上删不删数据的参数打开它
 │   ├── gallery.js           默认壁纸图库：读 manifest、按路径查找、旧路径迁移（含删掉的默认壁纸）
@@ -263,6 +264,9 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | 自定义元素 |
 | `placement:getDraft` / `commit` / `cancel` | R→M | 摆放窗口（草稿是元素 `{ instance, asset }` 或唱片机 `{ kind: 'vinyl', vinyl }`） |
 | `vinyl:startPlacement` | R→M | 打开摆放窗口拖动唱片机 |
+| `vinyl:resolveCover` | R→M | 一首歌该显示哪张封面：`{ path, cover }` → `{ file, source: 'manual'|'embedded'|'sidecar'|'none' }`（壁纸、摆放窗口、设置页都用） |
+| `vinyl:progress` | R→M→R | 壁纸 → 设置页的播放进度 `{ path, currentTime, duration, playing }`，主进程只在设置窗口显示着时转发 |
+| `vinyl:seek` / `vinyl:requestProgress` | R→M→R | 设置页 → 壁纸：跳到 `{ path, time }`（path 不是正在放的那首就不跳）/ 要一次当前进度 |
 | `unlock:selectVideo` / `setVideo` / `setCrop` / `remove` / `getInfo` / `preview` | R→M | 解锁动画：选视频 / 导入（复制文件、打开开关）/ 重新裁剪 / 移除 / 文件在不在、视频和缩略图地址 / 预览。开关、淡入淡出、声音走 `config:save` |
 | `unlock:player-event` / `unlock:start` / `unlock:fade-out` | R→M / M→R / M→R | 全屏播放页上报 `ready`、`near-end`、`skip`、`error` / 主进程通知开始播放 / 开始淡出（带时长，声音跟着降） |
 | `vinyl:duck` | M→R | 解锁动画开着声音时，唱片机音量降到 0 / 恢复 |
@@ -292,9 +296,11 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
                 // 我的壁纸，按 lastUsedAt 从新到旧；只记路径；thumb 是 wallpaper_thumbs/ 里的缩略图；effect / sound 只有视频有；crop 是裁剪区域 { x, y, w, h }（相对原图的比例），没裁过时没有这个键
   myWallpapersVersion: 1, // 迁移标记（不写默认值）：没有它时把当前的用户图片放进我的壁纸，只做一次
   theme: 'dark',          // 设置窗口的界面主题 'dark'|'light'|'system'（不认识的值读成 dark），主进程写进 nativeTheme.themeSource
-  vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
-                  playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
+  vinyl:        { enabled, position, x, y, scale, volume, playing,
+                  playlist: [{ path, name, cover? }], current, playMode: 'list'|'one'|'shuffle'|'once' },
                 // 旧版本的 audioPath / audioName / loop 读配置时换成一首歌的歌单（shared/playlist.js 的 normalizeVinyl）
+                // cover：用户给这首选的封面图；没选时用文件自带的封面或同名图片（src/audio-cover.js）。
+                // 旧版本整台唱片机共用的 coverPath 读配置时去掉（阶段 23）
                 // position：四个角或 'custom'（x / y 是唱盘中心在屏幕上的比例位置）；scale 0.5 ~ 2
   weather:      { type, density, speed, parallax },
   videoOverlay: { enabled, presetId, customPath, customName, blendMode, opacity, speed },
@@ -325,7 +331,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 | 深度图缓存 / 迁移目录 | ✅ | |
 | 全屏 / 锁屏暂停 | ✅ | 自定义元素的视频和间隔计时也会暂停 |
 | 托盘、开机自启 | ✅ | 托盘"更换壁纸"：有缓存直接应用，没有就在设置窗口生成后自动应用 |
-| 黑胶唱片机 / 视频特效 / 天气粒子 | ✅ | 天气 2026-10-26 重写（贴图预渲染、景深、真实形状和飘落方式） |
+| 黑胶唱片机 / 视频特效 / 天气粒子 | ✅ | 天气 2026-10-26 重写（贴图预渲染、景深、真实形状和飘落方式）；唱片机 2026-11-20 起每首歌一张封面、设置页能拖进度条（阶段 23） |
 | **自定义元素系统** | ✅ | 图片 / GIF / 动态 webp / apng / mp4 / webm（自带的两个爆炸 2026-11-13 删掉了）；摆放模式（缩放、拉伸、旋转、翻转、自由变形）；深度遮挡；间隔播放；点击播放；抠绿幕；变色 |
 | 自定义贴纸 | ♻️ 已移除 | 被自定义元素取代，旧配置自动迁移 |
 | 默认壁纸图库（`wallpapers/`） | ✅ | |
@@ -812,6 +818,18 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - 没测：打包后的安装版；真的挪到另一个硬盘 / U 盘（用复制 + 删除模拟，效果一样是编号变了）；ReFS 开发驱动器。
 - 没改的小问题（审查提出、影响小）：自动找回后缩略图文件名还是按旧路径算的（之后有人在旧位置放了别的图再导入，会盖掉它）；暂停时换到一首读不出来的歌、随后被找回，按播放时会被当成坏的跳过一次；启动检查期间再打开一次程序，设置窗口可能先于 IPC 打开；手动接上时旧文件夹里的路径逐个检查（网络盘断了会等得久）；唱片机 / 视频特效比路径用 `===`（同一个文件两种写法时会重新加载一次）；手动接上配置里没变也提示"已找回"；几个 `record()` 同时跑时刚改名的记录可能被删掉，2 秒后补回。
 
+### ✅ 阶段 23 — 唱片机每首歌一张封面 + 进度条拖动（2026-11-20，在 `feat/vinyl-cover-seek` 分支上做）
+用户要求：一首歌绑定一个封面，切歌时唱片封面跟着换；唱片机页加能拖的进度条。用户定的：歌曲文件自带封面时默认直接用；软件不带默认封面图和歌曲。设计见 `docs/superpowers/specs/2026-11-20-vinyl-cover-seek-design.md`，计划见 `docs/superpowers/plans/2026-11-20-vinyl-cover-seek.md`。
+- 封面按顺序找：你给这首选的图（`playlist[i].cover`，文件还在）→ 歌曲文件自带的封面 → 同一个文件夹里同名的 jpg / jpeg / png / webp → 纯色标签。去掉了整台唱片机共用的 `coverPath`（旧配置读的时候丢掉，图片文件本身不动）。
+- 新模块 `src/audio-cover.js`：自己写的解析器（没加依赖），按文件开头的字节认格式（不看扩展名）：ID3v2.2 / 2.3 / 2.4（含反同步、扩展头）、FLAC 的 PICTURE 块（前面带 ID3 的也行）、mp4 / m4a 的 `moov > udta > meta > ilst > covr`（`moov` 在文件末尾也能找到，只读盒子头）。几张图时优先"封面"类型。读出来的图存到 `userData/vinyl_covers/`，文件名由"路径 + 大小 + 修改时间"算出来；启动时删掉不在歌单里的。坏数据当作没有封面。
+- 进度条在设置页唱片机卡片里（当前时间 + 滑块 + 总长）。音乐在壁纸窗口里放，壁纸在 `timeupdate` 等事件时把进度经主进程发给设置窗口（只在显示着时转）；拖动时不吃进度，松手发 `vinyl:seek`。进度不存进配置。
+- 跳转：在响 → 声音马上跳过去，唱臂抬起、摆到对应的那一圈再放下（声音不停）；唱臂正从停靠位摆过来 → 改摆到新位置；暂停中 → 只改位置，下次播放时唱臂落到那里。path 对不上（刚切歌）、时长未知时不跳。
+- 设置页：歌单每行加小封面（点它给这首换图，不会顺带播放）；"唱片封面"一行改成管当前这首，说明封面从哪来，"更换…"和有自选图时才出现的"不用这张"；窗口重新获得焦点时重新问一遍封面，有变化才重画（刚往文件夹里放了同名图片能马上看到）。文件找回功能（阶段 22）也会找回挪走的自选封面图。
+- 助手定的：同名图片规则；不读 `cover.jpg` / `folder.jpg`；不读 ogg / wav 里的封面；拖进度条时声音不停；旧的共用封面不迁移到每首歌（会盖住自带封面）；进度 0.25 秒一跳，不做每帧动画。
+- 验证：`npm test` 529 个全过（新增 24 个：`audio-cover` 18 个，`playlist` / `file-paths` / `store` / `vinyl-player` 6 个）。用 ffmpeg 从测试素材做了带自带封面的 mp3 / flac / m4a，解析器都读出来了。Electron 实测（单独的数据目录 + 调试端口，静音）：旧配置的 `coverPath` 启动后从磁盘上去掉；六首歌（自带封面 mp3 / flac / m4a、同名图片两首、没封面一首）在歌单、卡片、桌面上的唱片、摆放窗口里显示对；切歌两边一起换；播放中拖到 12 秒，声音立刻跳过去、唱臂从 23° 抬起摆到 17.4° 再放下；暂停中拖到 150 秒唱臂不动，再播放落到 20.1°；按播放后 0.3 秒内拖到 30 秒，唱臂改摆到 7.2°、从 30 秒出声；别的歌、空 path、NaN、负数的跳转都没生效；当前这首和别的歌的小封面手动选图、"不用这张"、自选图被删后回退到同名图片；放进同名图片后切回窗口小封面马上出来；820×560 没有横向滚动。日志没有错误。
+- 测试素材里的两首 `.mp3` 其实是改了扩展名的 mp4 视频（没有自带封面，旁边有同名图片），`<audio>` 照常能放。
+- 没测：打包后的安装版；真实鼠标拖动滑块（用合成的 input / change 事件测的）；有声音时的听感（测试时音量是 0）。
+
 ### ✅ 阶段 5 — 收尾（2026-11-10）
 - [x] 删掉 `生成深度图.bat`：应用自己能生成深度图，它还在选早就没有的 base / large 模型。
 - [x] `requirements.txt` 改成 venv 实际装的 onnxruntime / numpy / pillow，版本锁定成和 venv 一样（`pip install --dry-run --no-index -r requirements.txt` 核对过）。第一行的 `# -*- coding: utf-8 -*-` 不能删：中文 Windows 上 pip 默认按 GBK 读这个文件，读到中文注释会报 `UnicodeDecodeError`（原来的文件也有这个问题）。ffmpeg 和 `export_onnx.py` 要的 torch 写在注释里。
@@ -875,7 +893,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 - Electron 28 已停止安全更新。只加载本地页面，风险低，v1 可以不动。
 - ~~`package.json` 写了 `"license": "MIT"`，但仓库里没有 `LICENSE` 文件~~ ✅ 2026-11-10 补上了，README 写明了哪些不在 MIT 范围内。
 - ~~安装包带的 Depth Anything V2 Small 模型是 Apache-2.0，转发时要附上它的许可证文本，安装包里现在没有~~ ✅ 2026-11-19 从 v1.4.0 起放在 `resources/models/LICENSE-depth-anything-v2-small.txt`（源文件 `licenses/depth-anything-v2-small.txt`）。v1.3.1 及更早的安装包里没有。
-- 唱片机封面 `coverPath` 指向 `default wallpaper/`（已加进 `.gitignore`）里的一张图，删这个目录前先换封面。
+- ~~唱片机封面 `coverPath` 指向 `default wallpaper/`（已加进 `.gitignore`）里的一张图，删这个目录前先换封面。~~ 2026-11-20 起没有整台唱片机共用的封面了（阶段 23），`coverPath` 读配置时去掉。
 
 ---
 
