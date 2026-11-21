@@ -409,8 +409,9 @@ function createSettingsWindow() {
         minHeight: 560,
         resizable: true,
         title: '互动3D壁纸 - 设置',
-        // 任务栏图标（安装版的 exe 自带图标，开发时不设就是 Electron 的图标）
-        icon: path.join(__dirname, 'assets', 'icon.png'),
+        // 任务栏图标（安装版的 exe 自带图标，开发时不设就是 Electron 的图标）。
+        // 用 .ico：Windows 按屏幕缩放从里面挑合适尺寸的那张（tools/make_icon.py 生成）
+        icon: path.join(__dirname, 'assets', 'icon.ico'),
         autoHideMenuBar: true,
         // 页面自己画标题栏，系统的最小化 / 最大化 / 关闭按钮叠在右上角，颜色跟着界面主题
         titleBarStyle: 'hidden',

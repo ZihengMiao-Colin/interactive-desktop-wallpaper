@@ -32,16 +32,7 @@ const fs = require('fs');
 function createTray(callbacks) {
     const { onOpenSettings } = callbacks;
 
-    // 创建托盘图标（使用内置简单图标或自定义图标）
-    let trayIcon;
-    const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
-
-    if (fs.existsSync(iconPath)) {
-        trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
-    } else {
-        // 如果没有自定义图标，创建一个简单的 16x16 图标
-        trayIcon = createSimpleIcon();
-    }
+    const trayIcon = loadTrayIcon(path.join(__dirname, '..', 'assets', 'icon.ico'));
 
     const tray = new Tray(trayIcon);
     tray.setToolTip('互动3D壁纸');
@@ -131,10 +122,25 @@ function updateTrayMenu(tray, callbacks) {
 }
 
 /**
- * 创建简单的 16x16 托盘图标（没有自定义图标时的 fallback）。
+ * 读托盘图标。用 .ico（tools/make_icon.py 生成）：Windows 按屏幕缩放从里面挑 16 / 20 / 24 / 32 的那张，
+ * 每张都是单独画的，所以这里不能再缩放。
+ * 文件不在或读出来是空图时用兜底的小圆点，托盘不能因为图标出问题建不起来。
+ *
+ * @param {string} iconPath - .ico 文件路径
+ * @param {Electron.NativeImage} [ni] - nativeImage（测试时传假的）
+ * @returns {Electron.NativeImage}
+ */
+function loadTrayIcon(iconPath, ni = nativeImage) {
+    const image = fs.existsSync(iconPath) ? ni.createFromPath(iconPath) : null;
+    if (image && !image.isEmpty()) return image;
+    return createSimpleIcon(ni);
+}
+
+/**
+ * 创建简单的 16x16 托盘图标（图标文件读不到时的兜底）。
  * 生成一个带渐变色的圆形图标。
  */
-function createSimpleIcon() {
+function createSimpleIcon(ni = nativeImage) {
     // 创建一个 16x16 的 RGBA 图像数据
     const size = 16;
     const buffer = Buffer.alloc(size * size * 4);
@@ -166,10 +172,10 @@ function createSimpleIcon() {
         }
     }
 
-    return nativeImage.createFromBuffer(buffer, {
+    return ni.createFromBuffer(buffer, {
         width: size,
         height: size,
     });
 }
 
-module.exports = { createTray, updateTrayMenu };
+module.exports = { createTray, updateTrayMenu, loadTrayIcon };
