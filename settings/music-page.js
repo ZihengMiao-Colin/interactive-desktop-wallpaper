@@ -1,8 +1,10 @@
 /**
- * music-page.js — 设置窗口"唱片机"页：开关、播放控制、歌单、播放顺序、音量、位置、大小、封面
+ * music-page.js — 设置窗口"唱片机"页：开关、播放控制和进度条、歌单（每首歌的封面）、播放顺序、音量、位置、大小
  *
- * 歌单的增删、排序、换歌都用 Shared.playlist 算好再存进配置；壁纸那边一首播完自己换下一首，
+ * 歌单的增删、排序、换歌、换封面都用 Shared.playlist 算好再存进配置；壁纸那边一首播完自己换下一首，
  * 也是存进配置，这里跟着配置广播刷新播放器和歌单。
+ * 封面：每首歌按 自选图 → 文件自带 → 同名图片 的顺序找（主进程 src/audio-cover.js），这里只记结果。
+ * 进度条：音乐在壁纸窗口里放，进度经主进程发过来；拖完把"跳到第几秒"发回去，进度不存进配置。
  */
 
 'use strict';
@@ -15,11 +17,24 @@ const PLAY_MODE_DESC = {
     once: '往下放到最后一首就停，再按播放从第一首开始',
 };
 
+/** 封面是从哪来的（"唱片封面"一行的说明） */
+const COVER_SOURCE_DESC = {
+    manual: '用的是你选的图',
+    embedded: '用的是歌曲文件自带的封面',
+    sidecar: '用的是同一个文件夹里的同名图片',
+    none: '没有封面，唱片中间是纯色标签',
+};
+
 /**
- * @param {{ api: object, saver: { save: (partial: object) => void }, setStatus: (msg: string, cls?: string) => void }} deps
+ * @param {{
+ *   api: object,
+ *   saver: { save: (partial: object) => void },
+ *   setStatus: (msg: string, cls?: string) => void,
+ *   onPageChange: (cb: (name: string) => void) => void,
+ * }} deps
  * @returns {{ load: (config: object) => void }}
  */
-function initMusicPage({ api, saver, setStatus }) {
+function initMusicPage({ api, saver, setStatus, onPageChange }) {
     const { el, setRange, bindRange, segmented, button } = Controls;
     const PL = Shared.playlist;
     const enabled = document.getElementById('vinyl-enabled');
@@ -31,6 +46,9 @@ function initMusicPage({ api, saver, setStatus }) {
     const btnPrev = document.getElementById('btn-prev-track');
     const btnNext = document.getElementById('btn-next-track');
     const playIcon = btnPlayPause.querySelector('use');
+    const seekBar = document.getElementById('vinyl-seek');
+    const timeCur = document.getElementById('vinyl-time-cur');
+    const timeTotal = document.getElementById('vinyl-time-total');
     const listEl = document.getElementById('vinyl-playlist');
     const countEl = document.getElementById('playlist-count');
     const modeDesc = document.getElementById('vinyl-play-mode-desc');
@@ -39,10 +57,12 @@ function initMusicPage({ api, saver, setStatus }) {
     const scale = document.getElementById('vinyl-scale');
     const scaleVal = document.getElementById('vinyl-scale-val');
     const coverThumb = document.getElementById('vinyl-cover-thumb');
+    const coverDesc = document.getElementById('vinyl-cover-desc');
+    const btnPickCover = document.getElementById('btn-import-cover');
+    const btnClearCover = document.getElementById('btn-reset-cover');
 
     /** 最近一次的唱片机配置（歌单、当前歌、播放模式、在不在放） */
     let vinyl = PL.normalizeVinyl({});
-    let coverPath = '';
 
     /** 改唱片机配置：先改本地再保存，界面立刻跟着变 */
     function update(partial) {
@@ -51,9 +71,83 @@ function initMusicPage({ api, saver, setStatus }) {
         render();
     }
 
+    // ---------- 封面 ----------
+
+    const coverKey = (track) => (track ? `${track.path}|${track.cover || ''}` : '');
+    /** 每首歌的封面结果：coverKey → { track, result: Promise<{ file, source }> } */
+    const covers = new Map();
+
+    function askCover(track) {
+        return api.vinyl.resolveCover({ path: track.path, cover: track.cover || '' })
+            .catch(() => ({ file: '', source: 'none' }));
+    }
+
+    function coverOf(track) {
+        const key = coverKey(track);
+        if (!covers.has(key)) covers.set(key, { track, result: askCover(track) });
+        return covers.get(key).result;
+    }
+
+    const coverUrl = (file) => (file ? `url("${api.toFileUrl(file)}")` : '');
+
+    /**
+     * 窗口重新获得焦点时重新问一遍（可能刚往歌所在的文件夹里放了同名图片），有变化才重画，
+     * 不直接清掉记下的结果：那样每次切回窗口小封面都会闪一下。
+     */
+    async function refreshCovers() {
+        const known = [...covers.entries()];
+        const fresh = await Promise.all(known.map(([, c]) => askCover(c.track)));
+        const old = await Promise.all(known.map(([, c]) => c.result));
+        const changed = fresh.some((r, i) => r.file !== old[i].file || r.source !== old[i].source);
+        if (!changed) return;
+        known.forEach(([key, c], i) => covers.set(key, { track: c.track, result: Promise.resolve(fresh[i]) }));
+        if (dragFrom < 0) render();
+    }
+
+    /** 卡片里转的唱片、"唱片封面"一行：都是当前这首的 */
+    function renderCurrentCover() {
+        const track = PL.currentTrack(vinyl);
+        btnPickCover.disabled = !track;
+        btnClearCover.hidden = !(track && track.cover);
+        if (!track) {
+            discCover.style.backgroundImage = coverThumb.style.backgroundImage = '';
+            coverDesc.textContent = '添加歌曲后，每首歌可以有自己的封面';
+            return;
+        }
+        const key = coverKey(track);
+        coverOf(track).then((r) => {
+            if (coverKey(PL.currentTrack(vinyl)) !== key) return;
+            discCover.style.backgroundImage = coverThumb.style.backgroundImage = coverUrl(r.file);
+            const lost = track.cover && r.source !== 'manual' ? '你选的图找不到了，现在' : '';
+            coverDesc.textContent = `「${track.name}」${lost}${COVER_SOURCE_DESC[r.source] || ''}`;
+        });
+    }
+
+    async function pickCover(track) {
+        try {
+            const file = await api.selectCover();
+            if (!file) return;
+            update({ playlist: PL.setTrackCover(vinyl.playlist, track.path, file) });
+            setStatus(`已给「${track.name}」换上封面`, 'success');
+        } catch (err) {
+            setStatus('更换封面失败：' + err.message, 'error');
+        }
+    }
+
+    btnPickCover.addEventListener('click', () => {
+        const track = PL.currentTrack(vinyl);
+        if (track) pickCover(track);
+    });
+    btnClearCover.addEventListener('click', () => {
+        const track = PL.currentTrack(vinyl);
+        if (!track || !track.cover) return;
+        update({ playlist: PL.setTrackCover(vinyl.playlist, track.path, '') });
+        setStatus(`「${track.name}」不再用你选的图`);
+    });
+
     // ---------- 播放器 ----------
 
-    /** 曲名、播放状态、唱片转不转、按钮 */
+    /** 曲名、播放状态、唱片转不转、按钮、封面、进度条 */
     function renderPlayer() {
         const track = PL.currentTrack(vinyl);
         const n = vinyl.playlist.length;
@@ -68,6 +162,8 @@ function initMusicPage({ api, saver, setStatus }) {
         btnPlayPause.setAttribute('aria-label', btnPlayPause.title);
         btnPlayPause.disabled = !track;
         btnPrev.disabled = btnNext.disabled = n < 2;
+        renderCurrentCover();
+        renderProgress();
     }
 
     btnPlayPause.addEventListener('click', () => {
@@ -78,12 +174,86 @@ function initMusicPage({ api, saver, setStatus }) {
     btnPrev.addEventListener('click', () => update({ current: PL.step(vinyl, -1) }));
     btnNext.addEventListener('click', () => update({ current: PL.step(vinyl, 1) }));
 
+    // ---------- 进度条 ----------
+
+    const formatTime = (seconds) => Shared.myWallpapers.formatDuration(seconds) || '0:00';
+    /** 壁纸最近发来的进度（path 是壁纸正在放的那首） */
+    let progress = { path: '', currentTime: 0, duration: 0, playing: false };
+    /** 正在拖进度条：拖的时候不吃壁纸发来的进度，松手才跳 */
+    let seeking = false;
+
+    /** 进度是当前这首的、而且知道时长才能拖；否则灰掉，两边显示 --:-- */
+    function renderProgress() {
+        const track = PL.currentTrack(vinyl);
+        const known = !!track && progress.path === track.path && progress.duration > 0;
+        seekBar.disabled = !known;
+        if (!known) {
+            seeking = false;
+            seekBar.max = 1;
+            setRange(seekBar, 0);
+            timeCur.textContent = timeTotal.textContent = '--:--';
+            return;
+        }
+        if (seeking) return;
+        seekBar.max = progress.duration;
+        setRange(seekBar, progress.currentTime);
+        timeCur.textContent = formatTime(progress.currentTime);
+        timeTotal.textContent = formatTime(progress.duration);
+    }
+
+    seekBar.addEventListener('input', () => {
+        seeking = true;
+        timeCur.textContent = formatTime(Number(seekBar.value));
+    });
+    seekBar.addEventListener('change', () => {
+        seeking = false;
+        const track = PL.currentTrack(vinyl);
+        if (!track || progress.path !== track.path) return;
+        const time = Number(seekBar.value);
+        progress = { ...progress, currentTime: time };
+        api.vinyl.seek({ path: track.path, time });
+        renderProgress();
+    });
+    api.vinyl.onProgress((next) => {
+        if (!next) return;
+        progress = next;
+        renderProgress();
+    });
+
+    // 设置窗口隐藏 / 最小化时主进程不转发进度，回来时要一次
+    onPageChange((page) => {
+        if (page === 'music') api.vinyl.requestProgress();
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) api.vinyl.requestProgress();
+    });
+    window.addEventListener('focus', () => {
+        api.vinyl.requestProgress();
+        refreshCovers();
+    });
+
     // ---------- 歌单 ----------
 
     /** 拖动排序：正在拖的是第几首（-1 表示没在拖） */
     let dragFrom = -1;
     /** 上次画歌单的时候每首歌的文件在不在（主进程检查完文件后和它比） */
     const shownTracks = new Map();
+
+    /** 每行的小封面：点它给这首换图（不会顺带播放这首） */
+    function trackCover(track) {
+        const thumb = button('tcover', 'disc-3', '', `给「${track.name}」换封面`);
+        thumb.title = '给这首歌换封面';
+        thumb.draggable = false;
+        thumb.addEventListener('click', (e) => {
+            e.stopPropagation();
+            pickCover(track);
+        });
+        coverOf(track).then((r) => {
+            thumb.style.backgroundImage = coverUrl(r.file);
+            thumb.classList.toggle('has', !!r.file);
+        });
+        return thumb;
+    }
 
     function renderTrack(track, i) {
         const isCurrent = track.path === vinyl.current;
@@ -110,7 +280,7 @@ function initMusicPage({ api, saver, setStatus }) {
             e.stopPropagation();
             removeTrack(track);
         });
-        row.append(grip, no, tx, del);
+        row.append(grip, no, trackCover(track), tx, del);
 
         // 点一首直接放（已经在放的就不打断）；文件找不到的先让用户选它现在的位置
         row.addEventListener('click', () => {
@@ -243,12 +413,6 @@ function initMusicPage({ api, saver, setStatus }) {
 
     // ---------- 外观 ----------
 
-    function renderCover() {
-        const url = coverPath && api.fileExists(coverPath) ? `url("${api.toFileUrl(coverPath)}")` : '';
-        coverThumb.style.backgroundImage = url;
-        discCover.style.backgroundImage = url;
-    }
-
     enabled.addEventListener('change', () => {
         saver.save({ vinyl: { enabled: enabled.checked } });
         setStatus(enabled.checked ? '已显示唱片机' : '已隐藏唱片机');
@@ -285,26 +449,6 @@ function initMusicPage({ api, saver, setStatus }) {
         }
     });
 
-    document.getElementById('btn-import-cover').addEventListener('click', async () => {
-        try {
-            const path = await api.selectCover();
-            if (!path) return;
-            coverPath = path;
-            renderCover();
-            saver.save({ vinyl: { coverPath: path } });
-            setStatus('已更换唱片封面', 'success');
-        } catch (err) {
-            setStatus('更换封面失败：' + err.message, 'error');
-        }
-    });
-
-    document.getElementById('btn-reset-cover').addEventListener('click', () => {
-        coverPath = '';
-        renderCover();
-        saver.save({ vinyl: { coverPath: '' } });
-        setStatus('封面已换回默认');
-    });
-
     // 配置广播：桌面上点唱片机会改播放状态，壁纸放完一首会换歌，摆放窗口里会改位置和大小。
     // 音量和正在拖的大小滑块不跟着改，免得和自己刚发出去、还在节流的值打架
     api.onLoadConfig((config) => {
@@ -330,9 +474,7 @@ function initMusicPage({ api, saver, setStatus }) {
             volumeVal.textContent = vol + '%';
             showScale(v.scale);
             showPosition(v.position || 'bottom-right');
-
-            coverPath = v.coverPath || '';
-            renderCover();
+            api.vinyl.requestProgress();
         },
     };
 }

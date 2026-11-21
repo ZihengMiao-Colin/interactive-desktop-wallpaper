@@ -305,6 +305,12 @@
                         <span class="en">Current track</span>
                         <b id="vinyl-current-music-name">歌单是空的</b>
                         <small id="vinyl-play-state">添加本地音乐后就会开始播放</small>
+                        <!-- 进度条：拖动松手后跳到那里（settings/music-page.js） -->
+                        <div class="seek">
+                            <span class="time" id="vinyl-time-cur">--:--</span>
+                            <input type="range" id="vinyl-seek" min="0" max="1" step="1" value="0" disabled aria-label="播放进度">
+                            <span class="time" id="vinyl-time-total">--:--</span>
+                        </div>
                     </div>
                     <div class="player-actions">
                         <button type="button" class="btn icon ghost" id="btn-prev-track" title="上一首" aria-label="上一首"><svg class="i"><use href="#i-skip-back"/></svg></button>
@@ -365,11 +371,11 @@
                         </div>
                     </div>
                     <div class="row">
-                        <div class="row-label"><div class="t">唱片封面</div><div class="d">贴在唱片中间的图</div></div>
+                        <div class="row-label"><div class="t">唱片封面</div><div class="d" id="vinyl-cover-desc">添加歌曲后，每首歌可以有自己的封面</div></div>
                         <div class="row-ctrl">
                             <span class="cover-thumb" id="vinyl-cover-thumb"></span>
-                            <button type="button" class="btn sm" id="btn-import-cover">更换…</button>
-                            <button type="button" class="btn sm ghost" id="btn-reset-cover">用默认</button>
+                            <button type="button" class="btn sm" id="btn-import-cover" title="给当前这首歌选一张封面图">更换…</button>
+                            <button type="button" class="btn sm ghost" id="btn-reset-cover" title="去掉你选的图，用回歌曲自带的封面或同名图片" hidden>不用这张</button>
                         </div>
                     </div>
                 </div>
