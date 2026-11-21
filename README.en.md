@@ -17,7 +17,7 @@ The Android version is at [interactive-phone-wallpaper](https://github.com/Zihen
   - Click an element to enter placement mode: drag to move, drag a corner to resize, adjust depth; Enter to confirm, Esc to cancel.
   - Elements move with the mouse together with background at the same depth and are hidden behind closer objects; new elements "stick to the ground" for their depth by default.
   - Green-screen keying, loop / interval playback, opacity, show / hide; multiple elements at once.
-- **Other decorations**: vinyl record player (a playlist of local music with list loop / repeat one / shuffle / play in order; drag it anywhere), full-screen video effects (using a video you import), weather particles.
+- **Other decorations**: vinyl record player (a playlist of local music with list loop / repeat one / shuffle / play in order; one cover per track, using the song's own cover when it has one; a draggable progress bar; drag it anywhere), full-screen video effects (using a video you import), weather particles.
 - **Desktop integration**: injected into the WorkerW layer below the desktop icons; pauses automatically for full-screen apps, lock screen and sleep; tray menu, launch at startup.
 
 ## Running

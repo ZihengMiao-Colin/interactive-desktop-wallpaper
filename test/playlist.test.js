@@ -36,6 +36,25 @@ test('normalizeVinyl：没有歌、坏数据、重复的歌、current 找不到'
     assert.deepEqual(PL.normalizeVinyl({ playlist: [], audioPath: 'C:/m/a.mp3' }).playlist, []);
 });
 
+test('normalizeVinyl：每首歌的自选封面保留下来，整台唱片机共用的 coverPath 去掉', () => {
+    const v = PL.normalizeVinyl({
+        playlist: [{ path: A.path, cover: 'C:/c/a.png' }, { path: B.path, cover: '' }, { path: C.path, cover: 5 }],
+        current: A.path,
+        coverPath: 'C:/c/old.png',
+    });
+    assert.deepEqual(v.playlist, [{ ...A, cover: 'C:/c/a.png' }, B, C]);
+    assert.equal('coverPath' in v, false);
+    assert.equal('coverPath' in PL.normalizeVinyl({ coverPath: '' }), false);
+});
+
+test('setTrackCover：给某一首设上 / 去掉自选封面，别的歌不动', () => {
+    const set = PL.setTrackCover([A, B], B.path, 'C:/c/b.png');
+    assert.deepEqual(set, [A, { ...B, cover: 'C:/c/b.png' }]);
+    assert.deepEqual(PL.setTrackCover(set, B.path, ''), [A, B]);
+    assert.equal('cover' in PL.setTrackCover(set, B.path, '')[1], false);
+    assert.deepEqual(PL.setTrackCover([A, B], 'C:/m/zzz.mp3', 'C:/c/x.png'), [A, B]);
+});
+
 test('currentTrack / currentIndex', () => {
     assert.deepEqual(PL.currentTrack(vinylOf(B)), B);
     assert.equal(PL.currentIndex(vinylOf(C)), 2);

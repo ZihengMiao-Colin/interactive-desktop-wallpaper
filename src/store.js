@@ -445,7 +445,7 @@ class AppStore {
                 scale: 1.0,                 // 缩放大小 0.5 ~ 2.0
                 volume: 0.6,                // 音量 0.0 ~ 1.0
                 playing: false,             // 是否正在播放
-                coverPath: '',              // 唱片中心封面图片路径
+                // 封面跟着歌走：歌单里每首歌的 cover（没选时用文件自带的或同名图片，见 src/audio-cover.js）
                 // 歌单 playlist / current / playMode 不写在默认值里：没有 playlist 才说明是旧配置，
                 // 要把旧的 audioPath 换成歌单（shared/playlist.js 的 normalizeVinyl）
             },

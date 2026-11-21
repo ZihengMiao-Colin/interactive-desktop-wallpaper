@@ -79,7 +79,11 @@ const { registerElementsIpc } = require('./src/elements/ipc');
 const { PlacementController } = require('./src/elements/placement-controller');
 const { createFullScreenWindow } = require('./src/elements/placement-window');
 const { upsertInstance, hasClickTriggers } = require('./shared/elements-model');
-const { isClickable: isVinylClickable, normalizeLayout: normalizeVinylLayout } = require('./shared/vinyl-player');
+const {
+    isClickable: isVinylClickable, normalizeLayout: normalizeVinylLayout,
+    cleanProgress: cleanVinylProgress, cleanSeek: cleanVinylSeek,
+} = require('./shared/vinyl-player');
+const { CoverResolver } = require('./src/audio-cover');
 const { migrateLegacySticker } = require('./src/elements/migrate');
 const { cleanupOrphanFiles } = require('./src/elements/library');
 const { UnlockAnimationController } = require('./src/unlock-animation/controller');
@@ -138,6 +142,9 @@ let desktopClickWatcher = null;
 
 /** 数据持久化 */
 let store = null;
+
+/** 唱片机每首歌的封面（自选图 → 文件自带 → 同名图片），读出来的自带封面缓存在 userData/vinyl_covers */
+let coverResolver = null;
 
 /** 渲染是否活跃 */
 let isRenderingActive = true;
@@ -756,10 +763,10 @@ function registerIpcHandlers() {
         return result.canceled ? [] : result.filePaths;
     });
 
-    // ---- 选择唱片中心封面图片 ----
+    // ---- 给歌单里的一首歌选封面图片 ----
     ipcMain.handle('dialog:selectCover', async () => {
         const result = await dialog.showOpenDialog(dialogParent(), {
-            title: '选择唱片中心封面图片',
+            title: '选择这首歌的封面图片',
             filters: [
                 { name: '图片文件', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'] },
             ],
@@ -776,6 +783,26 @@ function registerIpcHandlers() {
     // ---- 在摆放窗口里拖动唱片机（和摆放元素共用一个摆放会话） ----
     ipcMain.handle('vinyl:startPlacement', () =>
         placement.start({ kind: 'vinyl', vinyl: store.getConfig().vinyl }));
+
+    // ---- 唱片机一首歌该显示哪张封面：{ path, cover } → { file, source }（壁纸、摆放窗口、设置页都用） ----
+    ipcMain.handle('vinyl:resolveCover', (_event, track) => coverResolver.resolve(track));
+
+    // ---- 唱片机播放进度：音乐在壁纸窗口里放，进度转给设置窗口（显示着才转）；设置页拖进度条后转回壁纸 ----
+    const wallpaperAlive = () => wallpaperWindow && !wallpaperWindow.isDestroyed();
+    ipcMain.on('vinyl:progress', (event, msg) => {
+        if (!wallpaperAlive() || event.sender !== wallpaperWindow.webContents) return;
+        const progress = cleanVinylProgress(msg);
+        if (!progress || !settingsWindow || settingsWindow.isDestroyed()) return;
+        if (!settingsWindow.isVisible() || settingsWindow.isMinimized()) return;
+        settingsWindow.webContents.send('vinyl:progress', progress);
+    });
+    ipcMain.on('vinyl:seek', (_event, msg) => {
+        const seek = cleanVinylSeek(msg);
+        if (seek && wallpaperAlive()) wallpaperWindow.webContents.send('vinyl:seek', seek);
+    });
+    ipcMain.on('vinyl:requestProgress', () => {
+        if (wallpaperAlive()) wallpaperWindow.webContents.send('vinyl:requestProgress');
+    });
 
     // ---- 选择自定义视频特效文件 ----
     ipcMain.handle('dialog:selectOverlayVideo', async () => {
@@ -1289,6 +1316,7 @@ async function startApp() {
     // 1. 初始化数据存储
     store = new AppStore();
     console.log('[Main] Data store path:', store.getStorePath());
+    coverResolver = new CoverResolver({ cacheDir: path.join(store.getStorePath(), 'vinyl_covers') });
 
     // 旧版"自定义贴纸"配置迁移为自定义元素（只会执行一次）
     migrateLegacySticker({
@@ -1367,6 +1395,10 @@ async function startApp() {
     if (orphans.length) console.log('[Main] 已清理无用的素材文件:', orphans);
     const unlockOrphans = cleanupUnlockFiles(store.getUnlockAnimationDir(), store.getConfig().unlockAnimation);
     if (unlockOrphans.length) console.log('[Main] 已清理无用的解锁动画文件:', unlockOrphans);
+    // 已经不在歌单里的歌的封面缓存（不等它，后台删）
+    coverResolver.prune(store.getConfig().vinyl.playlist).then((count) => {
+        if (count) console.log(`[Main] 已清理 ${count} 张不用的唱片封面缓存`);
+    });
 
     // 设置窗口的界面主题（要在建窗口之前，标题栏颜色按它取）
     applyTheme(store.getConfig().theme);

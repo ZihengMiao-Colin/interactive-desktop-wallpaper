@@ -7,6 +7,8 @@
  * 歌单（shared/playlist.js）：一首播完按播放模式换下一首，唱臂抬起回到外圈再放下；
  * 顺序播放放完最后一首时唱臂回停靠位。换歌、停下都先存进配置，再由广播回来执行，设置页跟着变。
  * 读不出来、放不了的歌提示一下跳过。
+ * 封面跟着当前这首换（主进程 src/audio-cover.js 找：自选图 → 文件自带 → 同名图片）。
+ * 设置页的进度条：进度经主进程发过去（reportProgress），拖完跳过来（seek），唱臂抬起挪到那一圈再放下。
  *
  * 唱片旋转用 Web Animations（在合成器线程上跑，不需要壁纸每帧重绘），
  * 唱臂用 CSS transition（中途被打断时会从当前位置接着转）。
@@ -50,8 +52,9 @@ class VinylPlayerManager {
 
         this.config = null;
         this.currentAudioPath = '';
-        this.currentCoverPath = '';
         this.audioBlobUrl = null;
+        /** 唱片中间的封面：按"当前歌的 path + 自选图"去找，这个 key 变了才重新找 */
+        this.coverKey = null;
 
         /** 配置要求的播放状态（开着 playing 且有音乐） */
         this.wantPlaying = false;
@@ -80,13 +83,22 @@ class VinylPlayerManager {
         this.previewOnly = false;
         /** 要改配置（换歌、停下）时调用；壁纸页设成保存配置，没设时（浏览器预览）直接应用 */
         this.onRequestChange = null;
+        /** 播放进度变了时调用（壁纸页设成发给设置页的进度条）：{ path, currentTime, duration, playing } */
+        this.onProgress = null;
         /** 连着放不了的歌数（够整张歌单就停下）；正在跳过的那首（error 事件和 play() 失败只算一次） */
         this.failures = 0;
         this.skippingPath = '';
 
         window.addEventListener('resize', () => this.applyLayout());
         if (this.audio) {
-            this.audio.addEventListener('timeupdate', () => this.followProgress());
+            this.audio.addEventListener('timeupdate', () => {
+                this.followProgress();
+                this.reportProgress();
+            });
+            // 换歌（emptied）、读出时长、跳转完、开始 / 停下：都让设置页的进度条跟上
+            for (const type of ['emptied', 'durationchange', 'seeked', 'play', 'pause']) {
+                this.audio.addEventListener(type, () => this.reportProgress());
+            }
             this.audio.addEventListener('ended', () => this.onEnded());
             this.audio.addEventListener('playing', () => {
                 this.failures = 0;
@@ -133,22 +145,8 @@ class VinylPlayerManager {
 
         if (this.songNameEl) this.songNameEl.textContent = track ? track.name : '未选择音乐';
 
-        // 唱片中心封面图片
-        if (config.coverPath && this.currentCoverPath !== config.coverPath) {
-            this.currentCoverPath = config.coverPath;
-            if (isElectron && window.electronAPI) {
-                const dataUrl = window.electronAPI.readFileAsDataURL(config.coverPath);
-                if (dataUrl && this.coverImg) {
-                    this.coverImg.src = dataUrl;
-                    this.coverImg.style.display = 'block';
-                    if (this.defaultCover) this.defaultCover.style.display = 'none';
-                }
-            }
-        } else if (!config.coverPath) {
-            this.currentCoverPath = '';
-            if (this.coverImg) this.coverImg.style.display = 'none';
-            if (this.defaultCover) this.defaultCover.style.display = 'flex';
-        }
+        // 唱片中间的封面跟着当前这首换
+        this.updateCover(track);
 
         // 位置和大小（放在歌名之后：歌名长短会改变唱片机的宽度）
         this.setLayout(config);
@@ -187,8 +185,70 @@ class VinylPlayerManager {
                     this.currentAudioPath = to;
                 }
             }
-            if (from === this.currentCoverPath) this.currentCoverPath = to;
         }
+    }
+
+    // ==================== 封面 ====================
+
+    /**
+     * 唱片中间的封面跟着当前这首换：主进程按 自选图 → 文件自带 → 同名图片 的顺序找，都没有就是纯色标签。
+     * 找的时候先留着上一张（不闪一下纯色标签）；找回来时已经又换了歌就丢掉结果。
+     */
+    updateCover(track) {
+        const key = track ? `${track.path}|${track.cover || ''}` : '';
+        if (key === this.coverKey) return;
+        this.coverKey = key;
+        const api = isElectron && window.electronAPI && window.electronAPI.vinyl;
+        if (!track || !api) {
+            this.showCover('');
+            return;
+        }
+        api.resolveCover({ path: track.path, cover: track.cover || '' }).then((result) => {
+            if (this.coverKey === key) this.showCover(result && result.file);
+        }, (err) => {
+            console.warn('[Vinyl] 找封面失败:', err);
+            if (this.coverKey === key) this.showCover('');
+        });
+    }
+
+    /** 换上封面图片；file 为空或读不出来时显示纯色标签 */
+    showCover(file) {
+        const dataUrl = file && window.electronAPI ? window.electronAPI.readFileAsDataURL(file) : null;
+        if (this.coverImg) {
+            if (dataUrl) this.coverImg.src = dataUrl;
+            else this.coverImg.removeAttribute('src');
+            this.coverImg.style.display = dataUrl ? 'block' : 'none';
+        }
+        if (this.defaultCover) this.defaultCover.style.display = dataUrl ? 'none' : 'flex';
+    }
+
+    // ==================== 进度（设置页的进度条） ====================
+
+    /** 把进度交给 onProgress：哪首、第几秒、总长（还不知道时是 NaN，主进程会整理）、有没有在响 */
+    reportProgress() {
+        if (!this.onProgress || this.previewOnly || !this.audio) return;
+        this.onProgress({
+            path: this.currentAudioPath,
+            currentTime: this.audio.currentTime,
+            duration: this.audio.duration,
+            playing: !this.audio.paused,
+        });
+    }
+
+    /**
+     * 设置页拖进度条：跳到 time 秒。path 不是正在放的这首（刚切歌）、还不知道时长时不跳。
+     * 在响 → 声音马上跳过去，唱臂抬起、挪到对应那一圈再放下（声音不停）；
+     * 要放但还没出声（唱臂正摆过来）→ 唱臂改摆到新位置；没在放 → 只改位置，下次播放时唱臂落到那里。
+     */
+    seek(path, time) {
+        if (this.previewOnly || !this.audio || !path || path !== this.currentAudioPath) return;
+        const duration = this.audio.duration;
+        if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(time)) return;
+        const sounding = !this.audio.paused;
+        this.audio.currentTime = Math.max(0, Math.min(duration, time));
+        if (!this.wantPlaying) return;
+        if (sounding) this.recue();
+        else this.play();
     }
 
     // ==================== 歌单 ====================

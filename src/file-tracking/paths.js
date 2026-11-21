@@ -3,7 +3,7 @@
  *
  * 只记路径、会因为用户挪动或改名而失效的字段：
  *   myWallpapers[].path、currentImage、currentImageCrop.path、currentVideo.path、currentVideo.imageAtTime、
- *   vinyl.playlist[].path、vinyl.current、vinyl.coverPath、videoOverlay.customPath
+ *   vinyl.playlist[].path、vinyl.playlist[].cover（自选封面）、vinyl.current、videoOverlay.customPath
  * 元素和解锁动画导入时复制到了数据目录，不在这里。
  *
  * 设计文档写的是放 shared/，但只有主进程用，还要用 Node 的 path.win32，所以放这里。
@@ -66,9 +66,8 @@ function collectPaths(config) {
         c.currentImageCrop && c.currentImageCrop.path,
         c.currentVideo && c.currentVideo.path,
         c.currentVideo && c.currentVideo.imageAtTime,
-        ...list(vinyl.playlist).map((t) => t && t.path),
+        ...list(vinyl.playlist).flatMap((t) => (t ? [t.path, t.cover] : [])),
         vinyl.current,
-        vinyl.coverPath,
         c.videoOverlay && c.videoOverlay.customPath,
     ];
     const out = [];
@@ -111,16 +110,17 @@ function replacePaths(config, moves) {
     if (vinyl) {
         let changed = false;
         const playlist = list(vinyl.playlist).map((t) => {
-            if (!t || map(t.path) === t.path) return t;
+            if (!t || (map(t.path) === t.path && map(t.cover) === t.cover)) return t;
             changed = true;
             const to = map(t.path);
-            return { ...t, path: to, name: t.name === trackName(t.path) ? trackName(to) : t.name };
+            const track = { ...t, path: to, name: t.name === trackName(t.path) ? trackName(to) : t.name };
+            if ('cover' in t) track.cover = map(t.cover);
+            return track;
         });
-        const next = { ...vinyl, playlist, current: map(vinyl.current), coverPath: map(vinyl.coverPath) };
+        const next = { ...vinyl, playlist, current: map(vinyl.current) };
         if (!Array.isArray(vinyl.playlist)) delete next.playlist;
         if (!('current' in vinyl)) delete next.current;
-        if (!('coverPath' in vinyl)) delete next.coverPath;
-        if (changed || next.current !== vinyl.current || next.coverPath !== vinyl.coverPath) partial.vinyl = next;
+        if (changed || next.current !== vinyl.current) partial.vinyl = next;
     }
 
     const overlay = c.videoOverlay;

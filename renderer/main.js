@@ -249,6 +249,12 @@ function registerIpcListeners() {
     // 解锁动画开着声音时，唱片机的音量降到 0
     window.electronAPI.onVinylDuck((ducked) => vinylManager.setDucked(ducked));
 
+    // 设置页唱片机卡片的进度条：进度经主进程发过去，拖完跳到那里
+    const vinylApi = window.electronAPI.vinyl;
+    vinylManager.onProgress = (progress) => vinylApi.sendProgress(progress);
+    vinylApi.onSeek(({ path, time }) => vinylManager.seek(path, time));
+    vinylApi.onProgressRequest(() => vinylManager.reportProgress());
+
     // 点击桌面：点中唱片机就播放 / 暂停（唱片机在最上层，点中了就不再传给元素），否则触发"点击播放"的元素
     window.electronAPI.onDesktopClick(({ x, y }) => {
         if (renderPaused) return;

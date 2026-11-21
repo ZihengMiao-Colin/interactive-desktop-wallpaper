@@ -97,8 +97,33 @@
         return !!card && x >= card.left && x <= card.right && y >= card.top && y <= card.bottom;
     }
 
+    const finiteNonNegative = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+
+    /**
+     * 壁纸发给设置页的播放进度（vinyl:progress），主进程转发前整理一遍。
+     * 时长还不知道（NaN、直播流的 Infinity）记成 0；当前秒数不超过时长。path 为 '' 表示歌单空了。
+     * @returns {{ path: string, currentTime: number, duration: number, playing: boolean } | null}
+     */
+    function cleanProgress(msg) {
+        if (!msg || typeof msg.path !== 'string') return null;
+        const duration = finiteNonNegative(msg.duration) ? msg.duration : 0;
+        let currentTime = finiteNonNegative(msg.currentTime) ? msg.currentTime : 0;
+        if (duration > 0) currentTime = Math.min(currentTime, duration);
+        return { path: msg.path, currentTime, duration, playing: !!msg.playing };
+    }
+
+    /**
+     * 设置页要壁纸跳到哪（vinyl:seek）：哪首歌（对不上就不跳）、第几秒。
+     * @returns {{ path: string, time: number } | null}
+     */
+    function cleanSeek(msg) {
+        if (!msg || typeof msg.path !== 'string' || !msg.path || !finiteNonNegative(msg.time)) return null;
+        return { path: msg.path, time: msg.time };
+    }
+
     return {
         spinRamp, velocityAt, progressOf, armAngle, isClickable, hitTest,
         CORNERS, SCALE_MIN, SCALE_MAX, normalizeLayout, clampCenter,
+        cleanProgress, cleanSeek,
     };
 });

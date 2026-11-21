@@ -47,7 +47,7 @@
     const wallpaperPage = initWallpaperPage({ api, saver, setStatus, setNowUsing: shell.setNowUsing, preview, cropDialog });
     const parallaxPage = initParallaxPage({ api, saver, setStatus, preview, wallpaperPage });
     const effectsPage = initEffectsPage({ api, saver, setStatus });
-    const musicPage = initMusicPage({ api, saver, setStatus });
+    const musicPage = initMusicPage({ api, saver, setStatus, onPageChange: shell.onPageChange });
     const unlockPage = initUnlockPage({ api, saver, setStatus, onPageChange: shell.onPageChange, cropDialog });
     const systemPage = initSystemPage({ api, saver, setStatus, onCacheCleared: () => wallpaperPage.markDepthStale() });
     initElementsTab({ api, setStatus, setBadge: shell.setBadge });

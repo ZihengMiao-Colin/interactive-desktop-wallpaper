@@ -2,7 +2,7 @@
 
 [简体中文](PROJECT_NOTES.md) | **English**
 
-> Last updated: 2026-11-20 (imported files keep working after being moved or renamed: the app remembers each file's NTFS file ID and finds it again when it is moved or renamed on the same drive; files it cannot find can be relinked with one click, and other missing files from the same folder come along, see 4.9 and Phase 22); 2026-11-20 (the adjustment panel on the right of the Elements page is now split into tabs: Position / Color / Playback / Chroma key, one group at a time; the left list no longer runs under the panel, see Phase 21); 2026-11-19 (Phases 18–20 packaged as v1.4.0; the installer now carries the model's Apache-2.0 license, see the end of Phase 20); 2026-11-18 (diagnostic report and feedback: one-click txt report from the settings page or tray, feedback on GitHub, a Chinese prompt when the main process throws, window and GPU process crashes now logged, see Phase 20); 2026-11-14 (UI redone with the updated `ark-style-ui`: square panels, neutral grays with a cyan accent, a color bar plus a thin frame, no more cut corners or frosted glass, see Phase 19); 2026-11-13 (deleted built-in assets with unclear licensing: only the 2 CC0 default wallpapers remain, and all built-in video effects and explosion elements are gone, see Phase 18; the license check is under "Public distribution notes" in §9); 2026-11-10 (wrap-up: added `LICENSE` and cleaned up the Python dependencies, see §9 Phase 5; before that, v1.3.1: the wallpaper no longer covers other programs when it can't attach to the desktop layer, see Phase 17; cropping on import, see Phase 16)
+> Last updated: 2026-11-20 (one cover per record player track: a song's embedded cover is used by default, or you pick an image, and it switches with the track; the record player page has a draggable progress bar, see Phase 23); 2026-11-20 (imported files keep working after being moved or renamed: the app remembers each file's NTFS file ID and finds it again when it is moved or renamed on the same drive; files it cannot find can be relinked with one click, and other missing files from the same folder come along, see 4.9 and Phase 22); 2026-11-20 (the adjustment panel on the right of the Elements page is now split into tabs: Position / Color / Playback / Chroma key, one group at a time; the left list no longer runs under the panel, see Phase 21); 2026-11-19 (Phases 18–20 packaged as v1.4.0; the installer now carries the model's Apache-2.0 license, see the end of Phase 20); 2026-11-18 (diagnostic report and feedback: one-click txt report from the settings page or tray, feedback on GitHub, a Chinese prompt when the main process throws, window and GPU process crashes now logged, see Phase 20); 2026-11-14 (UI redone with the updated `ark-style-ui`: square panels, neutral grays with a cyan accent, a color bar plus a thin frame, no more cut corners or frosted glass, see Phase 19); 2026-11-13 (deleted built-in assets with unclear licensing: only the 2 CC0 default wallpapers remain, and all built-in video effects and explosion elements are gone, see Phase 18; the license check is under "Public distribution notes" in §9); 2026-11-10 (wrap-up: added `LICENSE` and cleaned up the Python dependencies, see §9 Phase 5; before that, v1.3.1: the wallpaper no longer covers other programs when it can't attach to the desktop layer, see Phase 17; cropping on import, see Phase 16)
 > Purpose: the "map" for future development. Please update this file (and the Chinese version) after changing code.
 > The Chinese version, `PROJECT_NOTES.md`, is the primary one; if the two disagree, trust the Chinese version.
 
@@ -75,7 +75,7 @@ On top of that you can layer:
 │   ├── parallax-page.js     "Parallax" page: strength, responsiveness, focus depth, restore recommended values; notes which settings apply when the current wallpaper is a video
 │   ├── elements-tab.js      "Elements" page: asset library + two columns (element list / tabbed adjustment panel)
 │   ├── effects-page.js      "Effects" page: weather + video effects
-│   ├── music-page.js        "Record player" page: playback controls, playlist (add / delete / drag to reorder / click to play), play order, appearance
+│   ├── music-page.js        "Record player" page: playback controls and progress bar, playlist (add / delete / drag to reorder / click to play / per-track cover), play order, appearance
 │   ├── unlock-page.js       "Unlock animation" page: pick a video, on / off, fade in and out times, sound, preview
 │   ├── crop-dialog.js       Crop dialog: opens when importing a wallpaper or unlock video, only lets the user pick the area; the calling page decides where to store it
 │   ├── system-page.js       "Settings" page: launch at startup, depth map cache, uninstall (the confirmation dialog asks whether to delete data)
@@ -88,7 +88,7 @@ On top of that you can layer:
 │   ├── video-wallpaper.js   Video wallpaper: a hidden <video> as the texture; every new video frame updates the texture and wakes rendering (requestVideoFrameCallback)
 │   ├── weather.js           Weather manager: canvas, switches effects by config, computes wind and parallax per frame
 │   ├── weather/             Five weather types: kit.js (offscreen textures, texture matrices, particle base class) + rain / snow / sakura / leaves / sunlight
-│   ├── vinyl.js             Record player: tonearm lift / swing / lower, record spin-up and spin-down (Web Animations), music fade in/out, position and size
+│   ├── vinyl.js             Record player: tonearm lift / swing / lower, record spin-up and spin-down (Web Animations), music fade in/out, per-track cover, progress and seeking, position and size
 │   ├── video-overlay.js     Full-screen video effects
 │   ├── unlock-player.html / unlock-player.js Full-screen player for the unlock animation: plays the video and reports progress and input to the main process
 │   ├── elements/
@@ -105,8 +105,8 @@ On top of that you can layer:
 │   ├── playback.js          Animated frame lookup, interval playback scheduling, click playback state machine
 │   ├── frame-pacing.js      Idle frame-stop decision; whether a video wallpaper keeps playing while paused (keepVideoPlaying)
 │   ├── config-sync.js       Throttled config saving, apply only changed config sections, latest-only serial queue for wallpaper switches
-│   ├── vinyl-player.js      Record player logic: uniform spin-up/down, tonearm angle by progress, desktop click hit test, position and size (normalizeLayout / clampCenter)
-│   ├── playlist.js          Playlist logic: old-config migration, add / remove, reorder, previous / next, what plays after a track ends
+│   ├── vinyl-player.js      Record player logic: uniform spin-up/down, tonearm angle by progress, desktop click hit test, position and size (normalizeLayout / clampCenter), checking progress and seek messages (cleanProgress / cleanSeek)
+│   ├── playlist.js          Playlist logic: old-config migration, add / remove, reorder, per-track picked cover (setTrackCover), previous / next, what plays after a track ends
 │   ├── my-wallpapers.js     My wallpapers list (add, dedupe, sort, remove, migrate) and whether the current wallpaper is an image or a video (resolveCurrent)
 │   ├── crop.js              Crop area logic: normalizing config values, default position, move, resize, changing ratio, ratio label, blur check, CSS and URL formats
 │   ├── unlock-animation.js  Unlock animation logic: config normalizing, time math, state table (transition)
@@ -148,6 +148,7 @@ On top of that you can layer:
 │   │   ├── tracker.js       remember file IDs (userData/file_ids.json), find files by ID and confirm it is the same file
 │   │   ├── file-id.js       read the NTFS file ID; look up the current path by ID with kernel32's OpenFileById
 │   │   └── paths.js         pure logic: collect user file paths from the config, replace paths in bulk, relink the rest of a folder, same kind of file
+│   ├── audio-cover.js       Per-track record player covers: reads covers embedded in mp3 / flac / m4a, finds same-name images, caches them in userData/vinyl_covers (Phase 23)
 │   ├── store.js             config.json / depth cache (re-keyed when a file moves) / custom_elements folder / My wallpapers thumbnails (wallpaper_thumbs) / uninstall list
 │   ├── uninstaller.js       Uninstall from the settings page: find the uninstaller in the install folder and launch it with the delete-data choice
 │   ├── gallery.js           Default wallpaper gallery: read manifest, look up by path, migrate old paths (including deleted default wallpapers)
@@ -263,6 +264,9 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | `elements:getBuiltin` / `import` / `removeAsset` / `saveThumb` / `updateInstance` / `removeInstance` / `startPlacement` | R→M | Custom elements |
 | `placement:getDraft` / `commit` / `cancel` | R→M | Placement window (the draft is an element `{ instance, asset }` or the record player `{ kind: 'vinyl', vinyl }`) |
 | `vinyl:startPlacement` | R→M | Open the placement window to drag the record player |
+| `vinyl:resolveCover` | R→M | Which cover a track shows: `{ path, cover }` → `{ file, source: 'manual'|'embedded'|'sidecar'|'none' }` (used by the wallpaper, the placement window and the settings page) |
+| `vinyl:progress` | R→M→R | Playback progress from the wallpaper to the settings page `{ path, currentTime, duration, playing }`; the main process forwards it only while the settings window is visible |
+| `vinyl:seek` / `vinyl:requestProgress` | R→M→R | Settings page → wallpaper: jump to `{ path, time }` (ignored when the path is not the track playing) / ask for the current progress once |
 | `unlock:selectVideo` / `setVideo` / `remove` / `getInfo` / `preview` | R→M | Unlock animation: pick a video / import (copy the file, turn the feature on) / remove / whether the file exists and the thumbnail URL / preview. On / off, fades and sound go through `config:save` |
 | `unlock:setCrop` | R→M | Crop the unlock video again. `unlock:setVideo` also takes `crop`; `unlock:getInfo` also returns the video address |
 | `unlock:player-event` / `unlock:start` / `unlock:fade-out` | R→M / M→R / M→R | The full-screen player reports `ready`, `near-end`, `skip`, `error` / the main process starts playback / the fade-out begins (with its duration, the sound follows) |
@@ -295,9 +299,11 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
   // myWallpapers entries, currentVideo and unlockAnimation also have crop: { x, y, w, h } as fractions of the original.
   // Entries and currentVideo have no crop key when uncropped; unlockAnimation.crop is null
   theme: 'dark',          // settings window theme 'dark'|'light'|'system' (unknown values read as dark); main process writes it to nativeTheme.themeSource
-  vinyl:        { enabled, position, x, y, scale, volume, playing, coverPath,
-                  playlist: [{ path, name }], current, playMode: 'list'|'one'|'shuffle'|'once' },
+  vinyl:        { enabled, position, x, y, scale, volume, playing,
+                  playlist: [{ path, name, cover? }], current, playMode: 'list'|'one'|'shuffle'|'once' },
                 // older audioPath / audioName / loop become a one-track playlist when the config is read (normalizeVinyl in shared/playlist.js)
+                // cover: the image picked for this track; without it the embedded cover or a same-name image is used (src/audio-cover.js).
+                // the older record-wide coverPath is dropped when the config is read (Phase 23)
                 // position: one of the four corners or 'custom' (x / y = platter center as a fraction of the screen); scale 0.5 ~ 2
   weather:      { type, density, speed, parallax },
   videoOverlay: { enabled, presetId, customPath, customName, blendMode, opacity, speed },
@@ -328,7 +334,7 @@ Any change → main process writes `config.json` → `broadcastConfig()` pushes 
 | Depth map cache / moving the folder | ✅ | |
 | Pause on full screen / lock | ✅ | Custom element videos and interval timers pause too |
 | Tray, launch at startup | ✅ | Tray "Change wallpaper": applies directly if cached, otherwise generates in the settings window and then applies |
-| Vinyl player / video effects / weather particles | ✅ | Weather rewritten on 2026-10-26 (pre-rendered textures, depth of field, realistic shapes and falling motion) |
+| Vinyl player / video effects / weather particles | ✅ | Weather rewritten on 2026-10-26 (pre-rendered textures, depth of field, realistic shapes and falling motion); since 2026-11-20 the record player has one cover per track and a draggable progress bar on the settings page (Phase 23) |
 | **Custom element system** | ✅ | Image / GIF / animated webp / apng / mp4 / webm (the two bundled explosions were deleted on 2026-11-13); placement mode (resize, stretch, rotate, flip, free warp); depth occlusion; interval playback; click playback; green-screen keying; recolor |
 | Custom stickers | ♻️ Removed | Replaced by custom elements; old config migrates automatically |
 | Default wallpaper gallery (`wallpapers/`) | ✅ | |
@@ -815,6 +821,18 @@ User feedback: once an imported file is moved or renamed, the app can no longer 
 - Not tested: the packaged installer; actually moving to another drive / USB drive (simulated with copy + delete, which also gives a new ID); ReFS Dev Drive.
 - Small issues not changed (raised in review, low impact): after an automatic find the thumbnail file name is still based on the old path (if someone later puts a different image at the old path and imports it, it overwrites that thumbnail); switching to an unreadable track while paused, then having it found, skips it once as broken when played; launching the app a second time during the startup check may open the settings window before its IPC handlers exist; manual relink checks old-folder paths one by one (slow on a dead network drive); the record player / video effect compare paths with `===` (one reload if the same file is spelled two ways); manual relink says "已找回" even when nothing in the config changed; concurrent `record()` runs can drop a just-renamed record, restored 2 seconds later.
 
+### ✅ Phase 23 — One cover per track + a draggable progress bar on the record player (2026-11-20, on the `feat/vinyl-cover-seek` branch)
+User request: bind a cover to each track and switch the record's cover when the track changes; add a draggable progress bar to the record player page. Decided by the user: if a song file has an embedded cover, use it by default; the app ships no default cover image and no songs. Design in `docs/superpowers/specs/2026-11-20-vinyl-cover-seek-design.md`, plan in `docs/superpowers/plans/2026-11-20-vinyl-cover-seek.md`.
+- The cover is looked up in order: the image you picked for this track (`playlist[i].cover`, if the file still exists) → the cover embedded in the song file → a same-name jpg / jpeg / png / webp in the same folder → the plain label. The record-wide `coverPath` is gone (dropped when an old config is read; the image file itself is left alone).
+- New module `src/audio-cover.js`: a hand-written parser (no new dependency) that recognises the format by its first bytes, not the extension: ID3v2.2 / 2.3 / 2.4 (unsynchronisation, extended header), FLAC PICTURE blocks (also behind a leading ID3 tag), and mp4 / m4a `moov > udta > meta > ilst > covr` (found even when `moov` is at the end; only box headers are read). With several pictures the "front cover" type wins. Extracted covers are written to `userData/vinyl_covers/`, named from "path + size + modified time"; files for tracks no longer in the playlist are deleted at startup. Broken data counts as no cover.
+- The progress bar sits in the record player card on the settings page (current time + slider + length). Music plays in the wallpaper window, which sends progress through the main process on `timeupdate` and similar events (forwarded only while the settings window is visible); while dragging, the bar ignores incoming progress, and on release it sends `vinyl:seek`. Progress is not saved in the config.
+- Seeking: while sounding → the sound jumps at once, the tonearm lifts, swings to the matching groove and lowers (the sound does not stop); while the arm is still swinging in from rest → it swings to the new spot instead; while paused → only the position changes and the arm lands there on the next play. No seek when the path does not match (just switched tracks) or the length is unknown.
+- Settings page: each playlist row has a small cover (click it to pick an image for that track, without playing it); the "唱片封面" row now covers the current track, says where its cover comes from, and has "更换…" plus "不用这张" (shown only when an image was picked); covers are asked again when the window regains focus and redrawn only if something changed (a same-name image just dropped into the folder shows up at once). The file-relocation feature (Phase 22) also finds picked cover images that were moved.
+- Decided by the assistant: the same-name image rule; no `cover.jpg` / `folder.jpg`; no covers from ogg / wav; the sound keeps playing while seeking; the old shared cover is not copied onto each track (it would hide embedded covers); progress updates every 0.25 s, no per-frame animation.
+- Verified: `npm test` 529 passing (24 new: 18 in `audio-cover`, 6 in `playlist` / `file-paths` / `store` / `vinyl-player`). mp3 / flac / m4a files with embedded covers made with ffmpeg from the test material were all read. Electron run (separate data folder + debugging port, muted): the old `coverPath` was removed from disk at startup; six tracks (embedded-cover mp3 / flac / m4a, two with same-name images, one without a cover) showed the right cover in the playlist, the card, the record on the desktop and the placement window; switching tracks changed both sides; seeking to 12 s while playing jumped the sound at once and the arm lifted from 23° to 17.4° and lowered; seeking to 150 s while paused left the arm at rest, and playing landed it at 20.1°; seeking to 30 s within 0.3 s of pressing play redirected the arm to 7.2° and the sound started at 30 s; seeks for another track, an empty path, NaN and negative times had no effect; picking an image for the current track and for another track, "不用这张", and a deleted picked image falling back to the same-name image all worked; a same-name image dropped in showed up after refocusing the window; no horizontal scrolling at 820×560. No errors in the log.
+- The two `.mp3` files in the test material are actually mp4 videos with a changed extension (no embedded cover, same-name images next to them); `<audio>` plays them fine.
+- Not tested: the packaged installer; dragging the slider with a real mouse (tested with synthetic input / change events); how it sounds (volume was 0 during the test).
+
 ### ✅ Phase 5 — Wrap-up (2026-11-10)
 - [x] Deleted `生成深度图.bat` (the "generate depth map" batch file): the app generates depth maps itself, and the bat still offered base / large models that have long been gone.
 - [x] `requirements.txt` now lists what the venv actually has installed — onnxruntime / numpy / pillow — pinned to the venv's versions (checked with `pip install --dry-run --no-index -r requirements.txt`). Don't remove the `# -*- coding: utf-8 -*-` first line: on Chinese Windows pip reads the file as GBK by default and fails with `UnicodeDecodeError` on the Chinese comments (the old file had the same problem). ffmpeg and the torch needed by `export_onnx.py` are mentioned in comments.
@@ -878,7 +896,7 @@ Public distribution notes (v1.0.0 is public; these still hold):
 - Electron 28 no longer receives security updates. It only loads local pages, so the risk is low and v1 can leave it.
 - ~~`package.json` says `"license": "MIT"`, but the repo has no `LICENSE` file~~ ✅ 2026-11-10 added; the README says what is not covered by MIT.
 - ~~The Depth Anything V2 Small model bundled in the installer is Apache-2.0, which requires a copy of its license text when redistributing; the installer doesn't include one yet~~ ✅ 2026-11-19 from v1.4.0 on it is at `resources/models/LICENSE-depth-anything-v2-small.txt` (source file `licenses/depth-anything-v2-small.txt`). v1.3.1 and older installers don't have it.
-- The record player cover `coverPath` points to an image in `default wallpaper/` (now in `.gitignore`); change the cover before deleting that folder.
+- ~~The record player cover `coverPath` points to an image in `default wallpaper/` (now in `.gitignore`); change the cover before deleting that folder.~~ Since 2026-11-20 there is no record-wide cover any more (Phase 23); `coverPath` is dropped when the config is read.
 
 ---
 

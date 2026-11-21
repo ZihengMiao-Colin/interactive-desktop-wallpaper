@@ -1030,6 +1030,18 @@ input[type=range].hue::-webkit-slider-runnable-track {
     text-overflow: ellipsis;
 }
 .player-text small { display: block; margin-top: 2px; color: var(--text-2); }
+/* 进度条：当前时间 + 滑块 + 总长，滑块占满中间；时间用等宽数字，走动时不晃 */
+.seek { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.seek input[type=range] { flex: 1; width: auto; min-width: 0; }
+.seek input[type=range]:disabled { cursor: default; opacity: 0.4; }
+.seek .time {
+    flex-shrink: 0;
+    min-width: 32px;
+    color: var(--text-2);
+    font: 500 12px/1 var(--f-data);
+    font-variant-numeric: tabular-nums;
+}
+.seek .time:last-child { text-align: right; }
 .player-actions { display: flex; align-items: center; gap: 10px; }
 /* 播放：这张卡片里唯一的主色按钮 */
 .play-btn {
@@ -1099,6 +1111,23 @@ input[type=range].hue::-webkit-slider-runnable-track {
 .track .no i:nth-child(2) { animation-duration: 0.6s; animation-delay: 0.2s; }
 .track .no i:nth-child(3) { animation-duration: 0.9s; animation-delay: 0.4s; }
 @keyframes track-eq { from { height: 3px; } to { height: 14px; } }
+/* 每首歌的小封面：没有封面时显示一个唱片图标；点它换图 */
+.track .tcover {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    background: var(--raised) center / cover no-repeat;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.track .tcover svg.i { width: 15px; height: 15px; }
+.track .tcover.has svg.i { display: none; }
+.track .tcover:hover { border-color: var(--accent-text); }
 .track .tx { flex: 1; min-width: 0; padding-left: 4px; }
 .track .tx b, .track .tx small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .track .tx b { font-size: 13px; font-weight: 500; }

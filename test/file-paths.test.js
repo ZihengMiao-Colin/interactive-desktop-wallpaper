@@ -14,7 +14,7 @@ function fullConfig() {
         currentImage: 'c:/w/A.jpg',                       // 和第一格是同一个文件
         currentImageCrop: { path: 'C:\\w\\a.jpg', x: 0.1, y: 0, w: 0.8, h: 1 },
         currentVideo: { path: 'C:\\w\\v.mp4', effect: 'pan', sound: true, imageAtTime: 'C:\\w\\old.png' },
-        vinyl: { enabled: true, playlist: [{ path: 'D:\\m\\s.mp3', name: 's' }], current: 'D:\\m\\s.mp3', coverPath: 'D:\\m\\c.png', volume: 0.5 },
+        vinyl: { enabled: true, playlist: [{ path: 'D:\\m\\s.mp3', name: 's', cover: 'D:\\m\\c.png' }], current: 'D:\\m\\s.mp3', volume: 0.5 },
         videoOverlay: { enabled: true, customPath: 'C:\\w\\v.mp4', customName: 'v.mp4', opacity: 0.8 },
         weather: { type: 'rain' },
     };
@@ -54,12 +54,19 @@ test('replacePaths 换掉每一处引用，包括 imageAtTime 和 vinyl.current'
     assert.equal(partial.currentVideo.imageAtTime, 'E:\\x\\old2.png');
     assert.equal(partial.currentVideo.path, 'C:\\w\\v.mp4');
     assert.equal(partial.currentVideo.effect, 'pan');
-    assert.deepEqual(partial.vinyl.playlist, [{ path: 'E:\\m\\s.mp3', name: 's' }]);
+    assert.deepEqual(partial.vinyl.playlist, [{ path: 'E:\\m\\s.mp3', name: 's', cover: 'E:\\m\\c2.png' }]);
     assert.equal(partial.vinyl.current, 'E:\\m\\s.mp3');
-    assert.equal(partial.vinyl.coverPath, 'E:\\m\\c2.png');
+    assert.ok(!('coverPath' in partial.vinyl));
     assert.equal(partial.vinyl.volume, 0.5);
     assert.ok(!('videoOverlay' in partial));
     assert.ok(!('weather' in partial));
+});
+
+test('replacePaths 只挪了某首歌的自选封面：只换 cover，歌的路径和名字不动', () => {
+    const partial = replacePaths(fullConfig(), [{ from: 'D:\\m\\c.png', to: 'E:\\m\\c2.png' }]);
+    assert.deepEqual(partial.vinyl.playlist, [{ path: 'D:\\m\\s.mp3', name: 's', cover: 'E:\\m\\c2.png' }]);
+    assert.equal(partial.vinyl.current, 'D:\\m\\s.mp3');
+    assert.deepEqual(Object.keys(partial), ['vinyl']);
 });
 
 test('replacePaths 同一个文件被壁纸和视频特效同时引用时两处都换', () => {
