@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kirie 壁纸 安装注意事项</title>
+<!-- 安装注意事项的源文件。导出 PDF：msedge --headless --no-pdf-header-footer --print-to-pdf=Kirie-Install-Guide.pdf install-guide.html -->
+<link rel="stylesheet" href="../../ui/fonts/noto-serif-sc.css">
+<style>
+  @font-face {
+    font-family: 'Saira';
+    src: url(../../ui/fonts/saira-wdth.woff2) format('woff2-variations');
+    font-weight: 100 900;
+    font-stretch: 50% 125%;
+  }
+  @page { size: A4; margin: 16mm 16mm 18mm; }
+  :root {
+    --ink: #141416;
+    --sub: #55585e;
+    --line: #d4d6da;
+    --panel: #f3f4f6;
+    --accent: #0d5a6e;   /* 图标里的深青，打印在白纸上对比度够 */
+    --cyan: #18d1ff;     /* 图标里的亮青，只用在色条上 */
+    --warn: #8a5a00;
+    --warn-bg: #fff6e0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; color: var(--ink); }
+  body {
+    font-family: 'Microsoft YaHei', 'Source Han Sans SC', sans-serif;
+    font-size: 10.2pt;
+    line-height: 1.7;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .serif { font-family: 'Noto Serif SC Variable', 'SimSun', serif; }
+  .en { font-family: 'Saira', 'Segoe UI', sans-serif; font-stretch: 112%; letter-spacing: .04em; }
+  code, .path {
+    font-family: 'Cascadia Mono', Consolas, monospace;
+    font-size: 9pt;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 0 4px;
+    word-break: break-all;
+  }
+
+  /* ---------- 封面头部 ---------- */
+  header.cover {
+    display: flex; align-items: center; gap: 18px;
+    background: #0f0f10; color: #fff;
+    padding: 22px 24px;
+    border-left: 6px solid var(--cyan);
+  }
+  header.cover svg { width: 64px; height: 64px; flex: none; }
+  header.cover .kicker { font-size: 8.5pt; color: var(--cyan); margin: 0; }
+  header.cover h1 { margin: 2px 0 2px; font-size: 22pt; font-weight: 800; line-height: 1.25; }
+  header.cover .meta { margin: 0; font-size: 9pt; color: #b9bcc2; }
+
+  .tldr {
+    margin: 14px 0 6px;
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--accent);
+    padding: 10px 16px 8px;
+  }
+  .tldr h2 { margin: 0 0 4px; font-size: 11pt; border: 0; padding: 0; }
+  .tldr ol { margin: 0; padding-left: 1.4em; }
+
+  /* ---------- 章节 ---------- */
+  h2 {
+    font-size: 14pt; font-weight: 800;
+    margin: 20px 0 8px; padding: 0 0 4px 10px;
+    border-left: 4px solid var(--accent);
+    border-bottom: 1px solid var(--line);
+    break-after: avoid;
+  }
+  h2 .num { color: var(--accent); margin-right: 6px; }
+  h3 { font-size: 11pt; margin: 14px 0 4px; break-after: avoid; }
+  p { margin: 4px 0 6px; }
+  ul, ol { margin: 4px 0 8px; padding-left: 1.5em; }
+  li { margin: 2px 0; }
+  .sub { color: var(--sub); font-size: 9pt; }
+
+  /* 步骤：编号方块 */
+  ol.steps { list-style: none; counter-reset: s; padding-left: 0; }
+  ol.steps > li {
+    counter-increment: s; position: relative;
+    padding: 2px 0 2px 30px; margin: 4px 0;
+  }
+  ol.steps > li::before {
+    content: counter(s);
+    position: absolute; left: 0; top: 4px;
+    width: 20px; height: 20px; line-height: 20px;
+    text-align: center; font-size: 9pt; font-weight: 700;
+    background: var(--accent); color: #fff;
+  }
+  .ui { font-weight: 700; color: var(--accent); }   /* 界面上的按钮、菜单名 */
+
+  /* 模拟的系统弹窗 */
+  .mock {
+    border: 1px solid #9fb4c4; background: #f5f9fc;
+    padding: 10px 14px; margin: 8px 0 10px;
+    break-inside: avoid;
+  }
+  .mock .title { font-weight: 700; font-size: 10.5pt; margin: 0 0 2px; }
+  .mock .body { color: var(--sub); font-size: 9pt; margin: 0 0 6px; }
+  .mock .btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .mock .btn {
+    font-size: 9pt; padding: 1px 12px; border: 1px solid #8a9199; background: #fff;
+  }
+  .mock .btn.hl { border: 2px solid var(--accent); color: var(--accent); font-weight: 700; }
+  .mock .link { color: #0a64c2; text-decoration: underline; font-size: 9pt; }
+
+  .note, .warn {
+    padding: 8px 12px; margin: 8px 0 10px; font-size: 9.4pt;
+    break-inside: avoid;
+  }
+  .note { background: var(--panel); border-left: 3px solid var(--accent); }
+  .warn { background: var(--warn-bg); border-left: 3px solid #d99a00; }
+  .warn b:first-child, .note b:first-child { margin-right: 4px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 9.2pt; break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: var(--panel); font-weight: 700; }
+
+  .cmd {
+    font-family: 'Cascadia Mono', Consolas, monospace; font-size: 8.8pt;
+    background: #0f0f10; color: #e8eaed; padding: 8px 12px; margin: 6px 0;
+    border-left: 3px solid var(--cyan); word-break: break-all;
+  }
+  .page-break { break-before: page; }
+  footer.end {
+    margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--line);
+    font-size: 8.5pt; color: var(--sub);
+  }
+</style>
+</head>
+<body>
+
+<header class="cover">
+  <svg viewBox="0 0 256 256" aria-hidden="true">
+    <rect width="256" height="256" fill="#0f0f10"/>
+    <path fill="#0d5a6e" d="M67 50 L117 50 L117 234 L67 234 Z M147 50 L217 50 L117 150 L117 80 Z M67 142 L125 142 L217 234 L147 234 L67 154 Z"/>
+    <path fill="#18d1ff" d="M53 36 L103 36 L103 220 L53 220 Z M133 36 L203 36 L103 136 L103 66 Z M53 128 L111 128 L203 220 L133 220 L53 140 Z"/>
+    <path fill="#ffffff" d="M39 22 L89 22 L89 206 L39 206 Z M119 22 L189 22 L89 122 L89 52 Z M39 114 L97 114 L189 206 L119 206 L39 126 Z"/>
+  </svg>
+  <div>
+    <p class="kicker en">KIRIE WALLPAPER · INSTALLATION NOTES</p>
+    <h1 class="serif">Kirie 壁纸 安装注意事项</h1>
+    <p class="meta">Windows 安全提示与安全软件设置 · 适用于 v1.5.0 · 2026 年 11 月</p>
+  </div>
+</header>
+
+<section class="tldr">
+  <h2>先看这里</h2>
+  <ol>
+    <li>安装包没有代码签名，Windows 会提示"Windows 已保护你的电脑"：点 <span class="ui">更多信息</span> → <span class="ui">仍要运行</span>。</li>
+    <li>浏览器可能说这个文件"不常被下载"：选 <span class="ui">保留</span>。</li>
+    <li>装了 360 等安全软件时，壁纸可能挂不到桌面上（会盖住桌面图标）：把 Kirie 加入信任区，或者退出安全软件后重新打开 Kirie。</li>
+    <li>只从官方发布页下载，有疑问时可以核对安装包的 SHA-256（见第 1 节）。</li>
+  </ol>
+</section>
+
+<!-- ==================== 1 ==================== -->
+<h2 class="serif"><span class="num en">01</span>下载和安装前</h2>
+
+<h3>系统要求</h3>
+<ul>
+  <li>Windows 10 或 Windows 11，64 位（x64）。32 位系统、ARM 版 Windows、Windows 7/8 都不支持。</li>
+  <li>硬盘空间：安装包约 190 MB，装好后约 560 MB。</li>
+  <li>不需要联网，深度图在本机生成。</li>
+</ul>
+
+<h3>只从官方地址下载</h3>
+<p>官方发布页：<span class="path">https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases</span>。在 Assets 里下载 <code>Kirie-Setup-1.5.0.exe</code>。别的网站转载的安装包可能被改过，下面这些"放行"的操作只对官方安装包做。</p>
+
+<h3>浏览器的下载提示</h3>
+<p>因为下载的人还不多，Edge、Chrome 可能提示这个文件"通常不会被下载"或"不常被下载"，并把它挡在下载列表里：</p>
+<ul>
+  <li><b>Edge</b>：在下载列表里把鼠标移到这个文件上，点 <span class="ui">…</span> → <span class="ui">保留</span>；如果再弹出提示，点 <span class="ui">显示更多</span> → <span class="ui">仍然保留</span>。</li>
+  <li><b>Chrome</b>：在下载列表里点这个文件旁边的 <span class="ui">保留</span>（或 <span class="ui">仍然下载</span>）。</li>
+</ul>
+
+<h3>（可选）核对安装包没被改过</h3>
+<p>在安装包所在的文件夹里按住 Shift 点右键 → <span class="ui">在终端中打开</span>（或"在此处打开 PowerShell 窗口"），输入：</p>
+<div class="cmd">Get-FileHash .\Kirie-Setup-1.5.0.exe -Algorithm SHA256</div>
+<p>显示的 Hash 应该是：</p>
+<div class="cmd">2D6375845DA73A3D76F4FDB0F8235362B1DBD070844E6EF545A6938C8EE10E85</div>
+<p class="sub">只适用于 v1.5.0。以后的版本请以发布页上写的为准。</p>
+
+<!-- ==================== 2 ==================== -->
+<h2 class="serif"><span class="num en">02</span>Windows 的安全提示</h2>
+
+<h3>2.1 "Windows 已保护你的电脑"（SmartScreen）</h3>
+<p>代码签名证书要每年付费购买，Kirie 是个人项目，安装包没有签名，所以第一次运行时 Windows 的 SmartScreen 会认不出发布者，弹出蓝色的提示框：</p>
+<div class="mock">
+  <p class="title">Windows 已保护你的电脑</p>
+  <p class="body">Microsoft Defender SmartScreen 阻止了无法识别的应用启动。运行此应用可能会导致你的电脑存在风险。</p>
+  <p class="link">更多信息</p>
+  <div class="btns"><span class="btn">不运行</span></div>
+</div>
+<ol class="steps">
+  <li>点提示框文字下面的 <span class="ui">更多信息</span>。</li>
+  <li>这时会显示"应用：Kirie-Setup-1.5.0.exe"和"发布者：未知发布者"，右下角多出一个按钮，点 <span class="ui">仍要运行</span>。</li>
+</ol>
+<div class="mock">
+  <p class="title">Windows 已保护你的电脑</p>
+  <p class="body">应用：Kirie-Setup-1.5.0.exe<br>发布者：未知发布者</p>
+  <div class="btns"><span class="btn hl">仍要运行</span><span class="btn">不运行</span></div>
+</div>
+<p class="sub">"未知发布者"的意思是没有签名，不是说文件有病毒。这个提示只在第一次运行安装包时出现，装好后的 Kirie 一般不会再提示。</p>
+<div class="note"><b>另一种办法：</b>右键安装包 → <span class="ui">属性</span> → 在"常规"页最下面勾选 <span class="ui">解除锁定</span> → <span class="ui">确定</span>，再双击运行，就不会弹出这个提示。</div>
+
+<h3>2.2 "智能应用控制已阻止…"（只有部分 Windows 11 会遇到）</h3>
+<p>全新安装的 Windows 11 可能开着"智能应用控制"（Smart App Control）。它比 SmartScreen 严格，会直接拦下没有签名的程序，<b>没有"仍要运行"按钮</b>。只有看到这个提示时才需要处理：</p>
+<ol class="steps">
+  <li>打开 <span class="ui">Windows 安全中心</span> → <span class="ui">应用和浏览器控制</span> → <span class="ui">智能应用控制设置</span>。</li>
+  <li>如果显示"开"，可以改成 <span class="ui">关</span>，再运行安装包。</li>
+</ol>
+<div class="warn"><b>注意：</b>智能应用控制是系统级的保护，关掉后其他没签名的程序也不会再被它拦。在部分 Windows 版本上，关闭后要重置或重装系统才能重新打开。请自己权衡，不想关的话就没办法安装 Kirie。</div>
+
+<h3>2.3 用户账户控制（UAC）</h3>
+<p>安装向导里可以选"只为我安装"或"为使用这台电脑的任何人安装"：</p>
+<ul>
+  <li><b>只为我安装（推荐）</b>：装到 <span class="path">%LOCALAPPDATA%\Programs\interactive-desktop-wallpaper</span>，不需要管理员权限，不会弹 UAC 提示。</li>
+  <li><b>为所有人安装</b>：装到 Program Files，Windows 会弹出"你要允许此应用对你的设备进行更改吗？"，点 <span class="ui">是</span>（需要管理员账户）。</li>
+</ul>
+<p>Kirie 运行时<b>不需要</b>管理员权限，不要用"以管理员身份运行"打开它。</p>
+
+<h3>2.4 Microsoft Defender 报毒</h3>
+<p>正常情况下 Defender 不会拦 Kirie。如果 Windows 安全中心说发现了威胁并隔离了 Kirie 的文件：</p>
+<ol class="steps">
+  <li>先确认安装包是从官方发布页下载的，最好按第 1 节核对一下 SHA-256。</li>
+  <li>打开 <span class="ui">Windows 安全中心</span> → <span class="ui">病毒和威胁防护</span> → <span class="ui">保护历史记录</span>，找到这条记录，点 <span class="ui">操作</span> → <span class="ui">允许</span>（或"还原"）。</li>
+  <li>重新安装一遍，确保文件完整。</li>
+</ol>
+<p class="sub">遇到这种情况请生成诊断报告发给开发者（见第 4 节），方便向微软提交误报。</p>
+
+<!-- ==================== 3 ==================== -->
+<h2 class="serif"><span class="num en">03</span>安全软件（360、火绒、电脑管家等）</h2>
+
+<p>Kirie 要把壁纸窗口挂到桌面图标的下面，这一步要把自己的窗口放进资源管理器的桌面窗口里。有些安全软件会把这个操作当成可疑行为拦下来，目前<b>确认会拦的是 360 安全卫士</b>（不是每次都拦）。被拦时电脑和文件都不受影响，只是壁纸的显示方式变了。</p>
+
+<h3>3.1 怎么判断被拦了</h3>
+<table>
+  <tr><th style="width:34%">看哪里</th><th>正常</th><th>被拦下（兜底模式）</th></tr>
+  <tr><td>桌面图标</td><td>壁纸在图标下面，图标正常显示</td><td>图标被壁纸盖住看不见，但点原来的位置还能打开</td></tr>
+  <tr><td>Kirie 设置窗口顶部</td><td>没有提示</td><td>显示"<b>壁纸没能挂到桌面上</b>"</td></tr>
+  <tr><td>诊断报告</td><td>桌面层：已挂上</td><td>桌面层：没挂上（兜底模式：壁纸放在所有程序后面）</td></tr>
+  <tr><td>点"显示桌面"（Win + D）</td><td>还是壁纸</td><td>看到的是 Windows 原来的桌面，再点一次恢复</td></tr>
+</table>
+<p>兜底模式下壁纸放在所有程序后面，不会挡住你在用的程序，可以先这样用；想恢复正常就按下面的办法处理。</p>
+
+<h3>3.2 办法一：把 Kirie 加入信任区</h3>
+<p>需要添加的位置（默认的"只为我安装"）：</p>
+<div class="cmd">%LOCALAPPDATA%\Programs\interactive-desktop-wallpaper\Kirie.exe</div>
+<p class="sub">文件选择框里可以直接把上面这一行粘贴到地址栏，回车就能跳过去。如果安装时改过位置，就去你选的文件夹里找 Kirie.exe。也可以把整个安装文件夹加进去，以后升级不用重新添加。</p>
+<table>
+  <tr><th style="width:22%">安全软件</th><th>大致的位置（不同版本的菜单名可能略有不同）</th></tr>
+  <tr><td>360 安全卫士</td><td>主界面 → <span class="ui">木马查杀</span> → 右下角 <span class="ui">信任区</span> → <span class="ui">添加文件</span> 或 <span class="ui">添加目录</span></td></tr>
+  <tr><td>360 杀毒</td><td>主界面 → <span class="ui">设置</span> → <span class="ui">文件白名单</span> → 添加文件 / 目录</td></tr>
+  <tr><td>火绒安全</td><td>主界面右上角菜单 → <span class="ui">信任区</span> → <span class="ui">添加文件</span> / <span class="ui">添加文件夹</span></td></tr>
+  <tr><td>腾讯电脑管家</td><td><span class="ui">病毒查杀</span> → <span class="ui">信任区</span> → 添加文件 / 目录</td></tr>
+  <tr><td>其他</td><td>找"信任区""白名单""排除项"之类的设置，把 Kirie.exe 或安装文件夹加进去</td></tr>
+</table>
+<p>加好以后要<b>完全退出</b> Kirie 再打开：右键任务栏右下角托盘里的 Kirie 图标 → <span class="ui">退出</span>，然后从开始菜单或桌面快捷方式重新打开。</p>
+<div class="note"><b>说明：</b>"加入信任区"能不能让 360 放行，开发者还没有实测过。如果加了还是不行，用办法二。</div>
+
+<h3>3.3 办法二：先退出安全软件，再打开 Kirie</h3>
+<ol class="steps">
+  <li>托盘里右键 Kirie 图标 → <span class="ui">退出</span>。</li>
+  <li>托盘里右键安全软件的图标 → <span class="ui">退出</span>（360 安全卫士会再问一次，确认退出）。</li>
+  <li>重新打开 Kirie，确认设置窗口顶部不再有"壁纸没能挂到桌面上"的提示。</li>
+  <li>需要的话再把安全软件打开。</li>
+</ol>
+<p class="sub">实测退出 360 后 Kirie 能正常挂到桌面上。Kirie 挂上以后再打开 360 会不会有影响、下次开机会不会又被拦，还没有完整测过；如果又出现提示，重复这几步即可。</p>
+
+<h3>3.4 其他可能遇到的安全软件提示</h3>
+<ul>
+  <li><b>安装时弹窗</b>：安全软件可能提示"有程序正在安装 / 修改系统设置"，确认是 Kirie 的安装包后选 <span class="ui">允许</span>。</li>
+  <li><b>开机自动启动</b>：在 Kirie 的 <span class="ui">设置</span> 页打开"开机自动启动"时，安全软件可能提示"有程序要添加启动项"，选 <span class="ui">允许</span>。如果开了自启但开机后 Kirie 没出现，去安全软件的"启动项管理 / 优化加速"里看看 Kirie 是不是被禁用了。</li>
+  <li><b>其他壁纸、桌面美化软件</b>：Wallpaper Engine、Lively Wallpaper、桌面整理类软件也会改动桌面窗口，和 Kirie 同时开着可能互相影响。出问题时先关掉它们试试。</li>
+</ul>
+
+<!-- ==================== 4 ==================== -->
+<h2 class="serif"><span class="num en">04</span>Kirie 会做什么、不会做什么</h2>
+<table>
+  <tr><th style="width:50%">会</th><th>不会</th></tr>
+  <tr>
+    <td>
+      在 <span class="path">%APPDATA%\interactive-desktop-wallpaper</span> 里保存设置、生成的深度图和日志<br>
+      读取你自己选的图片、视频、音乐<br>
+      你打开"开机自动启动"时，在当前用户的启动项里加一条
+    </td>
+    <td>
+      不需要管理员权限<br>
+      不联网上传任何东西（只有你点"到 GitHub 反馈"时才会打开浏览器）<br>
+      不修改系统文件，不改 Windows 原来的壁纸设置
+    </td>
+  </tr>
+</table>
+
+<h3>还是有问题？</h3>
+<p>在 Kirie 的 <span class="ui">设置</span> 页（或托盘菜单 → <span class="ui">问题反馈</span>）点 <span class="ui">生成诊断报告</span>，桌面上会出现一个 <code>Kirie-诊断报告-…txt</code>，里面写着桌面层有没有挂上、检测到哪些安全软件和壁纸软件。报告会去掉路径里的 Windows 用户名，但壁纸和音乐的文件名还在，发出去之前可以自己看一遍。把它发给开发者，或在 GitHub 发布页所在的仓库里提 Issue。</p>
+<p class="sub">如果 Kirie 完全打不开，请发送这个文件：<span class="path">%APPDATA%\interactive-desktop-wallpaper\logs\main.log</span></p>
+
+<footer class="end">
+  Kirie 壁纸 · 软件代码为 MIT 许可证，安装包内的深度模型 Depth Anything V2 Small 为 Apache-2.0 许可证。<br>
+  本文中的系统和安全软件界面文字可能随版本变化，以实际显示为准。
+</footer>
+
+</body>
+</html>

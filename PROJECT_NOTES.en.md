@@ -162,6 +162,7 @@ On top of that you can layer:
 ├── tools/make_icon.py               App icon generation: assets/icon.ico (nine sizes), icon.png, icon.svg, icon-20.svg (Phase 24)
 ├── dev/                     Fake config and sample GIF for browser preview
 ├── build/installer.nsh      NSIS custom script: "Also delete my data" checkbox in the uninstall wizard, deleting data, removing the startup entry
+├── docs/install/            Installation notes for users: install-guide.html is the source, Kirie-Install-Guide.pdf is exported with headless Edge (command in the comment at the top of the html). It quotes the v1.5.0 SHA-256; update it for new releases
 ├── test/                    Node unit tests
 ├── generate_depth_map.py / export_onnx.py   Python depth-map generation (used by tools/prepare_wallpapers.py; the app now uses src/depth/)
 ├── requirements.txt         Python dependencies of the venv (pinned; don't remove the encoding line at the top, see §9 Phase 5)

@@ -163,6 +163,7 @@ Electron 桌面应用：用户选一张图片 → 用 Depth Anything V2（ONNX�
 ├── tools/make_icon.py               软件图标生成：assets/icon.ico（九个尺寸）、icon.png、icon.svg、icon-20.svg（阶段 24）
 ├── dev/                     浏览器预览用的假配置和示例 GIF
 ├── build/installer.nsh      NSIS 自定义脚本：卸载向导的"同时删除我的数据"勾选框、删数据、删开机自启
+├── docs/install/            给用户的安装注意事项：install-guide.html 是源文件，Kirie-Install-Guide.pdf 由 Edge 无头模式导出（命令写在 html 开头的注释里）。写的是 v1.5.0 的 SHA-256，发新版要改
 ├── test/                    Node 单元测试
 ├── generate_depth_map.py / export_onnx.py   Python 版深度图（tools/prepare_wallpapers.py 在用；应用里已换成 src/depth/）
 ├── requirements.txt         venv 里的 Python 依赖（版本锁定；第一行的编码声明不能删，见 §9 阶段 5）
