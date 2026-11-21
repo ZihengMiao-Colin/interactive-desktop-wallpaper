@@ -49,7 +49,7 @@ test('生成报告：存到桌面，在文件夹里选中它', async () => {
     const t = setup();
     const result = await t.diagnostics.generateReport();
     assert.equal(result.success, true);
-    assert.equal(result.fileName, '互动3D壁纸-诊断报告-20261118-140322.txt');
+    assert.equal(result.fileName, 'Kirie-诊断报告-20261118-140322.txt');
     assert.equal(result.path, path.join(t.dir, result.fileName));
     assert.ok(fs.existsSync(result.path));
     assert.deepEqual(t.shown, [result.path]);
@@ -78,7 +78,7 @@ test('到 GitHub 反馈：先生成报告，再打开填好的反馈页（带报
     assert.equal(t.shown.length, 1);
     assert.equal(t.opened.length, 1);
     const body = new URL(t.opened[0]).searchParams.get('body');
-    assert.match(body, /互动3D壁纸-诊断报告-20261118-140322\.txt/);
+    assert.match(body, /Kirie-诊断报告-20261118-140322\.txt/);
     assert.match(body, /软件版本：1\.3\.1/);
     assert.match(body, /读不到 C:\\Users\\<用户名>\\Pictures/);
     assert.doesNotMatch(t.opened[0] + body, /Alice/);

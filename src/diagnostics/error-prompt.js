@@ -38,7 +38,7 @@ function createErrorPrompt({ showDialog, onReport, onQuit, now = Date.now, minIn
         if (fatal) {
             return {
                 type: 'error',
-                title: '互动3D壁纸',
+                title: 'Kirie 壁纸',
                 message: '程序启动失败',
                 detail: `${messageOf(error)}\n\n${HINT}`,
                 buttons: [REPORT, QUIT],
@@ -49,7 +49,7 @@ function createErrorPrompt({ showDialog, onReport, onQuit, now = Date.now, minIn
         }
         return {
             type: 'error',
-            title: '互动3D壁纸',
+            title: 'Kirie 壁纸',
             message: '程序出错了',
             detail: `${messageOf(error)}\n\n${HINT}点"${IGNORE}"可以接着用，之后不正常的话重新打开程序就好。`,
             buttons: [REPORT, IGNORE, QUIT],

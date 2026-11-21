@@ -27,6 +27,16 @@ test('打包配置用 assets/icon.ico，文件存在', () => {
     assert.ok(fs.existsSync(path.join(root, pkg.build.win.icon)));
 });
 
+test('打包配置：显示名 Kirie 壁纸，exe 叫 Kirie，安装包 Kirie-Setup-<版本>', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    assert.equal(pkg.build.productName, 'Kirie 壁纸');
+    assert.equal(pkg.build.executableName, 'Kirie');
+    assert.equal(pkg.build.nsis.artifactName, 'Kirie-Setup-${version}.${ext}');
+    // 这两个决定数据目录、安装目录和"是不是同一个软件"，改名时不动
+    assert.equal(pkg.name, 'interactive-desktop-wallpaper');
+    assert.equal(pkg.build.appId, 'com.wallpaper.interactive-3d');
+});
+
 test('设置窗口标题栏的 logo 是 assets/icon-20.svg，文件存在', () => {
     const html = fs.readFileSync(path.join(root, 'settings.html'), 'utf8');
     const m = html.match(/<span class="logo"[^>]*>\s*<img[^>]*src="([^"]+)"/);

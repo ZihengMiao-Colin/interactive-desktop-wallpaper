@@ -19,11 +19,11 @@ function formatTime(date) {
         + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
-/** 互动3D壁纸-诊断报告-20261118-140322.txt */
+/** Kirie-诊断报告-20261118-140322.txt */
 function reportFileName(date) {
     const stamp = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`
         + `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-    return `互动3D壁纸-诊断报告-${stamp}.txt`;
+    return `Kirie-诊断报告-${stamp}.txt`;
 }
 
 const failed = (part) => part && typeof part === 'object' && !Array.isArray(part) && 'error' in part;
@@ -149,7 +149,7 @@ function formatReport(info) {
     const problemCount = Array.isArray(info.problems) && info.problems.length ? `（最近 ${info.problems.length} 条）` : '';
     const logTitle = failed(info.log) ? '日志' : `日志（${path.basename(info.log.file)} 最后 ${info.log.lines.length} 行）`;
     return [
-        '互动3D壁纸 诊断报告',
+        'Kirie 壁纸 诊断报告',
         `生成时间：${formatTime(info.generatedAt)}`,
         `路径里的 Windows 用户名已换成 ${PLACEHOLDER}。壁纸、音乐的文件名没有去掉，介意的话可以先删掉再发。`,
         ...section('基本信息', appLines(info.app)),

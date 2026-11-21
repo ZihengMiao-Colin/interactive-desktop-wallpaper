@@ -14,8 +14,8 @@ function installDirWith(files) {
 }
 
 test('安装目录里有 "Uninstall <产品名>.exe" 时找到它', () => {
-    const dir = installDirWith(['互动3D壁纸.exe', 'Uninstall 互动3D壁纸.exe', 'ffmpeg.dll']);
-    assert.equal(findUninstaller(dir), path.join(dir, 'Uninstall 互动3D壁纸.exe'));
+    const dir = installDirWith(['Kirie.exe', 'Uninstall Kirie 壁纸.exe', 'ffmpeg.dll']);
+    assert.equal(findUninstaller(dir), path.join(dir, 'Uninstall Kirie 壁纸.exe'));
 });
 
 test('没有卸载程序时返回 null', () => {

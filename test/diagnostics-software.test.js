@@ -31,7 +31,7 @@ test('名单里没有、但名字带 wallpaper 的程序当成其他壁纸软件
 });
 
 test('普通进程一个都不列', () => {
-    assert.deepEqual(matchKnownSoftware(['explorer.exe', 'chrome.exe', 'svchost.exe', '互动3D壁纸.exe', 'electron.exe']), []);
+    assert.deepEqual(matchKnownSoftware(['explorer.exe', 'chrome.exe', 'svchost.exe', 'Kirie.exe', 'electron.exe']), []);
 });
 
 test('安全软件排在前面', () => {

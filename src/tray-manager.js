@@ -35,7 +35,7 @@ function createTray(callbacks) {
     const trayIcon = loadTrayIcon(path.join(__dirname, '..', 'assets', 'icon.ico'));
 
     const tray = new Tray(trayIcon);
-    tray.setToolTip('互动3D壁纸');
+    tray.setToolTip('Kirie 壁纸');
 
     // 左键单击打开设置
     tray.on('click', () => {
@@ -105,8 +105,8 @@ function updateTrayMenu(tray, callbacks) {
                 const { dialog } = require('electron');
                 dialog.showMessageBox({
                     type: 'info',
-                    title: '关于 互动3D壁纸',
-                    message: `互动3D壁纸 v${app.getVersion()}`,
+                    title: '关于 Kirie 壁纸',
+                    message: `Kirie 壁纸 v${app.getVersion()}`,
                     detail: '基于 Pixi.js + Electron 的伪3D深度视差桌面壁纸。\n使用 Depth Anything V2 生成深度图。',
                 });
             },

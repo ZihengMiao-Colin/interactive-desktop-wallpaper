@@ -90,7 +90,7 @@ test('migrateLegacyImagePath：用户自己 wallpapers 文件夹里的同名图�
 
 test('migrateLegacyImagePath：已移除的默认壁纸文件不在了，换成图库第一张', () => {
     const current = loadGallery(galleryDir([cat, lake]));
-    const removed = 'C:\\Program Files\\互动3D壁纸\\resources\\wallpapers\\lake-forest.jpg';
+    const removed = 'C:\\Program Files\\Kirie 壁纸\\resources\\wallpapers\\lake-forest.jpg';
     assert.equal(migrateLegacyImagePath(removed, current, () => false), current[0].file);
     // 大小写不同也认
     assert.equal(migrateLegacyImagePath(removed.replace('lake-forest', 'Lake-Forest'), current, () => false), current[0].file);
