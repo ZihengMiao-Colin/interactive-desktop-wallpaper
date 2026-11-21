@@ -863,6 +863,7 @@ Phases 21–25 packaged as **v1.5.0** (2026-11-20). Since v1.4.0 there are new f
   - Element panel (Phase 21): import an image → click confirm in the placement window → select it on the Elements page, which shows the "位置 / 颜色" (Position / Color) tabs (image elements only have those two); clicking the real "添加素材" (Add asset) button makes the thumbnail.
   - Diagnostic report: file name `Kirie-诊断报告-<time>.txt`, first line `Kirie 壁纸 诊断报告`, "软件版本：1.5.0（安装版）", "桌面层：已挂上" (attached), UTF-8 with BOM, CRLF, no user name found; GitHub URL 1671 characters. No horizontal scrolling in the default window. 0 errors / warnings in the log.
 - Not tested: a real install (the names in the Start menu, desktop shortcut and system Apps list are still not seen directly); real clicks in the tray menu; the light theme; the record player with sound.
+- Published (2026-11-20, the user confirmed going public): https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/tag/v1.5.0 , titled "Kirie 壁纸 v1.5.0" (earlier releases are titled "互动3D壁纸 v1.x" and were left as they are); tag `v1.5.0` points to `fab70af` and is Latest. The asset's size and SHA-256 match the ones above; the page and the download work without signing in, and `releases/latest` goes to v1.5.0.
 
 ### ✅ Phase 5 — Wrap-up (2026-11-10)
 - [x] Deleted `生成深度图.bat` (the "generate depth map" batch file): the app generates depth maps itself, and the bat still offered base / large models that have long been gone.
