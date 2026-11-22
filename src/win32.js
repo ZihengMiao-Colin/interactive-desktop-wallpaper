@@ -48,6 +48,12 @@ const RDW_ALLCHILDREN = 0x0080;
 const RDW_UPDATENOW = 0x0100;
 const RDW_FRAME = 0x0400;
 
+// DWM 窗口属性（Windows 11 22000 起才有，Windows 10 上设置会返回错误、不起作用）
+const DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+const DWMWCP_DONOTROUND = 1;
+const DWMWA_BORDER_COLOR = 34;
+const DWMWA_COLOR_NONE = 0xFFFFFFFE;
+
 /** 在工作线程上调用，返回 Promise */
 function runAsync(func, ...args) {
     return new Promise((resolve, reject) => {
@@ -104,6 +110,9 @@ function load() {
     const InvalidateRect = user32.func('int __stdcall InvalidateRect(uintptr_t hwnd, void *rect, int erase)');
     const UpdateWindow = user32.func('int __stdcall UpdateWindow(uintptr_t hwnd)');
     const RedrawWindow = user32.func('int __stdcall RedrawWindow(uintptr_t hwnd, void *rect, void *region, uint32_t flags)');
+
+    const dwmapi = koffi.load('dwmapi.dll');
+    const DwmSetWindowAttribute = dwmapi.func('int32_t __stdcall DwmSetWindowAttribute(uintptr_t hwnd, uint32_t attr, _In_ uint32_t *value, uint32_t size)');
 
     return {
         // ---- 只读，同步 ----
@@ -173,6 +182,19 @@ function load() {
             } finally {
                 CloseHandle(snapshot);
             }
+        },
+
+        // ---- 本进程自己的窗口，同步 ----
+
+        /**
+         * 去掉 Windows 11 默认给顶层窗口加的圆角和 1 像素描边，铺满屏幕的窗口靠它盖住四个角和边缘。
+         * Windows 10 没有这两个属性，本来也没有圆角，返回 false 就行。
+         * @returns {boolean} 两个属性都设上了
+         */
+        setSquareCorners(hwnd) {
+            const corner = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, [DWMWCP_DONOTROUND], 4);
+            const border = DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, [DWMWA_COLOR_NONE], 4);
+            return corner === 0 && border === 0;
         },
 
         // ---- 会发消息，工作线程 ----

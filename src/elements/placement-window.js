@@ -8,17 +8,30 @@
  *
  * 所以建好后要再 setBounds 一次（setBounds 不受工作区限制）。
  * 要在加载页面之前调，这样页面第一次排版就是全屏大小。
+ *
+ * Windows 11 还会给无边框窗口加圆角和 1 像素灰色描边，四个角和一圈边缘会露出下面的窗口，
+ * 要用 DWM 属性关掉（squareCorners，和解锁动画窗口共用）。
  */
 
 /**
  * @param {typeof import('electron').BrowserWindow} BrowserWindow
  * @param {{x: number, y: number, width: number, height: number}} bounds - 显示器的 bounds
  * @param {object} options - 其余窗口选项
+ * @param {object} [native]
+ * @param {(win: import('electron').BrowserWindow) => void} [native.squareCorners] - 去掉系统加的圆角和描边
  * @returns {import('electron').BrowserWindow}
  */
-function createFullScreenWindow(BrowserWindow, bounds, options) {
+function createFullScreenWindow(BrowserWindow, bounds, options, { squareCorners } = {}) {
     const win = new BrowserWindow({ ...options, ...bounds });
     win.setBounds(bounds);
+    // 去不掉只是边角漏一点，不能因此建不了窗口
+    if (squareCorners) {
+        try {
+            squareCorners(win);
+        } catch (err) {
+            console.warn('[Placement] 去掉窗口圆角失败:', err.message);
+        }
+    }
     return win;
 }
 

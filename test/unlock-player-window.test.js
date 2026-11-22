@@ -22,8 +22,8 @@ class FakeBrowserWindow {
     showInactive(...args) { this.calls.push(['showInactive', ...args]); }
 }
 
-function make(overrides) {
-    return createPlayerWindow({ BrowserWindow: FakeBrowserWindow, screen: fakeScreen }, { ...PLAYBACK, ...overrides });
+function make(overrides, squareCorners = (win) => win.calls.push(['squareCorners'])) {
+    return createPlayerWindow({ BrowserWindow: FakeBrowserWindow, screen: fakeScreen, squareCorners }, { ...PLAYBACK, ...overrides });
 }
 
 test('窗口选项和 spec 一致', () => {
@@ -38,21 +38,31 @@ test('窗口选项和 spec 一致', () => {
     assert.equal(path.basename(path.dirname(o.webPreferences.preload)), 'unlock-animation');
 });
 
-test('建好后先 setBounds 铺满，再置顶、加载、不抢焦点地显示', () => {
+/** loadFile 的参数：[页面路径, 选项] */
+const loadArgs = (win) => win.calls.find((c) => c[0] === 'loadFile').slice(1);
+
+test('建好后先 setBounds 铺满、去掉圆角，再置顶、加载、不抢焦点地显示', () => {
     const win = make();
-    assert.deepEqual(win.calls.map((c) => c[0]), ['setBounds', 'setAlwaysOnTop', 'loadFile', 'showInactive']);
+    assert.deepEqual(win.calls.map((c) => c[0]), ['setBounds', 'squareCorners', 'setAlwaysOnTop', 'loadFile', 'showInactive']);
     assert.deepEqual(win.calls[0][1], SCREEN);
-    assert.deepEqual(win.calls[1].slice(1), [true, 'screen-saver']);
+    assert.deepEqual(win.calls[2].slice(1), [true, 'screen-saver']);
+});
+
+test('去圆角出错时照样建窗口、显示：只是边角漏一点，不能因此不放动画', (t) => {
+    t.mock.method(console, 'warn', () => {});
+    const win = make({}, () => { throw new Error('koffi 加载失败'); });
+    assert.deepEqual(win.calls.map((c) => c[0]), ['setBounds', 'setAlwaysOnTop', 'loadFile', 'showInactive']);
+    assert.equal(console.warn.mock.callCount(), 1);
 });
 
 test('加载的是播放页面', () => {
-    const page = make().calls[2][1];
+    const [page] = loadArgs(make());
     assert.equal(path.basename(page), 'unlock-player.html');
     assert.ok(fs.existsSync(page));
 });
 
 test('query 带上视频地址、淡入淡出和声音', () => {
-    const { query } = make({ sound: true, fadeInMs: 250 }).calls[2][2];
+    const { query } = loadArgs(make({ sound: true, fadeInMs: 250 }))[1];
     assert.equal(query.fadeInMs, '250');
     assert.equal(query.fadeOutMs, '700');
     assert.equal(query.sound, '1');
@@ -60,7 +70,7 @@ test('query 带上视频地址、淡入淡出和声音', () => {
 });
 
 test('静音时 sound 是 0', () => {
-    assert.equal(make().calls[2][2].query.sound, '0');
+    assert.equal(loadArgs(make())[1].query.sound, '0');
 });
 
 test('refitPlayerWindow 按当前主显示器设大小', () => {
@@ -78,6 +88,6 @@ test('refitPlayerWindow 把窗口压回最上面：任务栏是前台窗口时�
 
 test('有裁剪时 query 带上，没有时没有这个键', () => {
     const crop = { x: 0.125, y: 0.25, w: 0.5, h: 0.5 };
-    assert.equal(make({ crop }).calls[2][2].query.crop, '0.125,0.25,0.5,0.5');
-    assert.equal('crop' in make().calls[2][2].query, false);
+    assert.equal(loadArgs(make({ crop }))[1].query.crop, '0.125,0.25,0.5,0.5');
+    assert.equal('crop' in loadArgs(make())[1].query, false);
 });

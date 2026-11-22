@@ -68,7 +68,7 @@ log.errorHandler.startCatching({
 });
 
 // ---- 自定义模块 ----
-const { injectToWallpaperLayer, showBehindOtherWindows, describeWallpaperWindow } = require('./src/wallpaper-native');
+const { injectToWallpaperLayer, showBehindOtherWindows, describeWallpaperWindow, toHwndNumber } = require('./src/wallpaper-native');
 const { createDiagnostics } = require('./src/diagnostics');
 const { collectDiagnostics, windowsName } = require('./src/diagnostics/collect');
 const { createTray, updateTrayMenu } = require('./src/tray-manager');
@@ -474,6 +474,14 @@ function forwardDesktopClick() {
     wallpaperWindow.webContents.send('desktop:click', { x: point.x - x, y: point.y - y });
 }
 
+/**
+ * 去掉 Windows 11 给无边框窗口加的圆角和 1 像素描边。铺满屏幕的置顶窗口（摆放、解锁动画）要用，
+ * 否则四个角和一圈边缘会露出下面的东西。壁纸窗口用了 thickFrame: false，本来就没有圆角。
+ */
+function squareWindowCorners(win) {
+    getWin32().setSquareCorners(toHwndNumber(win.getNativeWindowHandle()));
+}
+
 // ==================== 自定义元素摆放窗口 ====================
 
 /**
@@ -500,7 +508,7 @@ function createPlacementWindow() {
             webgl: true,
             webSecurity: false,
         },
-    });
+    }, { squareCorners: squareWindowCorners });
     win.setAlwaysOnTop(true, 'screen-saver');
     win.loadFile('index.html', { query: { mode: 'edit' } });
     win.once('ready-to-show', () => {
@@ -1107,7 +1115,11 @@ function createUnlockAnimation() {
             if (!preview && (isPlacing || isRemoteSession())) return null;
             return resolvePlayback(store.getConfig().unlockAnimation, store.getUnlockAnimationDir(), { preview });
         },
-        createWindow: (playback) => createPlayerWindow({ BrowserWindow, screen }, playback),
+        createWindow: (playback) => createPlayerWindow({
+            BrowserWindow,
+            screen,
+            squareCorners: squareWindowCorners,
+        }, playback),
         refitWindow: (win) => refitPlayerWindow(win, screen),
         registerSkipKey: (onSkip) => globalShortcut.register('Escape', onSkip),
         unregisterSkipKey: () => globalShortcut.unregister('Escape'),

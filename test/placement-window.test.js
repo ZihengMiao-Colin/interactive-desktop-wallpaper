@@ -36,6 +36,26 @@ test('任务栏在顶部：窗口的上边也回到屏幕顶端', () => {
     assert.deepEqual(win.getBounds(), SCREEN);
 });
 
+test('铺满后去掉 Windows 11 的圆角和描边，不然四个角露出下面的窗口', () => {
+    const calls = [];
+    const Fake = fakeBrowserWindow(WORK_AREA_BOTTOM_BAR);
+    const win = createFullScreenWindow(Fake, SCREEN, {}, {
+        squareCorners: (w) => calls.push(['squareCorners', w.getBounds()]),
+    });
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0][1], SCREEN, '先 setBounds 再去圆角');
+    assert.deepEqual(win.getBounds(), SCREEN);
+});
+
+test('去圆角出错时照样返回窗口：只是边角漏一点，不能因此摆放不了', (t) => {
+    t.mock.method(console, 'warn', () => {});
+    const win = createFullScreenWindow(fakeBrowserWindow(WORK_AREA_BOTTOM_BAR), SCREEN, {}, {
+        squareCorners: () => { throw new Error('koffi 加载失败'); },
+    });
+    assert.deepEqual(win.getBounds(), SCREEN);
+    assert.equal(console.warn.mock.callCount(), 1);
+});
+
 test('窗口选项原样传给 BrowserWindow', () => {
     const win = createFullScreenWindow(fakeBrowserWindow(WORK_AREA_BOTTOM_BAR), SCREEN, { frame: false, show: false });
     assert.equal(win.options.frame, false);
