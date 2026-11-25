@@ -20,6 +20,12 @@ The Android version is at [interactive-phone-wallpaper](https://github.com/Zihen
 - **Other decorations**: vinyl record player (a playlist of local music with list loop / repeat one / shuffle / play in order; one cover per track, using the song's own cover when it has one; a draggable progress bar; drag it anywhere), full-screen video effects (using a video you import), weather particles.
 - **Desktop integration**: injected into the WorkerW layer below the desktop icons; pauses automatically for full-screen apps, lock screen and sleep; tray menu, launch at startup.
 
+## Download and install
+
+Download the latest `Kirie-Setup-<version>.exe` from [Releases](https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/latest) and double-click it to install. Requires Windows 10 / 11, 64-bit.
+
+The installer is not code-signed, so Windows may show "Windows protected your PC"; click "More info" → "Run anyway". With 360 or other security software installed, the wallpaper may fail to attach to the desktop. For step-by-step fixes, see the [installation notes (PDF, in Chinese)](docs/install/Kirie-Install-Guide.pdf).
+
 ## Running
 
 Requires Windows, Node.js, and the Depth Anything V2 Small ONNX model in the project root (`depth_anything_v2_small*.onnx`, not in the repo; export it with `export_onnx.py`; if there are several, the largest one is used). Depth maps are generated with `onnxruntime-node`, so the app itself does not need Python.

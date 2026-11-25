@@ -20,6 +20,12 @@ Kirie（日语"切り絵"，剪纸画）是 Windows 桌面上的伪 3D 视差动
 - **其他装饰**：黑胶唱片机（本地音乐歌单，可列表循环 / 单曲循环 / 随机 / 顺序播放；每首歌一张封面，优先用歌曲自带的；能拖进度条；位置可以随意拖）、全屏视频特效（用自己导入的视频）、天气粒子。
 - **桌面集成**：注入到桌面图标下方的 WorkerW 层；全屏应用、锁屏、睡眠时自动暂停；托盘菜单、开机自启。
 
+## 下载安装
+
+在 [Releases](https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases/latest) 页面下载最新的 `Kirie-Setup-<版本>.exe`，双击安装。支持 Windows 10 / 11 64 位。
+
+安装包没有代码签名，Windows 可能提示"Windows 已保护你的电脑"，点"更多信息"→"仍要运行"即可。装了 360 等安全软件时壁纸可能挂不到桌面上。详细的处理步骤见 [安装注意事项（PDF）](docs/install/Kirie-Install-Guide.pdf)。
+
 ## 运行
 
 需要 Windows、Node.js，以及放在项目根目录的 Depth Anything V2 Small ONNX 模型（`depth_anything_v2_small*.onnx`，不进仓库，可以用 `export_onnx.py` 导出；有多个时用最大的那个）。深度图由 `onnxruntime-node` 生成，应用本身不需要 Python。
