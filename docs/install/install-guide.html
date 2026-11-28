@@ -12,7 +12,7 @@
     font-weight: 100 900;
     font-stretch: 50% 125%;
   }
-  @page { size: A4; margin: 16mm 16mm 18mm; }
+  @page { size: A4; margin: 13mm 15mm 13mm; }
   :root {
     --ink: #141416;
     --sub: #55585e;
@@ -28,7 +28,7 @@
   body {
     font-family: 'Microsoft YaHei', 'Source Han Sans SC', sans-serif;
     font-size: 10.2pt;
-    line-height: 1.7;
+    line-height: 1.62;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -127,6 +127,8 @@
     border-left: 3px solid var(--cyan); word-break: break-all;
   }
   .page-break { break-before: page; }
+  a.url { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 8.4pt; color: var(--accent); text-decoration: none; white-space: nowrap; }
+  table.dl td { vertical-align: middle; }
   footer.end {
     margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--line);
     font-size: 8.5pt; color: var(--sub);
@@ -155,7 +157,7 @@
     <li>安装包没有代码签名，Windows 会提示"Windows 已保护你的电脑"：点 <span class="ui">更多信息</span> → <span class="ui">仍要运行</span>。</li>
     <li>浏览器可能说这个文件"不常被下载"：选 <span class="ui">保留</span>。</li>
     <li>装了 360 等安全软件时，壁纸可能挂不到桌面上（会盖住桌面图标）：把 Kirie 加入信任区，或者退出安全软件后重新打开 Kirie。</li>
-    <li>只从官方发布页下载，有疑问时可以核对安装包的 SHA-256（见第 1 节）。</li>
+    <li>只从官方地址下载（GitHub 发布页或官方网盘，见第 1 节），有疑问时可以核对安装包的 SHA-256。</li>
   </ol>
 </section>
 
@@ -170,7 +172,14 @@
 </ul>
 
 <h3>只从官方地址下载</h3>
-<p>官方发布页：<span class="path">https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases</span>。在 Assets 里下载 <code>Kirie-Setup-1.5.0.exe</code>。别的网站转载的安装包可能被改过，下面这些操作只对官方安装包做。</p>
+<p>下面三个地址放的是同一个安装包 <code>Kirie-Setup-1.5.0.exe</code>，任选一个：</p>
+<table class="dl">
+  <tr><th style="width:26%">地址</th><th>链接</th></tr>
+  <tr><td><b>GitHub 发布页</b><br><span class="sub">在 Assets 里下载。国内网络可能打不开或很慢</span></td><td><a class="url" href="https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases">https://github.com/ZihengMiao-Colin/interactive-desktop-wallpaper/releases</a></td></tr>
+  <tr><td><b>123 云盘</b><br><span class="sub">不用登录就能下载</span></td><td><a class="url" href="https://4007773044.share.123pan.cn/123pan/Utm4wh-eMteA">https://4007773044.share.123pan.cn/123pan/Utm4wh-eMteA</a></td></tr>
+  <tr><td><b>夸克网盘</b><br><span class="sub">要登录夸克账号</span></td><td><a class="url" href="https://pan.quark.cn/s/756b9310bd34">https://pan.quark.cn/s/756b9310bd34</a></td></tr>
+</table>
+<p>别的网站或别人转发的安装包可能被改过，下面这些操作只对从这三个地址下载的安装包做。从网盘下载的，建议按本节最后的方法核对一下 SHA-256。</p>
 
 <h3>浏览器的下载提示</h3>
 <p>Edge、Chrome 可能提示这个文件"通常不会被下载"或"不常被下载"，并把它挡在下载列表里：</p>
@@ -228,7 +237,7 @@
 <h3>2.4 Microsoft Defender 报毒</h3>
 <p>正常情况下 Defender 不会拦 Kirie。如果 Windows 安全中心说发现了威胁并隔离了 Kirie 的文件：</p>
 <ol class="steps">
-  <li>先确认安装包是从官方发布页下载的，最好按第 1 节核对一下 SHA-256。</li>
+  <li>先确认安装包是从官方地址下载的，最好按第 1 节核对一下 SHA-256。</li>
   <li>打开 <span class="ui">Windows 安全中心</span> → <span class="ui">病毒和威胁防护</span> → <span class="ui">保护历史记录</span>，找到这条记录，点 <span class="ui">操作</span> → <span class="ui">允许</span>（或"还原"）。</li>
   <li>重新安装一遍，确保文件完整。</li>
 </ol>
